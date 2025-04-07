@@ -1,16 +1,136 @@
-# whitebox
+# Wi-Fi 5G IOT APP 框架
 
-A new Flutter project.
+一個為物聯網、Wi-Fi和5G設備管理設計的模組化Flutter應用框架。此框架提供統一的方法來建立可控制和監控各種類型智能設備的移動應用程式。
 
-## Getting Started
+## 概述
 
-This project is a starting point for a Flutter application.
+此框架設計以模組化為核心，讓開發者能夠創建適用於不同產品線的應用程式，包括Wi-Fi設備、5G設備和IoT系統。架構遵循基於元件的方法，提供可在不同產品實現中共享的可重用模組。
 
-A few resources to get you started if this is your first Flutter project:
+### 主要特點
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- **多產品支援**：支援Wi-Fi、5G和IoT產品線
+- **模組化UI元件**：跨不同設備類型的可重用UI元素
+- **一致的API整合**：統一的設備、雲端和第三方API連接方法
+- **標準化的初始化和運行時流程**：設備設置和管理的通用模式
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 專案結構
+
+框架組織為層次結構：
+
+```
+Wi-Fi 5G IOT APP 系統
+├── 產品線
+│   ├── Wi-Fi
+│   │   ├── 產品一型號A：標準路由器
+│   │   └── 產品一型號B：高性能路由器
+│   ├── 5G
+│   │   └── 產品二型號A：5G網關
+│   └── IoT
+│       └── 產品三型號A：智能家居控制器
+└── 可共享/抽換模組池
+    ├── 流程層
+    │   ├── 初始化流程
+    │   └── 運行時流程
+    ├── UI頁面
+    │   ├── 產品選擇頁
+    │   ├── 初始化嚮導頁
+    │   ├── 首頁/儀表板
+    │   └── 設定頁
+    ├── UI元件
+    │   ├── 基礎元件
+    │   ├── 表單元件
+    │   ├── 圖表元件
+    │   └── 自定義元件
+    └── API接口
+        ├── 設備API
+        ├── 雲端API
+        └── 第三方API
+```
+
+## 開始使用
+
+### 前置需求
+
+- Flutter SDK (版本 3.7.2 或更高)
+- Dart SDK (與Flutter版本兼容)
+- Android Studio 或 Visual Studio Code 並安裝Flutter插件
+
+### 安裝
+
+1. 複製專案庫：
+   ```bash
+   git clone https://github.com/yourusername/wifi-5g-iot-app.git
+   ```
+
+2. 進入專案目錄：
+   ```bash
+   cd wifi-5g-iot-app
+   ```
+
+3. 安裝依賴：
+   ```bash
+   flutter pub get
+   ```
+
+4. 運行應用：
+   ```bash
+   flutter run
+   ```
+
+## 開發指南
+
+### 添加新的設備類型
+
+1. 在適當的產品線目錄中建立新的模型文件
+2. 實現所需的初始化和運行時流程
+3. 根據需要自定義UI元素
+4. 在產品選擇頁面中註冊新設備類型
+
+### 擴展API接口
+
+框架支援三種類型的API接口：
+- **設備API**：用於直接與物理設備通信
+- **雲端API**：用於伺服器端操作和遠程控制
+- **第三方API**：用於與外部服務集成
+
+## 流程類型
+
+### 初始化流程
+
+初始化流程處理設備設置過程，包括：
+- Wi-Fi連接
+- QR碼掃描
+- 帳戶設置
+- 連線類型設定
+- SSID設置
+- SIM設置（對於5G設備）
+- 設備發現（對於IoT設備）
+
+### 運行時流程
+
+運行時流程管理設備的正常操作，提供：
+- 首頁儀表板
+- 設備狀態監控
+- 設置配置
+- 高級功能（對於支援的設備）
+- 自動化控制（對於IoT設備）
+
+## UI元件
+
+框架提供各種可在不同設備類型間重用的UI元件：
+- 基本UI元素
+- 表單輸入字段
+- 用於數據視覺化的圖表和圖形
+- 專為特定設備需求設計的自定義元件
+
+## 許可證
+
+本專案採用Apache許可證2.0版 - 詳見LICENSE文件。
+
+## 貢獻
+
+1. Fork 此專案
+2. 創建您的功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交您的更改 (`git commit -m '添加一些驚人的功能'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 開啟Pull Request
