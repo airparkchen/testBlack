@@ -1,0 +1,703 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36" version="26.2.8">
+  <diagram id="kgpKYQtTHZ0yAKxKKP6v" name="Page-1">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="N-2HM272d_Kksu7roasR-109" value="" style="group" connectable="0" vertex="1" parent="1">
+          <mxGeometry x="-1090" y="205" width="830" height="690" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-172" value="產品線層級" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-173" value="型號層級" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry y="130" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-174" value="流程層級" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry y="260" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-175" value="頁面/步驟層級" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry y="390" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-176" value="UI元件層級" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry y="520" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-177" value="API層級" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry y="650" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-178" value="Wi-Fi產品線" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="160" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-181" value="標準路由器 (model_a)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="140" y="130" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-185" value="初始化流程 (initialization)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="130" y="260" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-186" value="常規使用流程 (normal)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="470" y="260" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-187" value="連接Wi-Fi (wifi_connect)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="140" y="390" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-188" value="掃描QR碼 (qr_scan)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="320" y="390" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-189" value="首頁 (home)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="500" y="390" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-190" value="儀表板 (dashboard)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="640" y="390" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-191" value="Wi-Fi列表 (wifi_list)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="150" y="520" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-192" value="密碼設定框" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="310" y="520" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-193" value="拓樸畫面" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="490" y="520" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-194" value="列表" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="680" y="520" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-195" value="/api/wifi/scan (GET)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="150" y="650" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-196" value="/api/wifi/connect (POST)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="310" y="650" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-197" value="/api/device/status (GET)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="480" y="650" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-198" value="/api/stats/traffic (GET)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-109">
+          <mxGeometry x="670" y="650" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-199" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-178" target="LvDD5-w-dfbo22jAhSco-181">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="220" y="70" />
+              <mxPoint x="220" y="70" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-203" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-181" target="LvDD5-w-dfbo22jAhSco-185">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-204" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-181" target="LvDD5-w-dfbo22jAhSco-186">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="220" y="210" />
+              <mxPoint x="560" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-205" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-185" target="LvDD5-w-dfbo22jAhSco-187">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="220" y="330" />
+              <mxPoint x="220" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-206" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-185" target="LvDD5-w-dfbo22jAhSco-188">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="220" y="340" />
+              <mxPoint x="400" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-207" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-186" target="LvDD5-w-dfbo22jAhSco-189">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="560" y="330" />
+              <mxPoint x="560" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-208" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-186" target="LvDD5-w-dfbo22jAhSco-190">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="560" y="340" />
+              <mxPoint x="700" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-209" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-187" target="LvDD5-w-dfbo22jAhSco-191">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-210" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-187" target="LvDD5-w-dfbo22jAhSco-192">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="220" y="480" />
+              <mxPoint x="390" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-211" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-189" target="LvDD5-w-dfbo22jAhSco-193">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-212" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-190" target="LvDD5-w-dfbo22jAhSco-194">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="410" as="sourcePoint" />
+            <mxPoint x="510" y="360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="700" y="480" />
+              <mxPoint x="750" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-213" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-191" target="LvDD5-w-dfbo22jAhSco-195">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="410" as="sourcePoint" />
+            <mxPoint x="520" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-214" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-192" target="LvDD5-w-dfbo22jAhSco-196">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="410" as="sourcePoint" />
+            <mxPoint x="520" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-215" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-193" target="LvDD5-w-dfbo22jAhSco-197">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="410" as="sourcePoint" />
+            <mxPoint x="520" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-216" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;rounded=0;fillColor=#f5f5f5;strokeColor=#666666;" edge="1" parent="N-2HM272d_Kksu7roasR-109" source="LvDD5-w-dfbo22jAhSco-194" target="LvDD5-w-dfbo22jAhSco-198">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="410" as="sourcePoint" />
+            <mxPoint x="520" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-110" value="" style="group" connectable="0" vertex="1" parent="1">
+          <mxGeometry x="-2250" y="158" width="1020" height="785" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-62" value="Wi-Fi 5G IOT APP 系統" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9d5e5;strokeColor=#333333;fontStyle=1;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="400" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-63" value="Wifi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9d5e5;strokeColor=#333333;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="160" y="100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-64" value="5G" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9d5e5;strokeColor=#333333;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="450" y="100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-65" value="IOT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9d5e5;strokeColor=#333333;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="740" y="100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-66" value="型號A" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="100" y="200" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-67" value="型號B" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="240" y="200" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-68" value="型號A" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="390" y="200" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-69" value="型號B" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="530" y="200" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-70" value="型號A" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="680" y="200" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-71" value="型號B" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="820" y="200" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-72" value="初始化流程" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="250" y="350" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-73" value="運行時流程" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="596" y="347.5" width="140" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-84" value="可共享/抽換模組池" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#f5f5f5;strokeColor=#333333;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry y="255" width="1020" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-85" value="UI頁面" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#dae8fc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="20" y="420" width="980" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-86" value="產品選擇頁" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="83" y="468" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-87" value="初始化嚮導頁" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="313" y="468" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-88" value="首頁/儀表板" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="543" y="468" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-89" value="設定頁" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="773" y="468" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-90" value="UI元件" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#e1d5e7;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="20" y="540" width="980" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-91" value="基礎元件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="83" y="588" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-92" value="表單元件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="313" y="588" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-93" value="圖表元件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="543" y="588" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-94" value="自定義元件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="773" y="588" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-95" value="API接口" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#f8cecc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="20" y="662" width="980" height="99" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-96" value="設備API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="151" y="708" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-97" value="雲端API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="431" y="708" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-98" value="第三方API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="711" y="708" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-99" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-62" target="LvDD5-w-dfbo22jAhSco-63">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="510" y="80" />
+              <mxPoint x="220" y="80" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-100" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-62" target="LvDD5-w-dfbo22jAhSco-64">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-101" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-62" target="LvDD5-w-dfbo22jAhSco-65">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="510" y="80" />
+              <mxPoint x="800" y="80" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-102" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-63" target="LvDD5-w-dfbo22jAhSco-66">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="180" />
+              <mxPoint x="150" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-103" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-63" target="LvDD5-w-dfbo22jAhSco-67">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="180" />
+              <mxPoint x="290" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-104" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-64" target="LvDD5-w-dfbo22jAhSco-68">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="510" y="180" />
+              <mxPoint x="440" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-105" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-64" target="LvDD5-w-dfbo22jAhSco-69">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="510" y="180" />
+              <mxPoint x="580" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-106" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-65" target="LvDD5-w-dfbo22jAhSco-70">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="800" y="180" />
+              <mxPoint x="730" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-107" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#333333;" edge="1" parent="N-2HM272d_Kksu7roasR-110" source="LvDD5-w-dfbo22jAhSco-65" target="LvDD5-w-dfbo22jAhSco-71">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="800" y="180" />
+              <mxPoint x="870" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-113" value="流程層" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=light-dark(#D5E8D4,#1F2F1E);strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-110">
+          <mxGeometry x="20" y="300" width="980" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-111" value="" style="group" connectable="0" vertex="1" parent="1">
+          <mxGeometry x="-2425" y="1170" width="600" height="920" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-112" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-111" source="LvDD5-w-dfbo22jAhSco-20">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="440" y="60" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-20" value="設備層 (Device Layer)" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#ffcccc;strokeColor=#333333;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry width="600" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-21" value="產品線一 (Product 1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="40" y="50" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-22" value="產品線二 (Product 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="240" y="50" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-23" value="產品線三 (Product 3)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="440" y="50" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-24" value="型號層 (Model Layer)" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#ccffcc;strokeColor=#333333;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry y="160" width="600" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-25" value="型號A (Model A)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="40" y="210" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-26" value="型號B (Model B)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="240" y="210" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-27" value="型號C (Model C)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="440" y="210" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-28" value="流程層 (Process Layer)" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#ccccff;strokeColor=#333333;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry y="320" width="600" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-29" value="初始化流程 (Initialization)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="40" y="370" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-30" value="運行時流程 (Runtime)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="240" y="370" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-31" value="設定流程 (Settings)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="440" y="370" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-32" value="UI頁面層 (UI Page Layer)" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#ffffcc;strokeColor=#333333;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry y="480" width="600" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-33" value="產品選擇頁 (Product Select)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="40" y="530" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-34" value="首頁 (Home)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="240" y="530" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-35" value="設定頁 (Settings)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="440" y="530" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-36" value="UI元件層 (UI Component Layer)" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#ffccff;strokeColor=#333333;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry y="640" width="600" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-37" value="基礎元件 (Basic)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="40" y="690" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-38" value="表單元件 (Form)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="240" y="690" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-39" value="自定義元件 (Custom)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="440" y="690" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-40" value="API層 (API Layer)" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#ccffff;strokeColor=#333333;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry y="800" width="600" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-41" value="設備API (Device API)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d0cee2;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="40" y="850" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-42" value="雲端API (Cloud API)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d0cee2;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="240" y="850" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-43" value="第三方API (3rd Party)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d0cee2;strokeColor=#333333;" vertex="1" parent="N-2HM272d_Kksu7roasR-111">
+          <mxGeometry x="440" y="850" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-113" value="" style="group" connectable="0" vertex="1" parent="1">
+          <mxGeometry x="-825" y="1195" width="800" height="910" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-122" value="AppStorage&#xa;(應用存儲)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry x="280" width="240" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-123" value="+ getDeviceList() : 獲取設備列表&#xa;+ addDevice(deviceInfo) : 添加設備&#xa;+ updateDevice(deviceId, deviceInfo) : 更新設備&#xa;+ removeDevice(deviceId) : 移除設備&#xa;+ getLastUsedDevice() : 獲取最後使用的設備&#xa;+ setLastUsedDevice(deviceId) : 設置最後使用的設備" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-122">
+          <mxGeometry y="40" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-124" value="DeviceRegistry&#xa;(設備註冊表)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry x="280" y="200" width="240" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-125" value="+ devices : List&lt;DeviceInfo&gt; 設備列表&#xa;+ lastUsedDevice : DeviceInfo 最後使用的設備" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-124">
+          <mxGeometry y="40" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-126" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-124">
+          <mxGeometry y="90" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-127" value="+ getDeviceById(deviceId) : 按ID獲取設備&#xa;+ findDevicesByProductLine(productLine) : 按產品線查找&#xa;+ findDevicesByModel(modelType) : 按型號查找" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-124">
+          <mxGeometry y="98" width="240" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-128" value="DeviceInfo&#xa;(設備信息)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry y="200" width="240" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-129" value="+ deviceId : String 設備ID&#xa;+ deviceName : String 設備名稱&#xa;+ productLine : String 產品線&#xa;+ modelType : String 型號類型&#xa;+ basicSettings : Object 基本設定&#xa;+ lastModified : Date 最後修改時間" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-128">
+          <mxGeometry y="40" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-130" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-128">
+          <mxGeometry y="140" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-131" value="+ loadDeviceSettings() : 載入設備設定&#xa;+ saveDeviceSettings() : 保存設備設定" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-128">
+          <mxGeometry y="148" width="240" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-132" value="DeviceSettings&#xa;(設備設定)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry y="420" width="240" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-133" value="+ settingsMap : Map&lt;String, Object&gt; 設定映射" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-132">
+          <mxGeometry y="40" width="240" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-134" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-132">
+          <mxGeometry y="70" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-135" value="+ getSettingValue(key) : 獲取設定值&#xa;+ setSettingValue(key, value) : 設置設定值&#xa;+ getProductSpecificSettings() : 獲取產品特定設定&#xa;+ getFlowSpecificSettings(flowType) : 獲取流程設定&#xa;+ applyDefaultSettings() : 應用預設設定&#xa;+ export() : 導出設定&#xa;+ import(data) : 導入設定" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-132">
+          <mxGeometry y="78" width="240" height="102" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-136" value="ProductLineSettings&#xa;(產品線設定)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry x="280" y="420" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-137" value="+ productLineId : String 產品線ID&#xa;+ modelSettings : Map&lt;String, ModelSettings&gt; 型號設定" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-136">
+          <mxGeometry y="40" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-138" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-136">
+          <mxGeometry y="80" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-139" value="+ getModelSettings(modelType) : 獲取型號設定&#xa;+ getDefaultModelSettings() : 獲取預設型號設定" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-136">
+          <mxGeometry y="88" width="240" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-140" value="ModelSettings&#xa;(型號設定)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry x="280" y="580" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-141" value="+ modelId : String 型號ID&#xa;+ flowSettings : Map&lt;String, FlowSettings&gt; 流程設定" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-140">
+          <mxGeometry y="40" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-142" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-140">
+          <mxGeometry y="80" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-143" value="+ getFlowSettings(flowType) : 獲取流程設定&#xa;+ getDefaultFlowSettings() : 獲取預設流程設定" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-140">
+          <mxGeometry y="88" width="240" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-144" value="FlowSettings&#xa;(流程設定)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry x="560" y="580" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-145" value="+ flowId : String 流程ID&#xa;+ pageSettings : Map&lt;String, PageSettings&gt; 頁面設定" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-144">
+          <mxGeometry y="40" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-146" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-144">
+          <mxGeometry y="80" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-147" value="+ getPageSettings(pageId) : 獲取頁面設定&#xa;+ getDefaultPageSettings() : 獲取預設頁面設定" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-144">
+          <mxGeometry y="88" width="240" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-148" value="PageSettings&#xa;(頁面設定)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry x="560" y="740" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-149" value="+ pageId : String 頁面ID&#xa;+ componentSettings : List&lt;ComponentSetting&gt; 元件設定&#xa;+ apiEndpoints : List&lt;String&gt; API端點" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-148">
+          <mxGeometry y="40" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-150" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-148">
+          <mxGeometry y="90" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-151" value="+ getComponentSettings() : 獲取元件設定&#xa;+ getAPIEndpoints() : 獲取API端點" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-148">
+          <mxGeometry y="98" width="240" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-152" value="ComponentSetting&#xa;(元件設定)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry x="280" y="740" width="240" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-153" value="+ componentId : String 元件ID&#xa;+ componentType : String 元件類型&#xa;+ properties : Map&lt;String, Object&gt; 屬性&#xa;+ validationRules : List&lt;ValidationRule&gt; 驗證規則&#xa;+ isVisible : Boolean 是否可見&#xa;+ isRequired : Boolean 是否必填" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-152">
+          <mxGeometry y="40" width="240" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-154" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-152">
+          <mxGeometry y="130" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-155" value="+ getPropertyValue(key) : 獲取屬性值&#xa;+ setPropertyValue(key, value) : 設置屬性值" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-152">
+          <mxGeometry y="138" width="240" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-156" value="ValidationRule&#xa;(驗證規則)" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="N-2HM272d_Kksu7roasR-113">
+          <mxGeometry y="740" width="240" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-157" value="+ type : String 類型&#xa;+ errorMessage : String 錯誤訊息&#xa;+ params : Object 參數" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-156">
+          <mxGeometry y="40" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-158" value="" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-156">
+          <mxGeometry y="90" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-159" value="+ validate(value) : 驗證值" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="LvDD5-w-dfbo22jAhSco-156">
+          <mxGeometry y="98" width="240" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-160" value="管理" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-122" target="LvDD5-w-dfbo22jAhSco-124">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="290" y="190" as="sourcePoint" />
+            <mxPoint x="450" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-161" value="包含多個" style="endArrow=diamondThin;endFill=1;endSize=12;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-125" target="LvDD5-w-dfbo22jAhSco-129">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="290" y="340" as="sourcePoint" />
+            <mxPoint x="450" y="340" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-162" value="維護" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-128" target="LvDD5-w-dfbo22jAhSco-132">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="290" y="340" as="sourcePoint" />
+            <mxPoint x="450" y="340" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-163" value="基於" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-133" target="LvDD5-w-dfbo22jAhSco-137">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="290" y="540" as="sourcePoint" />
+            <mxPoint x="450" y="540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-164" value="包含多個" style="endArrow=diamondThin;endFill=1;endSize=12;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-136" target="LvDD5-w-dfbo22jAhSco-140">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="290" y="540" as="sourcePoint" />
+            <mxPoint x="450" y="540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-165" value="包含多個" style="endArrow=diamondThin;endFill=1;endSize=12;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-141" target="LvDD5-w-dfbo22jAhSco-145">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="460" y="640" as="sourcePoint" />
+            <mxPoint x="620" y="640" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-166" value="包含多個" style="endArrow=diamondThin;endFill=1;endSize=12;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-144" target="LvDD5-w-dfbo22jAhSco-148">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="460" y="740" as="sourcePoint" />
+            <mxPoint x="620" y="740" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-167" value="包含多個" style="endArrow=diamondThin;endFill=1;endSize=12;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-149" target="LvDD5-w-dfbo22jAhSco-153">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="460" y="740" as="sourcePoint" />
+            <mxPoint x="620" y="740" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LvDD5-w-dfbo22jAhSco-168" value="包含多個" style="endArrow=diamondThin;endFill=1;endSize=12;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="N-2HM272d_Kksu7roasR-113" source="LvDD5-w-dfbo22jAhSco-153" target="LvDD5-w-dfbo22jAhSco-157">
+          <mxGeometry width="160" relative="1" as="geometry">
+            <mxPoint x="290" y="790" as="sourcePoint" />
+            <mxPoint x="450" y="790" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-114" value="" style="group" connectable="0" vertex="1" parent="1">
+          <mxGeometry x="-1635" y="1370" width="720" height="560" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-83" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry width="720" height="560" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-84" value="手機 APP 與 WiFi 路由器通信流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="140" y="10" width="460" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-85" value="" style="verticalLabelPosition=bottom;verticalAlign=top;html=1;shadow=0;dashed=0;strokeWidth=1;shape=mxgraph.android.phone2;strokeColor=#c0c0c0;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="45" y="80" width="50" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-86" value="手機 APP" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="20" y="190" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-87" value="" style="shape=mxgraph.cisco.routers.wireless_router;html=1;pointerEvents=1;dashed=0;fillColor=#036897;strokeColor=#ffffff;strokeWidth=2;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="607" y="90" width="78" height="77" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-88" value="WiFi 路由器" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="595" y="190" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-89" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;strokeColor=#4CAF50;" edge="1" parent="N-2HM272d_Kksu7roasR-114" source="N-2HM272d_Kksu7roasR-85" target="N-2HM272d_Kksu7roasR-87">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="350" y="350" as="sourcePoint" />
+            <mxPoint x="400" y="300" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="350" y="100" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-90" value="WiFi 連接" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontColor=#4CAF50;" connectable="0" vertex="1" parent="N-2HM272d_Kksu7roasR-89">
+          <mxGeometry x="0.0968" y="-1" relative="1" as="geometry">
+            <mxPoint x="-1" y="-11" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-91" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.3;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;entryPerimeter=0;strokeColor=#2196F3;strokeWidth=2;" edge="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="120" y="140" as="sourcePoint" />
+            <mxPoint x="590" y="140" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-92" value="1. 登入請求" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontColor=#2196F3;labelBackgroundColor=#FFFFFF;" connectable="0" vertex="1" parent="N-2HM272d_Kksu7roasR-91">
+          <mxGeometry x="-0.2" y="-1" relative="1" as="geometry">
+            <mxPoint x="46" y="-11" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-93" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;strokeColor=#FF9800;strokeWidth=2;" edge="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="590" y="160" as="sourcePoint" />
+            <mxPoint x="120" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-94" value="2. 登入成功回應" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontColor=#FF9800;labelBackgroundColor=#FFFFFF;" connectable="0" vertex="1" parent="N-2HM272d_Kksu7roasR-93">
+          <mxGeometry x="0.2" y="-1" relative="1" as="geometry">
+            <mxPoint x="34" y="-9" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-95" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.7;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;entryPerimeter=0;strokeColor=#673AB7;strokeWidth=2;" edge="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="120" y="180" as="sourcePoint" />
+            <mxPoint x="590" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-96" value="3. 設定 WiFi&amp;nbsp;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontColor=#673AB7;labelBackgroundColor=#FFFFFF;" connectable="0" vertex="1" parent="N-2HM272d_Kksu7roasR-95">
+          <mxGeometry x="-0.2" y="-1" relative="1" as="geometry">
+            <mxPoint x="46" y="-11" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-97" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.9;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.9;entryDx=0;entryDy=0;entryPerimeter=0;strokeColor=#F44336;strokeWidth=2;" edge="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="590" y="200" as="sourcePoint" />
+            <mxPoint x="120" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-98" value="4. 設定成功回應" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontColor=#F44336;labelBackgroundColor=#FFFFFF;" connectable="0" vertex="1" parent="N-2HM272d_Kksu7roasR-97">
+          <mxGeometry x="0.2" y="-1" relative="1" as="geometry">
+            <mxPoint x="34" y="-9" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-99" value="登入請求 JSON:&#xa;{&#xa;  &quot;username&quot;: &quot;admin&quot;,&#xa;  &quot;password&quot;: &quot;admin123&quot;&#xa;}" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#E3F2FD;strokeColor=#2196F3;fontColor=#000000;align=left;spacingLeft=10;fontSize=12;fontFamily=Courier New;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="40" y="230" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-100" value="設定 WiFi JSON:&lt;br&gt;{&lt;br&gt;&amp;nbsp; &quot;ssid&quot;: &quot;MyNewNetwork&quot;,&lt;br&gt;&amp;nbsp; &quot;password&quot;: &quot;123456789&quot;,&lt;br&gt;&amp;nbsp; &quot;&lt;span&gt;&lt;/span&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;Security Option&lt;/span&gt;&quot;: &quot;&lt;span&gt;&lt;/span&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;WPA3 Personal&lt;/span&gt;&quot;,&lt;br&gt;&amp;nbsp; &quot;&lt;span&gt;&lt;/span&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&quot;white-space-collapse: preserve;&quot;&gt;Connection Type&lt;/span&gt;&quot;: &quot;DHCP&quot;&lt;br&gt;}" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#E8EAF6;strokeColor=#673AB7;fontColor=#000000;align=left;spacingLeft=10;fontSize=12;fontFamily=Courier New;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="40" y="340" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-101" value="設定成功回應 JSON:&lt;br&gt;{&lt;br&gt;&amp;nbsp; &quot;success&quot;: true,&lt;br&gt;&amp;nbsp; &quot;message&quot;: &quot;WiFi 設定已更新，路由器即將重啟&quot;&lt;br&gt;}" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#FFEBEE;strokeColor=#F44336;fontColor=#000000;align=left;spacingLeft=10;fontSize=12;fontFamily=Courier New;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="405" y="340" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-102" value="登入成功回應 JSON:&lt;br&gt;{&lt;br&gt;&amp;nbsp; &quot;success&quot;: true,&lt;br&gt;}" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#FFF3E0;strokeColor=#FF9800;fontColor=#000000;align=left;spacingLeft=10;fontSize=12;fontFamily=Courier New;" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="405" y="230" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-103" value="通信協議: HTTP/HTTPS, TCP, UDP, websocket" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="205" y="500" width="330" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="N-2HM272d_Kksu7roasR-104" value="數據格式: JSON" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="N-2HM272d_Kksu7roasR-114">
+          <mxGeometry x="295" y="528" width="150" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
