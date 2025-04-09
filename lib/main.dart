@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/pages/initialization/AddDevices.dart';
 import 'package:whitebox/shared/ui/pages/initialization/WifiConnectionPage.dart';
+import 'package:whitebox/shared/ui/pages/initialization/QrCodeScannerPage.dart';
 
 void main() {
   runApp(const MyApp());

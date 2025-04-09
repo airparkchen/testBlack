@@ -8,11 +8,13 @@ plugins {
 android {
     namespace = "com.example.whitebox"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // 啟用 desugaring 支援
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -37,6 +39,11 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+// 添加 desugaring 依賴項
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:1.1.5")
 }
 
 flutter {
