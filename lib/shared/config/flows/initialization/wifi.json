@@ -1,0 +1,34 @@
+{
+  "models": {
+    "A": {
+      "steps": [
+        {
+          "id": 1,
+          "name": "Account",
+          "next": 2
+        },
+        {
+          "id": 2,
+          "name": "Internet",
+          "next": 3
+        },
+        {
+          "id": 3,
+          "name": "Wireless",
+          "next": 4
+        },
+        {
+          "id": 4,
+          "name": "Summery",
+          "next": null
+        }
+      ]
+    },
+    "B": {
+      "steps": []
+    },
+    "C": {
+      "steps": []
+    }
+  }
+}
