@@ -5,43 +5,54 @@
         {
           "id": 1,
           "name": "Account",
-          "next": 2
+          "next": 2,
+          "components": ["AccountPasswordComponent"]
         },
         {
           "id": 2,
           "name": "Internet",
-          "next": 3
+          "next": 3,
+          "components": []
         },
         {
           "id": 3,
           "name": "Wireless",
-          "next": 4
+          "next": 4,
+          "components": []
         },
         {
           "id": 4,
           "name": "Summery",
-          "next": null
+          "next": null,
+          "components": []
         }
-      ]
+      ],
+      "type": "JSON",
+      "API": "WifiAPI"
     },
     "B": {
       "steps": [
         {
           "id": 1,
           "name": "選擇模式",
-          "next": 2
+          "next": 2,
+          "components": []
         },
         {
           "id": 2,
           "name": "連線",
-          "next": 3
+          "next": 3,
+          "components": []
         },
         {
           "id": 3,
           "name": "完成",
-          "next": null
+          "next": null,
+          "components": []
         }
-      ]
+      ],
+      "type": "JSON",
+      "API": "WifiAPI"
     }
   }
 }

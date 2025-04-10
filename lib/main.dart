@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.grey,
         scaffoldBackgroundColor: const Color(0xFFD9D9D9),
       ),
-      home: const StepperTestPage(),
+      home: const TestPage(),
     );
   }
 }

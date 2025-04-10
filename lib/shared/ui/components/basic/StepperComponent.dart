@@ -6,11 +6,14 @@ import 'package:flutter/services.dart' show rootBundle;
 class StepperComponent extends StatefulWidget {
   final String configPath;
   final String modelType;
+  // 简化回调定义，只传递当前索引
+  final void Function(int)? onStepChanged;
 
   const StepperComponent({
     Key? key,
     this.configPath = 'lib/shared/config/flows/initialization/wifi.json',
     this.modelType = 'A',
+    this.onStepChanged,  // 新增的回调参数
   }) : super(key: key);
 
   @override
@@ -19,19 +22,29 @@ class StepperComponent extends StatefulWidget {
 
 class _StepperComponentState extends State<StepperComponent> {
   List<Map<String, dynamic>> steps = [];
-  int currentStepIndex = 0; // Track the current step index
-  bool isLoading = true; // 添加載入狀態標誌
-  bool isLastStepCompleted = false; // Add a flag to track if the last step is completed
+  int currentStepIndex = 0;
+  bool isLoading = true;
+  bool isLastStepCompleted = false;
+
+  // 添加标志以避免在组件已卸载时调用setState
+  bool _mounted = true;
 
   @override
   void initState() {
     super.initState();
     _loadStepsConfig();
 
-    // 測試用：如果 30 秒後仍然沒有數據，則使用硬編碼的測試資料
+    // 初始化时延迟一帧再通知，确保父组件已完全挂载
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notifyStepChanged();
+    });
+
+    // 测试数据延迟加载
     Future.delayed(Duration(seconds: 3), () {
+      if (!_mounted) return;
+
       if (steps.isEmpty) {
-        print('使用硬編碼的測試資料');
+        print('使用硬编码的测试数据');
         setState(() {
           steps = [
             {"id": 1, "name": "帳戶", "next": 2},
@@ -41,74 +54,130 @@ class _StepperComponentState extends State<StepperComponent> {
           ];
           isLoading = false;
         });
+
+        // 在下一帧通知以确保渲染完成
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _notifyStepChanged();
+        });
       }
     });
   }
 
+  @override
+  void dispose() {
+    _mounted = false;
+    super.dispose();
+  }
+
+  // 通知父组件当前步骤的辅助方法
+  void _notifyStepChanged() {
+    if (!_mounted) return;
+
+    if (widget.onStepChanged != null) {
+      print('通知步骤变化: $currentStepIndex');
+      widget.onStepChanged!(currentStepIndex);
+    }
+  }
+
   // Load the steps from the JSON configuration file
   Future<void> _loadStepsConfig() async {
+    if (!_mounted) return;
+
     try {
       setState(() {
         isLoading = true;
-        isLastStepCompleted = false; // Reset completion state when loading new config
+        isLastStepCompleted = false;
       });
 
-      print('嘗試載入設定檔: ${widget.configPath}');
-      print('目前模型類型: ${widget.modelType}');
+      print('尝试加载配置: ${widget.configPath}');
+      print('当前模型类型: ${widget.modelType}');
 
-      // 載入 JSON 檔案
+      // 加载 JSON 文件
       final String jsonContent = await rootBundle.loadString(widget.configPath);
-      print('成功載入 JSON 內容，長度: ${jsonContent.length}');
+      if (!_mounted) return;
+
+      print('成功加载 JSON 内容，长度: ${jsonContent.length}');
 
       final Map<String, dynamic> jsonData = json.decode(jsonContent);
-      print('解析 JSON 資料，鍵值: ${jsonData.keys}');
+      print('解析 JSON 数据，键值: ${jsonData.keys}');
 
-      // 提取指定模型類型的步驟
+      // 提取指定模型类型的步骤
       if (jsonData.containsKey('models') &&
           jsonData['models'].containsKey(widget.modelType) &&
           jsonData['models'][widget.modelType].containsKey('steps')) {
 
         final stepsData = jsonData['models'][widget.modelType]['steps'];
-        print('找到步驟資料: $stepsData');
+        print('找到步骤数据: $stepsData');
 
+        if (!_mounted) return;
         setState(() {
           steps = List<Map<String, dynamic>>.from(stepsData);
           isLoading = false;
-          print('成功設置 ${steps.length} 個步驟');
+          currentStepIndex = 0; // 重置步骤索引
+          print('成功设置 ${steps.length} 个步骤');
+        });
+
+        // 在下一帧通知以确保渲染完成
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _notifyStepChanged();
         });
       } else {
-        print('未找到有效的步驟資料');
+        print('未找到有效的步骤数据');
+        if (!_mounted) return;
         setState(() {
           steps = [];
           isLoading = false;
+          currentStepIndex = 0;
+        });
+
+        // 在下一帧通知以确保渲染完成
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _notifyStepChanged();
         });
       }
     } catch (e) {
-      print('載入步驟設定時出錯: $e');
+      print('加载步骤配置时出错: $e');
+      if (!_mounted) return;
       setState(() {
         steps = [];
         isLoading = false;
+        currentStepIndex = 0;
+      });
+
+      // 在下一帧通知以确保渲染完成
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _notifyStepChanged();
       });
     }
   }
 
   // Go to the next step if possible
   void _nextStep() {
+    if (!_mounted) return;
+
     if (currentStepIndex < steps.length - 1) {
       // If not on the last step, advance to the next step
       setState(() {
         currentStepIndex++;
       });
+
+      // 在状态更新后通知
+      _notifyStepChanged();
     } else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
       // If on the last step and it's not completed yet, mark it as completed
       setState(() {
         isLastStepCompleted = true;
       });
+
+      // 在状态更新后通知
+      _notifyStepChanged();
     }
   }
 
   // Go to the previous step if possible
   void _previousStep() {
+    if (!_mounted) return;
+
     if (currentStepIndex > 0) {
       setState(() {
         currentStepIndex--;
@@ -117,6 +186,9 @@ class _StepperComponentState extends State<StepperComponent> {
           isLastStepCompleted = false;
         }
       });
+
+      // 在状态更新后通知
+      _notifyStepChanged();
     }
   }
 
@@ -295,6 +367,11 @@ class _StepperComponentState extends State<StepperComponent> {
         widget.configPath != oldWidget.configPath) {
       // 如果模型類型發生變化，重新載入設定
       _loadStepsConfig();
+    }
+
+    // 如果回调函数变了，通知新的回调
+    if (widget.onStepChanged != oldWidget.onStepChanged) {
+      _notifyStepChanged();
     }
   }
 }
