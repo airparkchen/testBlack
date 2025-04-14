@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AccountPasswordComponent extends StatefulWidget {
-  // 回调函数，用于表单提交或值变化时通知父组件
-  final Function(String, String, String)? onFormChanged;
+  final Function(String, String, String, bool)? onFormChanged;
   final Function()? onNextPressed;
   final Function()? onBackPressed;
 
@@ -18,23 +17,19 @@ class AccountPasswordComponent extends StatefulWidget {
 }
 
 class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
-  // 表单控制器
   final TextEditingController _userController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
-  // 密码可见性状态
   bool _passwordVisible = false;
   bool _confirmPasswordVisible = false;
 
-  // 表单验证器
   final _formKey = GlobalKey<FormState>();
+  bool _isFormComplete = false;
 
   @override
   void initState() {
     super.initState();
-
-    // 添加监听器以便在文本变化时通知父组件
     _userController.addListener(_notifyFormChanged);
     _passwordController.addListener(_notifyFormChanged);
     _confirmPasswordController.addListener(_notifyFormChanged);
@@ -42,244 +37,207 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
 
   @override
   void dispose() {
-    // 清理控制器
     _userController.removeListener(_notifyFormChanged);
     _passwordController.removeListener(_notifyFormChanged);
     _confirmPasswordController.removeListener(_notifyFormChanged);
-
     _userController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  // 通知父组件表单值变化
-  void _notifyFormChanged() {
-    if (widget.onFormChanged != null) {
-      widget.onFormChanged!(
-          _userController.text,
-          _passwordController.text,
-          _confirmPasswordController.text
-      );
-    }
-  }
-
-  // 表单验证
   bool _validateForm() {
     if (!_formKey.currentState!.validate()) {
       return false;
     }
-
-    // 检查密码是否匹配
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('密码不匹配')),
+        const SnackBar(content: Text('Passwords do not match')),
       );
       return false;
     }
-
     return true;
+  }
+
+  void _notifyFormChanged() {
+    final isComplete = _validateForm();
+    setState(() {
+      _isFormComplete = isComplete;
+    });
+    if (widget.onFormChanged != null) {
+      widget.onFormChanged!(
+        _userController.text,
+        _passwordController.text,
+        _confirmPasswordController.text,
+        _isFormComplete,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
     return Container(
-      color: const Color(0xFFEFEFEF), // 底色为 #EFEFEF
-      padding: const EdgeInsets.all(20.0),
+      width: screenSize.width * 0.9, // 寬度 90%
+      height: screenSize.height * 0.50, // 高度 50%
+      color: const Color(0xFFEFEFEF),
+      padding: const EdgeInsets.all(25.0),
       child: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 标题
-            const Text(
-              'Set Password',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 40),
-
-            // 用户名输入框
-            const Text(
-              'User',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _userController,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  borderSide: BorderSide.none,
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  borderSide: const BorderSide(color: Colors.red),
+        child: FittedBox(
+          fit: BoxFit.scaleDown, // 內容超出時按比例縮小
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Set Password',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return '请输入用户名';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // 密码输入框
-            const Text(
-              'Password',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _passwordController,
-              obscureText: !_passwordVisible,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  borderSide: BorderSide.none,
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  borderSide: const BorderSide(color: Colors.red),
-                ),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _passwordVisible ? Icons.visibility : Icons.visibility_off,
-                    color: Colors.grey,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _passwordVisible = !_passwordVisible;
-                    });
-                  },
+              const SizedBox(height: 20),
+              const Text(
+                'User',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.normal,
                 ),
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return '请输入密码';
-                }
-                if (value.length < 6) {
-                  return '密码长度不能少于6位';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // 确认密码输入框
-            const Text(
-              'Confirm Password',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _confirmPasswordController,
-              obscureText: !_confirmPasswordVisible,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  borderSide: BorderSide.none,
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  borderSide: const BorderSide(color: Colors.red),
-                ),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _confirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                    color: Colors.grey,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _confirmPasswordVisible = !_confirmPasswordVisible;
-                    });
-                  },
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return '请确认密码';
-                }
-                if (value != _passwordController.text) {
-                  return '两次输入的密码不一致';
-                }
-                return null;
-              },
-            ),
-
-            const Spacer(), // 将导航按钮推到底部
-
-            // 导航按钮
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      border: Border.all(color: Colors.grey[400]!),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: screenSize.width * 0.9, // 限制輸入框寬度，適應縮放
+                child: TextFormField(
+                  controller: _userController,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(2),
+                      borderSide: BorderSide.none,
                     ),
-                    child: TextButton(
-                      onPressed: widget.onBackPressed,
-                      child: const Text(
-                        'Back',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                        ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(2),
+                      borderSide: const BorderSide(color: Colors.red),
+                    ),
+                    errorStyle: const TextStyle(fontSize: 12), // 縮小錯誤文字
+                  ),
+                  style: const TextStyle(fontSize: 16), // 控制輸入文字大小
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a username';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Password',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: screenSize.width * 0.9,
+                child: TextFormField(
+                  controller: _passwordController,
+                  obscureText: !_passwordVisible,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(2),
+                      borderSide: BorderSide.none,
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(2),
+                      borderSide: const BorderSide(color: Colors.red),
+                    ),
+                    errorStyle: const TextStyle(fontSize: 12),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _passwordVisible ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.grey,
+                        size: 20, // 縮小圖標
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      border: Border.all(color: Colors.grey[400]!),
-                    ),
-                    child: TextButton(
                       onPressed: () {
-                        if (_validateForm() && widget.onNextPressed != null) {
-                          widget.onNextPressed!();
-                        }
+                        setState(() {
+                          _passwordVisible = !_passwordVisible;
+                        });
                       },
-                      child: const Text(
-                        'Next',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                        ),
-                      ),
                     ),
                   ),
+                  style: const TextStyle(fontSize: 16),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
                 ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Confirm Password',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: screenSize.width * 0.9,
+                child: TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: !_confirmPasswordVisible,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(2),
+                      borderSide: BorderSide.none,
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(2),
+                      borderSide: const BorderSide(color: Colors.red),
+                    ),
+                    errorStyle: const TextStyle(fontSize: 12),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _confirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _confirmPasswordVisible = !_confirmPasswordVisible;
+                        });
+                      },
+                    ),
+                  ),
+                  style: const TextStyle(fontSize: 16),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

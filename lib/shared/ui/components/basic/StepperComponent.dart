@@ -3,17 +3,46 @@ import 'dart:convert';
 import 'dart:async' show Future;
 import 'package:flutter/services.dart' show rootBundle;
 
+// 添加這個 controller 類，在已有的檔案中實作這部分
+class StepperController extends ChangeNotifier {
+  int _currentStep = 0;
+
+  int get currentStep => _currentStep;
+
+  // 跳轉至指定步驟
+  void jumpToStep(int step) {
+    _currentStep = step;
+    notifyListeners();
+  }
+
+  // 移至下一步
+  void nextStep() {
+    _currentStep++;
+    notifyListeners();
+  }
+
+  // 移至上一步
+  void previousStep() {
+    if (_currentStep > 0) {
+      _currentStep--;
+      notifyListeners();
+    }
+  }
+}
+
 class StepperComponent extends StatefulWidget {
   final String configPath;
   final String modelType;
-  // 简化回调定义，只传递当前索引
   final void Function(int)? onStepChanged;
+  // 新增控制器參數
+  final StepperController? controller;
 
   const StepperComponent({
     Key? key,
     this.configPath = 'lib/shared/config/flows/initialization/wifi.json',
     this.modelType = 'A',
-    this.onStepChanged,  // 新增的回调参数
+    this.onStepChanged,
+    this.controller,
   }) : super(key: key);
 
   @override
@@ -25,26 +54,42 @@ class _StepperComponentState extends State<StepperComponent> {
   int currentStepIndex = 0;
   bool isLoading = true;
   bool isLastStepCompleted = false;
-
-  // 添加标志以避免在组件已卸载时调用setState
   bool _mounted = true;
+
+  // 控制器監聽器
+  void _controllerListener() {
+    if (!_mounted) return;
+
+    setState(() {
+      currentStepIndex = widget.controller!.currentStep;
+    });
+
+    // 通知父組件
+    if (widget.onStepChanged != null) {
+      widget.onStepChanged!(currentStepIndex);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _loadStepsConfig();
 
-    // 初始化时延迟一帧再通知，确保父组件已完全挂载
+    // 如果有提供控制器，設置監聽器
+    if (widget.controller != null) {
+      widget.controller!.addListener(_controllerListener);
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _notifyStepChanged();
     });
 
-    // 测试数据延迟加载
+    // 測試數據延遲加載
     Future.delayed(Duration(seconds: 3), () {
       if (!_mounted) return;
 
       if (steps.isEmpty) {
-        print('使用硬编码的测试数据');
+        print('使用硬編碼的測試數據');
         setState(() {
           steps = [
             {"id": 1, "name": "帳戶", "next": 2},
@@ -55,7 +100,6 @@ class _StepperComponentState extends State<StepperComponent> {
           isLoading = false;
         });
 
-        // 在下一帧通知以确保渲染完成
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _notifyStepChanged();
         });
@@ -65,17 +109,52 @@ class _StepperComponentState extends State<StepperComponent> {
 
   @override
   void dispose() {
+    // 移除控制器監聽器
+    if (widget.controller != null) {
+      widget.controller!.removeListener(_controllerListener);
+    }
     _mounted = false;
     super.dispose();
   }
 
-  // 通知父组件当前步骤的辅助方法
+  @override
+  void didUpdateWidget(StepperComponent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // 檢查控制器是否變更
+    if (widget.controller != oldWidget.controller) {
+      if (oldWidget.controller != null) {
+        oldWidget.controller!.removeListener(_controllerListener);
+      }
+      if (widget.controller != null) {
+        widget.controller!.addListener(_controllerListener);
+        // 立即同步當前步驟
+        setState(() {
+          currentStepIndex = widget.controller!.currentStep;
+        });
+      }
+    }
+
+    if (widget.modelType != oldWidget.modelType ||
+        widget.configPath != oldWidget.configPath) {
+      _loadStepsConfig();
+    }
+  }
+
+  // 通知父組件當前步驟的輔助方法
   void _notifyStepChanged() {
     if (!_mounted) return;
 
     if (widget.onStepChanged != null) {
-      print('通知步骤变化: $currentStepIndex');
       widget.onStepChanged!(currentStepIndex);
+    }
+
+    // 同步控制器
+    if (widget.controller != null && widget.controller!.currentStep != currentStepIndex) {
+      // 避免無限循環，暫時移除監聽器
+      widget.controller!.removeListener(_controllerListener);
+      widget.controller!.jumpToStep(currentStepIndex);
+      widget.controller!.addListener(_controllerListener);
     }
   }
 
@@ -89,62 +168,80 @@ class _StepperComponentState extends State<StepperComponent> {
         isLastStepCompleted = false;
       });
 
-      print('尝试加载配置: ${widget.configPath}');
-      print('当前模型类型: ${widget.modelType}');
+      print('嘗試載入配置: ${widget.configPath}');
+      print('當前模型類型: ${widget.modelType}');
 
-      // 加载 JSON 文件
+      // 加載 JSON 文件
       final String jsonContent = await rootBundle.loadString(widget.configPath);
       if (!_mounted) return;
 
-      print('成功加载 JSON 内容，长度: ${jsonContent.length}');
+      print('成功載入 JSON 內容，長度: ${jsonContent.length}');
 
       final Map<String, dynamic> jsonData = json.decode(jsonContent);
-      print('解析 JSON 数据，键值: ${jsonData.keys}');
+      print('解析 JSON 數據，鍵值: ${jsonData.keys}');
 
-      // 提取指定模型类型的步骤
+      // 提取指定模型類型的步驟
       if (jsonData.containsKey('models') &&
           jsonData['models'].containsKey(widget.modelType) &&
           jsonData['models'][widget.modelType].containsKey('steps')) {
-
         final stepsData = jsonData['models'][widget.modelType]['steps'];
-        print('找到步骤数据: $stepsData');
+        print('找到步驟數據: $stepsData');
 
         if (!_mounted) return;
         setState(() {
           steps = List<Map<String, dynamic>>.from(stepsData);
           isLoading = false;
-          currentStepIndex = 0; // 重置步骤索引
-          print('成功设置 ${steps.length} 个步骤');
+
+          // 如果控制器存在，從控制器獲取當前步驟
+          if (widget.controller != null) {
+            currentStepIndex = widget.controller!.currentStep;
+          } else {
+            currentStepIndex = 0; // 重置步驟索引
+          }
+
+          print('成功設置 ${steps.length} 個步驟');
         });
 
-        // 在下一帧通知以确保渲染完成
+        // 在下一幀通知以確保渲染完成
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _notifyStepChanged();
         });
       } else {
-        print('未找到有效的步骤数据');
+        print('未找到有效的步驟數據');
         if (!_mounted) return;
         setState(() {
           steps = [];
           isLoading = false;
-          currentStepIndex = 0;
+
+          // 如果控制器存在，從控制器獲取當前步驟
+          if (widget.controller != null) {
+            currentStepIndex = widget.controller!.currentStep;
+          } else {
+            currentStepIndex = 0;
+          }
         });
 
-        // 在下一帧通知以确保渲染完成
+        // 在下一幀通知以確保渲染完成
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _notifyStepChanged();
         });
       }
     } catch (e) {
-      print('加载步骤配置时出错: $e');
+      print('載入步驟配置時出錯: $e');
       if (!_mounted) return;
       setState(() {
         steps = [];
         isLoading = false;
-        currentStepIndex = 0;
+
+        // 如果控制器存在，從控制器獲取當前步驟
+        if (widget.controller != null) {
+          currentStepIndex = widget.controller!.currentStep;
+        } else {
+          currentStepIndex = 0;
+        }
       });
 
-      // 在下一帧通知以确保渲染完成
+      // 在下一幀通知以確保渲染完成
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _notifyStepChanged();
       });
@@ -161,7 +258,7 @@ class _StepperComponentState extends State<StepperComponent> {
         currentStepIndex++;
       });
 
-      // 在状态更新后通知
+      // 在狀態更新後通知
       _notifyStepChanged();
     } else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
       // If on the last step and it's not completed yet, mark it as completed
@@ -169,7 +266,7 @@ class _StepperComponentState extends State<StepperComponent> {
         isLastStepCompleted = true;
       });
 
-      // 在状态更新后通知
+      // 在狀態更新後通知
       _notifyStepChanged();
     }
   }
@@ -187,7 +284,7 @@ class _StepperComponentState extends State<StepperComponent> {
         }
       });
 
-      // 在状态更新后通知
+      // 在狀態更新後通知
       _notifyStepChanged();
     }
   }
@@ -206,44 +303,6 @@ class _StepperComponentState extends State<StepperComponent> {
               ? const Center(child: Text('此模型沒有定義步驟'))
               : _buildStepperRow(),
         ),
-
-        // 只有在有步驟時才顯示導航按鈕
-        if (steps.isNotEmpty && !isLoading) ...[
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: currentStepIndex > 0 ? _previousStep : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[300],
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    side: BorderSide(color: Colors.grey[400]!),
-                  ),
-                ),
-                child: const Text('上一步'),
-              ),
-              const SizedBox(width: 20),
-              ElevatedButton(
-                // Enable next button if not on the last step OR if on the last step but not completed yet
-                onPressed: (currentStepIndex < steps.length - 1 ||
-                    (currentStepIndex == steps.length - 1 && !isLastStepCompleted))
-                    ? _nextStep : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[300],
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    side: BorderSide(color: Colors.grey[400]!),
-                  ),
-                ),
-                child: const Text('下一步'),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }
@@ -358,20 +417,5 @@ class _StepperComponentState extends State<StepperComponent> {
         ),
       ],
     );
-  }
-
-  @override
-  void didUpdateWidget(StepperComponent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.modelType != oldWidget.modelType ||
-        widget.configPath != oldWidget.configPath) {
-      // 如果模型類型發生變化，重新載入設定
-      _loadStepsConfig();
-    }
-
-    // 如果回调函数变了，通知新的回调
-    if (widget.onStepChanged != oldWidget.onStepChanged) {
-      _notifyStepChanged();
-    }
   }
 }

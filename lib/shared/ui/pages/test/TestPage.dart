@@ -12,35 +12,61 @@ class TestPage extends StatefulWidget {
 }
 
 class _TestPageState extends State<TestPage> {
-  // Toggle between different models for testing
   String currentModel = 'A';
-  // 新增當前步驟索引的狀態變數
   int currentStepIndex = 0;
+  bool isLastStepCompleted = false;
 
-  // 儲存步驟配置
   Map<String, dynamic> stepsConfig = {};
   bool isLoading = true;
 
-  // 新增表單數據狀態
   String userName = '';
   String password = '';
   String confirmPassword = '';
+  bool isCurrentStepComplete = false;
+
+  late PageController _pageController;
+  final StepperController _stepperController = StepperController();
+  bool _isUpdatingStep = false;
 
   @override
   void initState() {
     super.initState();
     _loadConfig();
+    _pageController = PageController(initialPage: currentStepIndex);
+    _stepperController.addListener(_onStepperControllerChanged);
   }
 
-  // 載入配置檔案
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _stepperController.removeListener(_onStepperControllerChanged);
+    _stepperController.dispose();
+    super.dispose();
+  }
+
+  void _onStepperControllerChanged() {
+    if (_isUpdatingStep) return;
+
+    final newStep = _stepperController.currentStep;
+    if (newStep != currentStepIndex) {
+      _isUpdatingStep = true;
+      setState(() {
+        currentStepIndex = newStep;
+        isCurrentStepComplete = false;
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(newStep);
+        }
+      });
+      _isUpdatingStep = false;
+    }
+  }
+
   Future<void> _loadConfig() async {
     try {
       setState(() {
         isLoading = true;
       });
 
-      // 假設配置檔案在assets目錄下
-      // 這裡可以替換為您實際的配置檔案路徑
       final String configPath = 'lib/shared/config/flows/initialization/wifi.json';
       final String jsonContent = await rootBundle.loadString(configPath);
 
@@ -49,121 +75,163 @@ class _TestPageState extends State<TestPage> {
         isLoading = false;
       });
 
-      print('成功載入配置：${stepsConfig.keys}');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncStepperState();
+      });
     } catch (e) {
       print('載入配置出錯: $e');
-      // 使用硬編碼的配置作為備用
-      final hardcodedConfig = {
-        "models": {
-          "A": {
-            "steps": [
-              {
-                "id": 1,
-                "name": "Account",
-                "next": 2,
-                "components": ["AccountPasswordComponent"]
-              },
-              {
-                "id": 2,
-                "name": "Internet",
-                "next": 3,
-                "components": []
-              },
-              {
-                "id": 3,
-                "name": "Wireless",
-                "next": 4,
-                "components": []
-              },
-              {
-                "id": 4,
-                "name": "Summery",
-                "next": null,
-                "components": []
-              }
-            ],
-            "type": "JSON",
-            "API": "WifiAPI"
-          },
-          "B": {
-            "steps": [
-              {
-                "id": 1,
-                "name": "選擇模式",
-                "next": 2,
-                "components": []
-              },
-              {
-                "id": 2,
-                "name": "連線",
-                "next": 3,
-                "components": []
-              },
-              {
-                "id": 3,
-                "name": "完成",
-                "next": null,
-                "components": []
-              }
-            ],
-            "type": "JSON",
-            "API": "WifiAPI"
-          }
-        }
-      };
-
       setState(() {
-        stepsConfig = hardcodedConfig;
         isLoading = false;
+        stepsConfig = {};
       });
-      print('使用硬編碼配置：${stepsConfig.keys}');
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showErrorDialog();
+      });
     }
   }
 
-  void _changeModel(String newModel) {
-    setState(() {
-      currentModel = newModel;
-      currentStepIndex = 0; // 切換模型時重置步驟
-    });
+  void _showErrorDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('配置載入失敗'),
+          content: const Text('無法載入設定流程，請確認 wifi.json 檔案是否存在並格式正確。'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('確定'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  // 新增更新當前步驟的回調方法
+  void _syncStepperState() {
+    _isUpdatingStep = true;
+    _stepperController.jumpToStep(currentStepIndex);
+    _isUpdatingStep = false;
+  }
+
   void _updateCurrentStep(int stepIndex) {
+    if (_isUpdatingStep || stepIndex == currentStepIndex) return;
+
+    _isUpdatingStep = true;
     setState(() {
       currentStepIndex = stepIndex;
+      isCurrentStepComplete = false;
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          stepIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+      if (stepIndex < _getCurrentModelSteps().length - 1) {
+        isLastStepCompleted = false;
+      }
     });
+
+    _stepperController.jumpToStep(stepIndex);
+    _isUpdatingStep = false;
   }
 
-  // 處理表單數據變化
-  void _handleFormChanged(String user, String pwd, String confirmPwd) {
+  void _handleFormChanged(String user, String pwd, String confirmPwd, bool isComplete) {
     setState(() {
       userName = user;
       password = pwd;
       confirmPassword = confirmPwd;
+      isCurrentStepComplete = isComplete;
     });
   }
 
-  // 處理下一步
   void _handleNext() {
-    // 從配置中獲取當前步驟的"next"值
-    List<dynamic> steps = _getCurrentModelSteps();
-    if (steps.isNotEmpty && currentStepIndex < steps.length - 1) {
+    final steps = _getCurrentModelSteps();
+
+    if (steps.isEmpty) return;
+
+    final currentComponents = _getCurrentStepComponents();
+    if (currentComponents.isNotEmpty && !isCurrentStepComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('請完成當前步驟的設定')),
+      );
+      return;
+    }
+
+    if (currentStepIndex < steps.length - 1) {
+      _isUpdatingStep = true;
       setState(() {
         currentStepIndex++;
+        isCurrentStepComplete = false;
       });
+
+      _stepperController.jumpToStep(currentStepIndex);
+      _pageController.animateToPage(
+        currentStepIndex,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      _isUpdatingStep = false;
+    } else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
+      if (currentComponents.isNotEmpty && !isCurrentStepComplete) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('請完成當前步驟的設定')),
+        );
+        return;
+      }
+
+      _isUpdatingStep = true;
+      setState(() {
+        isLastStepCompleted = true;
+      });
+      _isUpdatingStep = false;
+
+      _showCompletionDialog();
     }
   }
 
-  // 處理上一步
   void _handleBack() {
     if (currentStepIndex > 0) {
+      _isUpdatingStep = true;
       setState(() {
         currentStepIndex--;
+        isCurrentStepComplete = false;
       });
+
+      _stepperController.jumpToStep(currentStepIndex);
+      _pageController.animateToPage(
+        currentStepIndex,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      _isUpdatingStep = false;
     }
   }
 
-  // 獲取當前模型的步驟配置
+  void _showCompletionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('完成設置'),
+          content: const Text('恭喜！您已完成所有步驟。'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('確定'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   List<dynamic> _getCurrentModelSteps() {
     if (stepsConfig.isEmpty ||
         !stepsConfig.containsKey('models') ||
@@ -175,15 +243,15 @@ class _TestPageState extends State<TestPage> {
     return stepsConfig['models'][currentModel]['steps'];
   }
 
-  // 獲取當前步驟的組件列表
-  List<String> _getCurrentStepComponents() {
-    List<dynamic> steps = _getCurrentModelSteps();
+  List<String> _getCurrentStepComponents({int? stepIndex}) {
+    final index = stepIndex ?? currentStepIndex;
+    final steps = _getCurrentModelSteps();
 
-    if (steps.isEmpty || currentStepIndex >= steps.length) {
+    if (steps.isEmpty || index >= steps.length) {
       return [];
     }
 
-    var currentStep = steps[currentStepIndex];
+    var currentStep = steps[index];
     if (!currentStep.containsKey('components')) {
       return [];
     }
@@ -200,93 +268,38 @@ class _TestPageState extends State<TestPage> {
           : SafeArea(
         child: Column(
           children: [
-            // Model selection buttons
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Select Model: ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: () => _changeModel('A'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: currentModel == 'A' ? Colors.grey[400] : Colors.grey[300],
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(0),
-                        side: BorderSide(color: Colors.grey[400]!),
-                      ),
-                    ),
-                    child: const Text('Model A'),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: () => _changeModel('B'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: currentModel == 'B' ? Colors.grey[400] : Colors.grey[300],
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(0),
-                        side: BorderSide(color: Colors.grey[400]!),
-                      ),
-                    ),
-                    child: const Text('Model B'),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Display the current model being used
-            Text(
-              'Current Model: $currentModel',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-
-            // 新增顯示當前步驟的文字
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Current Step: ${currentStepIndex + 1}',  // 加1以便從1開始計數
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // StepperComponent 放在頂部
-            Container(
-              height: 120,
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: StepperComponent(
-                configPath: 'lib/shared/config/flows/initialization/wifi.json',
-                modelType: currentModel,
-                onStepChanged: _updateCurrentStep,
-              ),
-            ),
-
-            // 顯示當前步驟的組件列表（除錯用）
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-              child: Text(
-                '當前步驟組件: ${_getCurrentStepComponents().join(", ")}',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              ),
-            ),
-
-            // 主內容區域 - 根據當前步驟的組件配置顯示不同內容
             Expanded(
-              child: Padding(
+              flex: 30,
+              child: Container(
+                width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: _buildDynamicContent(),
+                child: StepperComponent(
+                  configPath: 'lib/shared/config/flows/initialization/wifi.json',
+                  modelType: currentModel,
+                  onStepChanged: _updateCurrentStep,
+                  controller: _stepperController,
+                ),
               ),
+            ),
+            Expanded(
+              flex: 10,
+              child: Container(
+                width: double.infinity,
+                alignment: Alignment.center,
+                child: Text(
+                  _getCurrentStepName(),
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 95,
+              child: _buildPageView(),
+            ),
+            Expanded(
+              flex: 38,
+              child: _buildNavigationButtons(),
             ),
           ],
         ),
@@ -294,23 +307,48 @@ class _TestPageState extends State<TestPage> {
     );
   }
 
-  // 根據當前步驟的組件配置動態構建內容
-  Widget _buildDynamicContent() {
-    List<String> componentNames = _getCurrentStepComponents();
+  String _getCurrentStepName() {
+    final steps = _getCurrentModelSteps();
+    if (steps.isNotEmpty && currentStepIndex < steps.length) {
+      return steps[currentStepIndex]['name'] ?? 'Step ${currentStepIndex + 1}';
+    }
+    return 'Step ${currentStepIndex + 1}';
+  }
 
-    // 如果當前步驟沒有定義組件，顯示預設內容
-    if (componentNames.isEmpty) {
-      return Center(
-        child: Text(
-          '步驟 ${currentStepIndex + 1} - 無組件定義',
-          style: const TextStyle(fontSize: 20),
-        ),
-      );
+  Widget _buildPageView() {
+    final steps = _getCurrentModelSteps();
+    if (steps.isEmpty) {
+      return const Center(child: Text('沒有可用的步驟'));
     }
 
-    // 創建組件列表
-    List<Widget> components = [];
+    return PageView.builder(
+      controller: _pageController,
+      physics: const ClampingScrollPhysics(),
+      itemCount: steps.length,
+      onPageChanged: (index) {
+        if (_isUpdatingStep || index == currentStepIndex) return;
 
+        _isUpdatingStep = true;
+        setState(() {
+          currentStepIndex = index;
+          isCurrentStepComplete = false;
+        });
+
+        _stepperController.jumpToStep(index);
+        _isUpdatingStep = false;
+      },
+      itemBuilder: (context, index) {
+        return SizedBox.expand(
+          child: _buildStepContent(index),
+        );
+      },
+    );
+  }
+
+  Widget _buildStepContent(int index) {
+    final componentNames = _getCurrentStepComponents(stepIndex: index);
+
+    List<Widget> components = [];
     for (String componentName in componentNames) {
       Widget? component = _createComponentByName(componentName);
       if (component != null) {
@@ -318,33 +356,91 @@ class _TestPageState extends State<TestPage> {
       }
     }
 
-    // 如果沒有成功創建任何組件，顯示預設內容
-    if (components.isEmpty) {
-      return Center(
-        child: Text(
-          '步驟 ${currentStepIndex + 1} - 無法創建組件',
-          style: const TextStyle(fontSize: 20),
+    if (components.isNotEmpty) {
+      return Center( // 居中顯示
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: components,
+          ),
         ),
       );
     }
 
-    // 如果只有一個組件，直接返回它
-    if (components.length == 1) {
-      return components.first;
-    }
-
-    // 如果有多個組件，將它們放在Column中
-    return SingleChildScrollView(
+    return Container(
+      color: Colors.grey[200],
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: components,
+        children: [
+          Text(
+            'Step ${index + 1} Content',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 20),
+          const Text('This step has no defined components. Please use the buttons below to continue.'),
+        ],
       ),
     );
   }
 
-  // 根據組件名稱創建對應的組件
+  Widget _buildNavigationButtons() {
+    final steps = _getCurrentModelSteps();
+    final isLastStep = steps.isNotEmpty && currentStepIndex == steps.length - 1;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                border: Border.all(color: Colors.grey[400]!),
+              ),
+              child: TextButton(
+                onPressed: currentStepIndex > 0 ? _handleBack : null,
+                child: const Text(
+                  'Back',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                border: Border.all(color: Colors.grey[400]!),
+              ),
+              child: TextButton(
+                onPressed: _handleNext,
+                child: Text(
+                  isLastStep && !isLastStepCompleted ? 'Finish' : 'Next',
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget? _createComponentByName(String componentName) {
-    // 可以根據需要擴展支援更多組件
     switch (componentName) {
       case 'AccountPasswordComponent':
         return AccountPasswordComponent(
