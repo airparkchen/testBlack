@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:whitebox/shared/ui/components/basic/StepperComponent.dart';
 import 'package:whitebox/shared/ui/components/basic/AccountPasswordComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/ConnectionTypeComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/SetSSIDComponent.dart';
 
 class TestPage extends StatefulWidget {
   const TestPage({super.key});
@@ -145,8 +147,21 @@ class _TestPageState extends State<TestPage> {
       userName = user;
       password = pwd;
       confirmPassword = confirmPwd;
-      isCurrentStepComplete = isComplete;
+      // 不再直接設置 isCurrentStepComplete，改由 _handleNext 控制
     });
+  }
+
+  bool _validateForm() {
+    if (userName.isEmpty) {
+      return false;
+    }
+    if (password.isEmpty || password.length < 6) {
+      return false;
+    }
+    if (confirmPassword.isEmpty || confirmPassword != password) {
+      return false;
+    }
+    return true;
   }
 
   void _handleNext() {
@@ -155,11 +170,26 @@ class _TestPageState extends State<TestPage> {
     if (steps.isEmpty) return;
 
     final currentComponents = _getCurrentStepComponents();
-    if (currentComponents.isNotEmpty && !isCurrentStepComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('請完成當前步驟的設定')),
-      );
-      return;
+    if (currentComponents.contains('AccountPasswordComponent')) {
+      if (!_validateForm()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              userName.isEmpty
+                  ? '請輸入用戶名'
+                  : password.isEmpty
+                  ? '請輸入密碼'
+                  : password.length < 6
+                  ? '密碼必須至少6個字符'
+                  : '密碼不匹配',
+            ),
+          ),
+        );
+        return;
+      }
+      setState(() {
+        isCurrentStepComplete = true;
+      });
     }
 
     if (currentStepIndex < steps.length - 1) {
@@ -177,7 +207,7 @@ class _TestPageState extends State<TestPage> {
       );
       _isUpdatingStep = false;
     } else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
-      if (currentComponents.isNotEmpty && !isCurrentStepComplete) {
+      if (currentComponents.contains('AccountPasswordComponent') && !isCurrentStepComplete) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('請完成當前步驟的設定')),
         );
@@ -357,10 +387,13 @@ class _TestPageState extends State<TestPage> {
     }
 
     if (components.isNotEmpty) {
-      return Center( // 居中顯示
-        child: SingleChildScrollView(
+      return SingleChildScrollView(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0), // 添加垂直內邊距
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start, // 從頂部開始排列
+            crossAxisAlignment: CrossAxisAlignment.center, // 水平居中
             children: components,
           ),
         ),
@@ -445,6 +478,37 @@ class _TestPageState extends State<TestPage> {
       case 'AccountPasswordComponent':
         return AccountPasswordComponent(
           onFormChanged: _handleFormChanged,
+          onNextPressed: _handleNext,
+          onBackPressed: _handleBack,
+        );
+      case 'ConnectionTypeComponent':
+        return ConnectionTypeComponent(
+          onSelectionChanged: (connectionType, isComplete) {
+            // 避免在 build 期間調用 setState
+            Future.microtask(() {
+              if (mounted) {
+                setState(() {
+                  isCurrentStepComplete = isComplete;
+                });
+              }
+            });
+          },
+          onNextPressed: _handleNext,
+          onBackPressed: _handleBack,
+        );
+      case 'SetSSIDComponent':
+        return SetSSIDComponent(
+          onFormChanged: (ssid, securityOption, password, isValid) {
+            // 避免在 build 期間調用 setState
+            Future.microtask(() {
+              if (mounted) {
+                setState(() {
+                  // 可以在這裡存儲 SSID、安全選項和密碼
+                  isCurrentStepComplete = isValid;
+                });
+              }
+            });
+          },
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );

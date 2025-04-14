@@ -12,13 +12,13 @@
           "id": 2,
           "name": "Internet",
           "next": 3,
-          "components": []
+          "components": ["ConnectionTypeComponent"]
         },
         {
           "id": 3,
           "name": "Wireless",
           "next": 4,
-          "components": []
+          "components": ["SetSSIDComponent"]
         },
         {
           "id": 4,
