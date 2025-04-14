@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/pages/initialization/AddDevices.dart';
 import 'package:whitebox/shared/ui/pages/initialization/WifiConnectionPage.dart';
 import 'package:whitebox/shared/ui/pages/initialization/QrCodeScannerPage.dart';
-// Fix the import path
+import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart';
 import 'package:whitebox/shared/ui/pages/test/TestPage.dart';
 
 void main() {
@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.grey,
         scaffoldBackgroundColor: const Color(0xFFD9D9D9),
       ),
-      home: const TestPage(),
+      home: const InitializationPage(),
     );
   }
 }
