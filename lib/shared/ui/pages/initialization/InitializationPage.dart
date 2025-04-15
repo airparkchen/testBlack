@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 import 'package:whitebox/shared/ui/pages/initialization/QrCodeScannerPage.dart';
 import 'package:whitebox/shared/ui/components/basic/WifiScannerComponent.dart';
+import 'package:whitebox/shared/ui/pages/initialization/WifiSettingFlowPage.dart'; // 引入 WifiSettingFlowPage
 
 class InitializationPage extends StatefulWidget {
   const InitializationPage({super.key});
@@ -35,9 +36,10 @@ class _InitializationPageState extends State<InitializationPage> {
 
   // 處理裝置選擇
   void _handleDeviceSelected(WiFiAccessPoint device) {
-    // 在這裡處理裝置選擇邏輯
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已選擇裝置: ${device.ssid.isNotEmpty ? device.ssid : "未知裝置"}')),
+    // 現在當選擇裝置時，直接導航到 WifiSettingFlowPage
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const WifiSettingFlowPage()),
     );
   }
 
@@ -56,10 +58,11 @@ class _InitializationPageState extends State<InitializationPage> {
     }
   }
 
-  // 手動新增頁面（先只顯示一個提示）
+  // 手動新增頁面 - 現在打開 WifiSettingFlowPage
   void _openManualAdd() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('手動新增功能即將推出')),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const WifiSettingFlowPage()),
     );
   }
 
