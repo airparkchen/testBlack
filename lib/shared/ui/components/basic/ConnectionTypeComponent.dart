@@ -73,17 +73,16 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
               width: screenSize.width * 0.9, // 限制輸入框寬度，適應縮放
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Color(0xFFEFEFEF),
                   borderRadius: BorderRadius.circular(2),
                 ),
                 child: DropdownButtonFormField<String>(
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: Color(0xFFEFEFEF),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(2),
-                      borderSide: BorderSide.none,
                     ),
                   ),
                   style: const TextStyle(fontSize: 16, color: Colors.black),
@@ -91,7 +90,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
                   icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
                   iconSize: 24,
                   elevation: 16,
-                  dropdownColor: Colors.white,
+                  dropdownColor: Color(0xFFEFEFEF),
                   onChanged: (String? newValue) {
                     if (newValue != null) {
                       setState(() {

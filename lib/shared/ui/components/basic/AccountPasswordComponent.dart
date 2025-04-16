@@ -89,11 +89,10 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
                 controller: _userController,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Color(0xFFEFEFEF),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(2),
-                    borderSide: BorderSide.none,
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(2),
@@ -120,11 +119,10 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
                 obscureText: !_passwordVisible,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Color(0xFFEFEFEF),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(2),
-                    borderSide: BorderSide.none,
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(2),
@@ -163,11 +161,10 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
                 obscureText: !_confirmPasswordVisible,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Color(0xFFEFEFEF),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(2),
-                    borderSide: BorderSide.none,
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(2),

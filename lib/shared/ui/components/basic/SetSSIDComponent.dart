@@ -125,11 +125,10 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
                 controller: _ssidController,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Color(0xFFEFEFEF),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(2),
-                    borderSide: BorderSide.none,
                   ),
                 ),
                 style: const TextStyle(fontSize: 16),
@@ -148,17 +147,16 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
               width: screenSize.width * 0.9,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Color(0xFFEFEFEF),
                   borderRadius: BorderRadius.circular(2),
                 ),
                 child: DropdownButtonFormField<String>(
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: Color(0xFFEFEFEF),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(2),
-                      borderSide: BorderSide.none,
                     ),
                   ),
                   style: const TextStyle(fontSize: 16, color: Colors.black),
@@ -166,7 +164,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
                   icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
                   iconSize: 24,
                   elevation: 16,
-                  dropdownColor: Colors.white,
+                  dropdownColor: Color(0xFFEFEFEF),
                   onChanged: (String? newValue) {
                     if (newValue != null) {
                       setState(() {
@@ -202,11 +200,9 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
                   obscureText: !_passwordVisible,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: Color(0xFFEFEFEF),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                      borderSide: BorderSide.none,
                     ),
                     suffixIcon: IconButton(
                       icon: Icon(
