@@ -5,6 +5,9 @@ import 'package:whitebox/shared/ui/components/basic/StepperComponent.dart';
 import 'package:whitebox/shared/ui/components/basic/AccountPasswordComponent.dart';
 import 'package:whitebox/shared/ui/components/basic/ConnectionTypeComponent.dart';
 import 'package:whitebox/shared/ui/components/basic/SetSSIDComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/SummaryComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/FinishingWizardComponent.dart'; // 引入新的嚮導完成元件
+import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart'; // 引入初始頁面
 
 class WifiSettingFlowPage extends StatefulWidget {
   const WifiSettingFlowPage({super.key});
@@ -17,18 +20,34 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   String currentModel = 'A';
   int currentStepIndex = 0;
   bool isLastStepCompleted = false;
+  bool isShowingFinishingWizard = false; // 是否顯示完成嚮導
 
   Map<String, dynamic> stepsConfig = {};
   bool isLoading = true;
 
+  // 儲存所有設定資料的變數
   String userName = '';
   String password = '';
   String confirmPassword = '';
+  String connectionType = 'DHCP'; // 預設連線類型
+  String ssid = '';
+  String securityOption = 'WPA3 Personal'; // 預設安全選項
+  String ssidPassword = '';
+
   bool isCurrentStepComplete = false;
 
   late PageController _pageController;
   final StepperController _stepperController = StepperController();
   bool _isUpdatingStep = false;
+
+  // 定義嚮導完成的進程名稱
+  final List<String> _processNames = [
+    'Process 01',
+    'Process 02',
+    'Process 03',
+    'Process 04',
+    'Process 05',
+  ];
 
   @override
   void initState() {
@@ -142,12 +161,31 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _isUpdatingStep = false;
   }
 
+  // 帳號密碼表單變更處理函數
   void _handleFormChanged(String user, String pwd, String confirmPwd, bool isComplete) {
     setState(() {
       userName = user;
       password = pwd;
       confirmPassword = confirmPwd;
-      // 不再直接設置 isCurrentStepComplete，改由 _handleNext 控制
+      // 表單完成狀態由 _handleNext 控制
+    });
+  }
+
+  // 連線類型變更處理函數
+  void _handleConnectionTypeChanged(String type, bool isComplete) {
+    setState(() {
+      connectionType = type;
+      isCurrentStepComplete = isComplete;
+    });
+  }
+
+  // SSID設定變更處理函數
+  void _handleSSIDFormChanged(String newSsid, String newSecurityOption, String newPassword, bool isValid) {
+    setState(() {
+      ssid = newSsid;
+      securityOption = newSecurityOption;
+      ssidPassword = newPassword;
+      isCurrentStepComplete = isValid;
     });
   }
 
@@ -170,6 +208,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     if (steps.isEmpty) return;
 
     final currentComponents = _getCurrentStepComponents();
+
+    // 帳號密碼元件的驗證
     if (currentComponents.contains('AccountPasswordComponent')) {
       if (!_validateForm()) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -192,6 +232,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       });
     }
 
+    // 如果當前不是最後一步，則前進到下一步
     if (currentStepIndex < steps.length - 1) {
       _isUpdatingStep = true;
       setState(() {
@@ -206,7 +247,10 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         curve: Curves.easeInOut,
       );
       _isUpdatingStep = false;
-    } else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
+    }
+    // 如果是最後一步但尚未完成
+    else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
+      // 檢查當前步驟是否需要驗證
       if (currentComponents.contains('AccountPasswordComponent') && !isCurrentStepComplete) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('請完成當前步驟的設定')),
@@ -217,10 +261,11 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       _isUpdatingStep = true;
       setState(() {
         isLastStepCompleted = true;
+        isShowingFinishingWizard = true; // 顯示完成嚮導
       });
       _isUpdatingStep = false;
 
-      _showCompletionDialog();
+      // 不再顯示對話框，而是在頁面上直接顯示完成嚮導
     }
   }
 
@@ -242,23 +287,12 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
-  void _showCompletionDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('完成設置'),
-          content: const Text('恭喜！您已完成所有步驟。'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('確定'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
+  // 處理嚮導完成後的操作
+  void _handleWizardCompleted() {
+    // 導航回初始頁面
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const InitializationPage()),
+          (route) => false, // 清除所有路由堆疊
     );
   }
 
@@ -296,7 +330,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
-        child: Column(
+        child: isShowingFinishingWizard
+            ? _buildFinishingWizard() // 顯示完成嚮導頁面
+            : Column(
           children: [
             Expanded(
               flex: 30,
@@ -332,6 +368,22 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
               child: _buildNavigationButtons(),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // 構建完成嚮導視圖
+  Widget _buildFinishingWizard() {
+    return Center(
+      child: SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+          child: FinishingWizardComponent(
+            processNames: _processNames,
+            totalDurationSeconds: 10, // 10秒完成
+            onCompleted: _handleWizardCompleted,
+          ),
         ),
       ),
     );
@@ -378,6 +430,25 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   Widget _buildStepContent(int index) {
     final componentNames = _getCurrentStepComponents(stepIndex: index);
 
+    // 最後一步顯示摘要元件
+    if (index == _getCurrentModelSteps().length - 1) {
+      return SingleChildScrollView(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+          child: SummaryComponent(
+            username: userName,
+            connectionType: connectionType,
+            ssid: ssid,
+            securityOption: securityOption,
+            password: ssidPassword,
+            onNextPressed: _handleNext,
+            onBackPressed: _handleBack,
+          ),
+        ),
+      );
+    }
+
     List<Widget> components = [];
     for (String componentName in componentNames) {
       Widget? component = _createComponentByName(componentName);
@@ -390,10 +461,10 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       return SingleChildScrollView(
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0), // 添加垂直內邊距
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start, // 從頂部開始排列
-            crossAxisAlignment: CrossAxisAlignment.center, // 水平居中
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: components,
           ),
         ),
@@ -483,32 +554,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         );
       case 'ConnectionTypeComponent':
         return ConnectionTypeComponent(
-          onSelectionChanged: (connectionType, isComplete) {
-            // 避免在 build 期間調用 setState
-            Future.microtask(() {
-              if (mounted) {
-                setState(() {
-                  isCurrentStepComplete = isComplete;
-                });
-              }
-            });
-          },
+          onSelectionChanged: _handleConnectionTypeChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );
       case 'SetSSIDComponent':
         return SetSSIDComponent(
-          onFormChanged: (ssid, securityOption, password, isValid) {
-            // 避免在 build 期間調用 setState
-            Future.microtask(() {
-              if (mounted) {
-                setState(() {
-                  // 可以在這裡存儲 SSID、安全選項和密碼
-                  isCurrentStepComplete = isValid;
-                });
-              }
-            });
-          },
+          onFormChanged: _handleSSIDFormChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );
