@@ -4,12 +4,16 @@ class SetSSIDComponent extends StatefulWidget {
   final Function(String, String, String, bool)? onFormChanged;
   final Function()? onNextPressed;
   final Function()? onBackPressed;
+  // 新增顯示選項參數
+  final List<String> displayOptions;
 
   const SetSSIDComponent({
     Key? key,
     this.onFormChanged,
     this.onNextPressed,
     this.onBackPressed,
+    // 預設顯示所有選項
+    this.displayOptions = const ['no authentication', 'Enhanced Open (OWE)', 'WPA2 Personal', 'WPA3 Personal', 'WPA2/WPA3 Personal', 'WPA2 Enterprise'],
   }) : super(key: key);
 
   @override
@@ -20,24 +24,22 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  String _selectedSecurityOption = 'WPA3 Personal';
+  String _selectedSecurityOption = ''; // 初始值設為空字串，後面會設定為第一個選項
   bool _passwordVisible = false;
   bool _showPasswordField = true;
-
-  final List<String> _securityOptions = [
-    'no authentication',
-    'Enhanced Open (OWE)',
-    'WPA2 Personal',
-    'WPA3 Personal',
-    'WPA2/WPA3 Personal',
-    'WPA2 Enterprise'
-  ];
 
   @override
   void initState() {
     super.initState();
     _ssidController.addListener(_notifyFormChanged);
     _passwordController.addListener(_notifyFormChanged);
+
+    // 設定初始安全選項為第一個可用選項
+    if (widget.displayOptions.isNotEmpty) {
+      _selectedSecurityOption = widget.displayOptions.first;
+    } else {
+      _selectedSecurityOption = 'WPA3 Personal'; // 如果沒有選項，使用默認值
+    }
 
     // 使用 addPostFrameCallback 避免在 build 期間調用 setState
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -174,7 +176,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
                       _notifyFormChanged();
                     }
                   },
-                  items: _securityOptions.map<DropdownMenuItem<String>>((String value) {
+                  items: widget.displayOptions.map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value),

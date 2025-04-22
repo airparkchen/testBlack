@@ -2,8 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:whitebox/shared/models/StaticIpConfig.dart';
 
+// 定義 PPPoE 配置類
+class PPPoEConfig {
+  String username = '';
+  String password = '';
+
+  // 檢查必填項是否有值
+  bool isValid() {
+    return username.isNotEmpty && password.isNotEmpty;
+  }
+}
+
 class ConnectionTypeComponent extends StatefulWidget {
-  final Function(String, bool, StaticIpConfig?)? onSelectionChanged;
+  final Function(String, bool, StaticIpConfig?, PPPoEConfig?)? onSelectionChanged;
   final Function()? onNextPressed;
   final Function()? onBackPressed;
   // 新增顯示選項參數
@@ -26,6 +37,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   String _selectedConnectionType = '';
   bool _isFormComplete = false;
   StaticIpConfig _staticIpConfig = StaticIpConfig();
+  PPPoEConfig _pppoeConfig = PPPoEConfig(); // 新增 PPPoE 配置
 
   // 用於 IP 相關輸入的控制器
   final TextEditingController _ipController = TextEditingController();
@@ -33,6 +45,11 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   final TextEditingController _gatewayController = TextEditingController();
   final TextEditingController _primaryDnsController = TextEditingController();
   final TextEditingController _secondaryDnsController = TextEditingController();
+
+  // 用於 PPPoE 相關輸入的控制器
+  final TextEditingController _pppoeUsernameController = TextEditingController();
+  final TextEditingController _pppoePasswordController = TextEditingController();
+  bool _pppoePasswordVisible = false; // 控制密碼可見性
 
   // 滾動控制器
   late ScrollController _scrollController;
@@ -66,6 +83,8 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     _gatewayController.dispose();
     _primaryDnsController.dispose();
     _secondaryDnsController.dispose();
+    _pppoeUsernameController.dispose();
+    _pppoePasswordController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -96,6 +115,17 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       _staticIpConfig.secondaryDns = _secondaryDnsController.text;
       _validateForm();
     });
+
+    // 添加 PPPoE 相關控制器的監聽器
+    _pppoeUsernameController.addListener(() {
+      _pppoeConfig.username = _pppoeUsernameController.text;
+      _validateForm();
+    });
+
+    _pppoePasswordController.addListener(() {
+      _pppoeConfig.password = _pppoePasswordController.text;
+      _validateForm();
+    });
   }
 
   // 驗證表單
@@ -112,6 +142,9 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       if (_staticIpConfig.secondaryDns.isNotEmpty && !_validateIpFormat(_staticIpConfig.secondaryDns)) {
         isValid = false;
       }
+    } else if (_selectedConnectionType == 'PPPoE') {
+      // 驗證 PPPoE 配置
+      isValid = _pppoeConfig.isValid();
     }
 
     if (isValid != _isFormComplete) {
@@ -146,6 +179,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
         _selectedConnectionType,
         _isFormComplete,
         _selectedConnectionType == 'Static IP' ? _staticIpConfig : null,
+        _selectedConnectionType == 'PPPoE' ? _pppoeConfig : null,
       );
     }
   }
@@ -166,8 +200,8 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
           final availableHeight = constraints.maxHeight;
 
           return LimitedBox(
-            maxHeight: _selectedConnectionType == 'Static IP'
-                ? screenSize.height * 0.75  // 靜態 IP 時，增加最大高度限制
+            maxHeight: _selectedConnectionType == 'Static IP' || _selectedConnectionType == 'PPPoE'
+                ? screenSize.height * 0.75  // 靜態 IP 或 PPPoE 時，增加最大高度限制
                 : screenSize.height * 0.25,
             child: SingleChildScrollView(
               controller: _scrollController,
@@ -175,7 +209,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   // 給內容一個最小高度，確保可以滾動
-                  minHeight: _selectedConnectionType == 'Static IP'
+                  minHeight: _selectedConnectionType == 'Static IP' || _selectedConnectionType == 'PPPoE'
                       ? screenSize.height * 0.7
                       : screenSize.height * 0.25,
                 ),
@@ -225,7 +259,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
                               if (newValue != null && newValue != _selectedConnectionType) {
                                 setState(() {
                                   _selectedConnectionType = newValue;
-                                  _isFormComplete = newValue != 'Static IP'; // 如果不是靜態 IP，則表單完成
+                                  _isFormComplete = (newValue != 'Static IP') && (newValue != 'PPPoE'); // 如果不是靜態 IP 或 PPPoE，則表單完成
                                 });
                                 _notifySelectionChanged();
                               }
@@ -306,6 +340,79 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
                         ),
                         const SizedBox(height: 8),
                         _buildIpInputField(_secondaryDnsController, '            .            .            .            '),
+
+                        // 添加額外的底部空間，確保滾動到底部時看得到最後一個輸入框
+                        const SizedBox(height: 250),
+                      ],
+
+                      // 如果選擇了 PPPoE，顯示用戶名和密碼輸入欄位
+                      if (_selectedConnectionType == 'PPPoE') ...[
+                        const SizedBox(height: 20),
+
+                        // 用戶名
+                        const Text(
+                          'User',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextFormField(
+                            controller: _pppoeUsernameController,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: const Color(0xFFEFEFEF),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // 密碼
+                        const Text(
+                          'Password',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextFormField(
+                            controller: _pppoePasswordController,
+                            obscureText: !_pppoePasswordVisible,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: const Color(0xFFEFEFEF),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _pppoePasswordVisible ? Icons.visibility : Icons.visibility_off,
+                                  color: Colors.grey,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _pppoePasswordVisible = !_pppoePasswordVisible;
+                                  });
+                                },
+                              ),
+                            ),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
 
                         // 添加額外的底部空間，確保滾動到底部時看得到最後一個輸入框
                         const SizedBox(height: 250),

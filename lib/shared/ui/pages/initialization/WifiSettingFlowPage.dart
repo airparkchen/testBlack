@@ -34,6 +34,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   String ssid = '';
   String securityOption = 'WPA3 Personal'; // 預設安全選項
   String ssidPassword = '';
+  // 添加 PPPoE 配置相關屬性
+  String pppoeUsername = '';
+  String pppoePassword = '';
 
   bool isCurrentStepComplete = false;
 
@@ -218,7 +221,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
 
   // 連線類型變更處理函數
-  void _handleConnectionTypeChanged(String type, bool isComplete, StaticIpConfig? config) {
+  void _handleConnectionTypeChanged(String type, bool isComplete, StaticIpConfig? config, PPPoEConfig? pppoeConfig) {
     setState(() {
       connectionType = type;
       isCurrentStepComplete = isComplete;
@@ -226,6 +229,12 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       // 如果有靜態 IP 配置，則更新它
       if (config != null) {
         staticIpConfig = config;
+      }
+
+      // 如果有 PPPoE 配置，則更新它
+      if (pppoeConfig != null) {
+        pppoeUsername = pppoeConfig.username;
+        pppoePassword = pppoeConfig.password;
       }
     });
   }
@@ -644,14 +653,16 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         );
       case 'ConnectionTypeComponent':
         return ConnectionTypeComponent(
-          // 如果 detail 數組存在，則傳遞；否則使用默認值
           displayOptions: detailOptions.isNotEmpty ? detailOptions : const ['DHCP', 'Static IP', 'PPPoE'],
           onSelectionChanged: _handleConnectionTypeChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );
+
       case 'SetSSIDComponent':
         return SetSSIDComponent(
+          // 新增：傳遞 detail 數組給 SetSSIDComponent
+          displayOptions: detailOptions.isNotEmpty ? detailOptions : const ['no authentication', 'Enhanced Open (OWE)', 'WPA2 Personal', 'WPA3 Personal', 'WPA2/WPA3 Personal', 'WPA2 Enterprise'],
           onFormChanged: _handleSSIDFormChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
@@ -664,9 +675,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           securityOption: securityOption,
           password: ssidPassword,
           staticIpConfig: connectionType == 'Static IP' ? staticIpConfig : null,
+          // 可以傳遞 PPPoE 資訊
+          pppoeUsername: connectionType == 'PPPoE' ? pppoeUsername : null,
+          pppoePassword: connectionType == 'PPPoE' ? pppoePassword : null,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );
+
       default:
         print('不支援的組件名稱: $componentName');
         return null;

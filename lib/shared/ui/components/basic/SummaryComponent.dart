@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/models/StaticIpConfig.dart';
 
-
 class SummaryComponent extends StatelessWidget {
   // 接收所有設定的資料
   final String username;
@@ -9,7 +8,11 @@ class SummaryComponent extends StatelessWidget {
   final String ssid;
   final String securityOption;
   final String password;
-  final StaticIpConfig? staticIpConfig; // 新增靜態 IP 配置
+  final StaticIpConfig? staticIpConfig; // 靜態 IP 配置
+
+  // 新增 PPPoE 相關資訊
+  final String? pppoeUsername;
+  final String? pppoePassword;
 
   // 可選的回調函數
   final Function()? onNextPressed;
@@ -23,6 +26,8 @@ class SummaryComponent extends StatelessWidget {
     this.securityOption = '',
     this.password = '',
     this.staticIpConfig,
+    this.pppoeUsername,
+    this.pppoePassword,
     this.onNextPressed,
     this.onBackPressed,
   }) : super(key: key);
@@ -34,6 +39,11 @@ class SummaryComponent extends StatelessWidget {
     // 建立一個密碼顯示字串，只顯示星號
     final maskedPassword = password.isNotEmpty
         ? '•' * password.length
+        : '(未設置)';
+
+    // PPPoE 密碼也使用星號顯示
+    final maskedPppoePassword = pppoePassword != null && pppoePassword!.isNotEmpty
+        ? '•' * pppoePassword!.length
         : '(未設置)';
 
     return Container(
@@ -69,6 +79,12 @@ class SummaryComponent extends StatelessWidget {
             _buildInfoItem('主要 DNS', staticIpConfig!.primaryDns),
             if (staticIpConfig!.secondaryDns.isNotEmpty)
               _buildInfoItem('次要 DNS', staticIpConfig!.secondaryDns),
+          ],
+
+          // 如果是 PPPoE，顯示相關資訊
+          if (connectionType == 'PPPoE' && pppoeUsername != null) ...[
+            _buildInfoItem('PPPoE 使用者名稱', pppoeUsername!),
+            _buildInfoItem('PPPoE 密碼', maskedPppoePassword),
           ],
 
           if (connectionType.isNotEmpty) const SizedBox(height: 20),
@@ -118,7 +134,7 @@ class SummaryComponent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 130, // 增加寬度以容納較長的標籤
             child: Text(
               '$label:',
               style: const TextStyle(
