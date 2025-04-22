@@ -161,15 +161,60 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _isUpdatingStep = false;
   }
 
-  // 帳號密碼表單變更處理函數
-  void _handleFormChanged(String user, String pwd, String confirmPwd, bool isComplete) {
+  // 修改表單變更處理函數以適應可能只有部分輸入欄位的情況
+  void _handleFormChanged(String user, String pwd, String confirmPwd, bool isValid) {
     setState(() {
       userName = user;
       password = pwd;
       confirmPassword = confirmPwd;
-      // 表單完成狀態由 _handleNext 控制
+      isCurrentStepComplete = isValid; // 使用組件返回的驗證結果
     });
   }
+
+  // 修改 _validateForm 方法，與 AccountPasswordComponent 的密碼規則保持一致
+  bool _validateForm() {
+    // 獲取當前步驟的 detail 信息
+    List<String> detailOptions = [];
+    final steps = _getCurrentModelSteps();
+
+    if (steps.isNotEmpty && currentStepIndex < steps.length) {
+      var currentStep = steps[currentStepIndex];
+      if (currentStep.containsKey('detail')) {
+        detailOptions = List<String>.from(currentStep['detail']);
+      }
+    }
+
+    // 如果沒有指定選項，使用默認全部選項
+    if (detailOptions.isEmpty) {
+      detailOptions = ['User', 'Password', 'Confirm Password'];
+    }
+
+    // 根據選項進行驗證
+    if (detailOptions.contains('User') && userName.isEmpty) {
+      return false;
+    }
+
+    if (detailOptions.contains('Password')) {
+      // 密碼長度檢查改為 8-32 字元
+      if (password.isEmpty || password.length < 8 || password.length > 32) {
+        return false;
+      }
+
+      // 檢查密碼字元是否符合規定的 ASCII 範圍
+      final RegExp validChars = RegExp(r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$');
+      if (!validChars.hasMatch(password)) {
+        return false;
+      }
+    }
+
+    if (detailOptions.contains('Confirm Password') &&
+        (confirmPassword.isEmpty || confirmPassword != password)) {
+      return false;
+    }
+
+    return true;
+  }
+
 
   // 連線類型變更處理函數
   void _handleConnectionTypeChanged(String type, bool isComplete) {
@@ -189,19 +234,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     });
   }
 
-  bool _validateForm() {
-    if (userName.isEmpty) {
-      return false;
-    }
-    if (password.isEmpty || password.length < 6) {
-      return false;
-    }
-    if (confirmPassword.isEmpty || confirmPassword != password) {
-      return false;
-    }
-    return true;
-  }
 
+  // 修改 _handleNext 方法中的錯誤訊息部分
   void _handleNext() {
     final steps = _getCurrentModelSteps();
 
@@ -209,21 +243,58 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
     final currentComponents = _getCurrentStepComponents();
 
-    // 帳號密碼元件的驗證
+    // 檢查當前步驟是否為帳號密碼元件
     if (currentComponents.contains('AccountPasswordComponent')) {
       if (!_validateForm()) {
+        // 根據當前步驟的 detail 選項顯示適當的錯誤訊息
+        List<String> detailOptions = [];
+        if (steps.isNotEmpty && currentStepIndex < steps.length) {
+          var currentStep = steps[currentStepIndex];
+          if (currentStep.containsKey('detail')) {
+            detailOptions = List<String>.from(currentStep['detail']);
+          }
+        }
+
+        // 如果沒有指定選項，使用默認全部選項
+        if (detailOptions.isEmpty) {
+          detailOptions = ['User', 'Password', 'Confirm Password'];
+        }
+
+        String errorMessage = '';
+
+        if (detailOptions.contains('User') && userName.isEmpty) {
+          errorMessage = '請輸入用戶名';
+        } else if (detailOptions.contains('Password')) {
+          if (password.isEmpty) {
+            errorMessage = '請輸入密碼';
+          } else if (password.length < 8) {
+            errorMessage = '密碼必須至少8個字元';
+          } else if (password.length > 32) {
+            errorMessage = '密碼長度不能超過32個字元';
+          } else {
+            // 檢查密碼字元是否合法
+            final RegExp validChars = RegExp(r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$');
+            if (!validChars.hasMatch(password)) {
+              errorMessage = '密碼包含不允許的字元';
+            }
+          }
+        }
+
+        if (errorMessage.isEmpty && detailOptions.contains('Confirm Password')) {
+          if (confirmPassword.isEmpty) {
+            errorMessage = '請輸入確認密碼';
+          } else if (confirmPassword != password) {
+            errorMessage = '兩次輸入的密碼不一致';
+          }
+        }
+
+        // 如果沒有找到具體錯誤，顯示通用錯誤
+        if (errorMessage.isEmpty) {
+          errorMessage = '請完成當前步驟的設定';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              userName.isEmpty
-                  ? '請輸入用戶名'
-                  : password.isEmpty
-                  ? '請輸入密碼'
-                  : password.length < 6
-                  ? '密碼必須至少6個字符'
-                  : '密碼不匹配',
-            ),
-          ),
+          SnackBar(content: Text(errorMessage)),
         );
         return;
       }
@@ -232,6 +303,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       });
     }
 
+    // 以下代碼保持不變...
     // 如果當前不是最後一步，則前進到下一步
     if (currentStepIndex < steps.length - 1) {
       _isUpdatingStep = true;
@@ -264,8 +336,6 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         isShowingFinishingWizard = true; // 顯示完成嚮導
       });
       _isUpdatingStep = false;
-
-      // 不再顯示對話框，而是在頁面上直接顯示完成嚮導
     }
   }
 
@@ -544,10 +614,24 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
+  // 修改 _createComponentByName 方法，從 JSON 讀取並傳遞 detail 數組
   Widget? _createComponentByName(String componentName) {
+    // 獲取當前步驟的 detail 信息
+    List<String> detailOptions = [];
+    final steps = _getCurrentModelSteps();
+
+    if (steps.isNotEmpty && currentStepIndex < steps.length) {
+      var currentStep = steps[currentStepIndex];
+      if (currentStep.containsKey('detail')) {
+        detailOptions = List<String>.from(currentStep['detail']);
+      }
+    }
+
     switch (componentName) {
       case 'AccountPasswordComponent':
         return AccountPasswordComponent(
+          // 如果 detail 數組存在，則傳遞；否則使用默認值
+          displayOptions: detailOptions.isNotEmpty ? detailOptions : const ['User', 'Password', 'Confirm Password'],
           onFormChanged: _handleFormChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
@@ -561,6 +645,16 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       case 'SetSSIDComponent':
         return SetSSIDComponent(
           onFormChanged: _handleSSIDFormChanged,
+          onNextPressed: _handleNext,
+          onBackPressed: _handleBack,
+        );
+      case 'SummaryComponent':
+        return SummaryComponent(
+          username: userName,
+          connectionType: connectionType,
+          ssid: ssid,
+          securityOption: securityOption,
+          password: ssidPassword,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );

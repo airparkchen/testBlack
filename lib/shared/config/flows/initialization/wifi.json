@@ -33,6 +33,33 @@
       ],
       "type": "JSON",
       "API": "WifiAPI"
+    },
+    "NewModel": {
+      "steps": [
+        {
+          "id": 1,
+          "name": "Account",
+          "next": 2,
+          "components": ["AccountPasswordComponent"],
+          "detail": ["User", "Password"]
+        },
+        {
+          "id": 2,
+          "name": "Internet",
+          "next": 3,
+          "components": ["ConnectionTypeComponent"],
+          "detail": ["DHCP", "Static IP"]
+        },
+        {
+          "id": 3,
+          "name": "Summary",
+          "next": null,
+          "components": ["SummaryComponent"],
+          "detail": ["Model Name", "Operation Mode"]
+        }
+      ],
+      "type": "JSON",
+      "API": "WifiAPI"
     }
   }
 }
