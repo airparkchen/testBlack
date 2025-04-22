@@ -1,30 +1,34 @@
 {
   "models": {
-    "A": {
+    "Micky": {
       "steps": [
         {
           "id": 1,
           "name": "Account",
           "next": 2,
-          "components": ["AccountPasswordComponent"]
+          "components": ["AccountPasswordComponent"],
+          "detail": ["Password"]
         },
         {
           "id": 2,
           "name": "Internet",
           "next": 3,
-          "components": ["ConnectionTypeComponent"]
+          "components": ["ConnectionTypeComponent"],
+          "detail": ["DHCP", "Static IP", "PPPoE"]
         },
         {
           "id": 3,
           "name": "Wireless",
           "next": 4,
-          "components": ["SetSSIDComponent"]
+          "components": ["SetSSIDComponent"],
+          "detail": ["WPA2 Personal", "WPA3 Personal", "WPA2/WPA3 Personal", "WPA2 Enterprise"]
         },
         {
           "id": 4,
           "name": "Summary",
           "next": null,
-          "components": ["SummaryComponent"]
+          "components": ["SummaryComponent"],
+          "detail": ["Model Name", "Operation Mode", "Wireless SSID", "Wireless Key"]
         }
       ],
       "type": "JSON",

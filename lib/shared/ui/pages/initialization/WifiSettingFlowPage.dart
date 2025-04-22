@@ -17,7 +17,7 @@ class WifiSettingFlowPage extends StatefulWidget {
 }
 
 class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
-  String currentModel = 'A';
+  String currentModel = 'Micky';
   int currentStepIndex = 0;
   bool isLastStepCompleted = false;
   bool isShowingFinishingWizard = false; // 是否顯示完成嚮導

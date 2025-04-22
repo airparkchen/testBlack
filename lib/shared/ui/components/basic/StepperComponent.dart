@@ -40,7 +40,7 @@ class StepperComponent extends StatefulWidget {
   const StepperComponent({
     Key? key,
     this.configPath = 'lib/shared/config/flows/initialization/wifi.json',
-    this.modelType = 'A',
+    this.modelType = 'Micky',
     this.onStepChanged,
     this.controller,
   }) : super(key: key);
