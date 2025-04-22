@@ -8,6 +8,7 @@ import 'package:whitebox/shared/ui/components/basic/SetSSIDComponent.dart';
 import 'package:whitebox/shared/ui/components/basic/SummaryComponent.dart';
 import 'package:whitebox/shared/ui/components/basic/FinishingWizardComponent.dart'; // 引入新的嚮導完成元件
 import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart'; // 引入初始頁面
+import 'package:whitebox/shared/models/StaticIpConfig.dart';
 
 class WifiSettingFlowPage extends StatefulWidget {
   const WifiSettingFlowPage({super.key});
@@ -24,7 +25,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
   Map<String, dynamic> stepsConfig = {};
   bool isLoading = true;
-
+  StaticIpConfig staticIpConfig = StaticIpConfig();
   // 儲存所有設定資料的變數
   String userName = '';
   String password = '';
@@ -217,10 +218,15 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
 
   // 連線類型變更處理函數
-  void _handleConnectionTypeChanged(String type, bool isComplete) {
+  void _handleConnectionTypeChanged(String type, bool isComplete, StaticIpConfig? config) {
     setState(() {
       connectionType = type;
       isCurrentStepComplete = isComplete;
+
+      // 如果有靜態 IP 配置，則更新它
+      if (config != null) {
+        staticIpConfig = config;
+      }
     });
   }
 
@@ -614,7 +620,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
-  // 修改 _createComponentByName 方法，從 JSON 讀取並傳遞 detail 數組
+  // 修改 _createComponentByName 方法，讀取並傳遞 detail 數組給 ConnectionTypeComponent
   Widget? _createComponentByName(String componentName) {
     // 獲取當前步驟的 detail 信息
     List<String> detailOptions = [];
@@ -638,6 +644,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         );
       case 'ConnectionTypeComponent':
         return ConnectionTypeComponent(
+          // 如果 detail 數組存在，則傳遞；否則使用默認值
+          displayOptions: detailOptions.isNotEmpty ? detailOptions : const ['DHCP', 'Static IP', 'PPPoE'],
           onSelectionChanged: _handleConnectionTypeChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
@@ -655,6 +663,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           ssid: ssid,
           securityOption: securityOption,
           password: ssidPassword,
+          staticIpConfig: connectionType == 'Static IP' ? staticIpConfig : null,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:whitebox/shared/models/StaticIpConfig.dart';
+
 
 class SummaryComponent extends StatelessWidget {
   // 接收所有設定的資料
@@ -7,6 +9,7 @@ class SummaryComponent extends StatelessWidget {
   final String ssid;
   final String securityOption;
   final String password;
+  final StaticIpConfig? staticIpConfig; // 新增靜態 IP 配置
 
   // 可選的回調函數
   final Function()? onNextPressed;
@@ -19,6 +22,7 @@ class SummaryComponent extends StatelessWidget {
     this.ssid = '',
     this.securityOption = '',
     this.password = '',
+    this.staticIpConfig,
     this.onNextPressed,
     this.onBackPressed,
   }) : super(key: key);
@@ -56,6 +60,17 @@ class SummaryComponent extends StatelessWidget {
           // 連線方式區塊
           if (connectionType.isNotEmpty) _buildSectionTitle('網路連線'),
           if (connectionType.isNotEmpty) _buildInfoItem('連線類型', connectionType),
+
+          // 如果是靜態 IP，顯示相關資訊
+          if (connectionType == 'Static IP' && staticIpConfig != null) ...[
+            _buildInfoItem('IP 位址', staticIpConfig!.ipAddress),
+            _buildInfoItem('子網掩碼', staticIpConfig!.subnetMask),
+            _buildInfoItem('閘道位址', staticIpConfig!.gateway),
+            _buildInfoItem('主要 DNS', staticIpConfig!.primaryDns),
+            if (staticIpConfig!.secondaryDns.isNotEmpty)
+              _buildInfoItem('次要 DNS', staticIpConfig!.secondaryDns),
+          ],
+
           if (connectionType.isNotEmpty) const SizedBox(height: 20),
 
           // 無線網路設定區塊

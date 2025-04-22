@@ -7,7 +7,7 @@
           "name": "Account",
           "next": 2,
           "components": ["AccountPasswordComponent"],
-          "detail": ["Password", "Confirm Password"]
+          "detail": ["Password"]
         },
         {
           "id": 2,
