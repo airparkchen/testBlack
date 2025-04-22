@@ -33,30 +33,6 @@
       ],
       "type": "JSON",
       "API": "WifiAPI"
-    },
-    "B": {
-      "steps": [
-        {
-          "id": 1,
-          "name": "選擇模式",
-          "next": 2,
-          "components": []
-        },
-        {
-          "id": 2,
-          "name": "連線",
-          "next": 3,
-          "components": []
-        },
-        {
-          "id": 3,
-          "name": "完成",
-          "next": null,
-          "components": []
-        }
-      ],
-      "type": "JSON",
-      "API": "WifiAPI"
     }
   }
 }
