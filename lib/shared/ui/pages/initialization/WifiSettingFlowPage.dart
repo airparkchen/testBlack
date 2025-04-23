@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
@@ -22,6 +24,10 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   int currentStepIndex = 0;
   bool isLastStepCompleted = false;
   bool isShowingFinishingWizard = false;
+
+  // 新增省略號動畫相關變數
+  String _ellipsis = '';
+  late Timer _ellipsisTimer;
 
   Map<String, dynamic> stepsConfig = {};
   bool isLoading = true;
@@ -56,13 +62,42 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _loadConfig();
     _pageController = PageController(initialPage: currentStepIndex);
     _stepperController.addListener(_onStepperControllerChanged);
-  }
 
+    // 初始化省略號動畫計時器
+    _startEllipsisAnimation();
+  }
+  // 新增省略號動畫方法
+  void _startEllipsisAnimation() {
+    _ellipsisTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      setState(() {
+        switch (_ellipsis) {
+          case '':
+            _ellipsis = '.';
+            break;
+          case '.':
+            _ellipsis = '..';
+            break;
+          case '..':
+            _ellipsis = '...';
+            break;
+          case '...':
+            _ellipsis = '';
+            break;
+          default:
+            _ellipsis = '';
+        }
+      });
+    });
+  }
   @override
   void dispose() {
     _pageController.dispose();
     _stepperController.removeListener(_onStepperControllerChanged);
     _stepperController.dispose();
+
+    // 取消省略號動畫計時器
+    _ellipsisTimer.cancel();
+
     super.dispose();
   }
 
@@ -435,17 +470,37 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   }
 
   Widget _buildFinishingWizard() {
-    return Center(
-      child: SingleChildScrollView(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-          child: FinishingWizardComponent(
-            processNames: _processNames,
-            totalDurationSeconds: 10,
-            onCompleted: _handleWizardCompleted,
+    return Column(
+      children: [
+        // 將標題修改為「Finishing Wizard...」，並加入動態省略號
+        Expanded(
+          flex: 10,
+          child: Container(
+            width: double.infinity,
+            alignment: Alignment.center,
+            child: Text(
+              'Finishing Wizard$_ellipsis',
+              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
-      ),
+        Expanded(
+          flex: 95,
+          child: Center(
+            child: SingleChildScrollView(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                child: FinishingWizardComponent(
+                  processNames: _processNames,
+                  totalDurationSeconds: 10,
+                  onCompleted: _handleWizardCompleted,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

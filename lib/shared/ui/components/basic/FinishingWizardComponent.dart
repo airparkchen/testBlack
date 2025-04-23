@@ -99,15 +99,6 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Finishing Wizard...',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 40),
-
           // 進程列表
           ..._processes.map((process) => _buildProcessItem(process)),
 
