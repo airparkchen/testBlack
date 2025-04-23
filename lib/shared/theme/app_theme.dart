@@ -41,11 +41,15 @@ class AppColors {
 
 // 文字樣式
 class AppTextStyles {
+  // 字體家族常量
+  static const String fontFamily = 'Segoe UI';
+
   // 大標題 (例如頁面標題)
   static const TextStyle titleStyle = TextStyle(
     fontSize: 32,
     fontWeight: FontWeight.bold,
     color: AppColors.primaryTextColor,
+    fontFamily: fontFamily,
   );
 
   // 中標題 (例如組件標題)
@@ -53,6 +57,7 @@ class AppTextStyles {
     fontSize: 22,
     fontWeight: FontWeight.bold,
     color: AppColors.primaryTextColor,
+    fontFamily: fontFamily,
   );
 
   // 小標題 (例如輸入區標籤)
@@ -60,6 +65,7 @@ class AppTextStyles {
     fontSize: 18,
     fontWeight: FontWeight.normal,
     color: AppColors.primaryTextColor,
+    fontFamily: fontFamily,
   );
 
   // 正文文字
@@ -67,6 +73,7 @@ class AppTextStyles {
     fontSize: 16,
     fontWeight: FontWeight.normal,
     color: AppColors.primaryTextColor,
+    fontFamily: fontFamily,
   );
 
   // 小型文字 (例如次要資訊)
@@ -74,6 +81,7 @@ class AppTextStyles {
     fontSize: 14,
     fontWeight: FontWeight.normal,
     color: AppColors.secondaryTextColor,
+    fontFamily: fontFamily,
   );
 
   // 微型文字 (例如MAC地址顯示)
@@ -81,18 +89,21 @@ class AppTextStyles {
     fontSize: 10,
     fontWeight: FontWeight.normal,
     color: AppColors.secondaryTextColor,
+    fontFamily: fontFamily,
   );
 
   // 按鈕文字
   static const TextStyle buttonTextStyle = TextStyle(
     fontSize: 18,
     color: AppColors.buttonTextColor,
+    fontFamily: fontFamily,
   );
 
   // 錯誤提示文字
   static const TextStyle errorTextStyle = TextStyle(
     fontSize: 12,
     color: AppColors.errorColor,
+    fontFamily: fontFamily,
   );
 }
 
@@ -153,6 +164,10 @@ class AppButtonStyles {
       side: BorderSide(color: AppColors.primaryBorderColor),
     ),
     minimumSize: const Size(100, AppSizes.standardButtonHeight),
+    textStyle: const TextStyle(
+      fontFamily: AppTextStyles.fontFamily,
+      fontSize: 18,
+    ),
   );
 
   // 禁用按鈕樣式
@@ -169,6 +184,10 @@ class AppButtonStyles {
       side: BorderSide(color: AppColors.secondaryBorderColor),
     ),
     minimumSize: const Size(100, AppSizes.standardButtonHeight),
+    textStyle: const TextStyle(
+      fontFamily: AppTextStyles.fontFamily,
+      fontSize: 18,
+    ),
   );
 
   // 方形按鈕樣式 (用於設備選擇)
@@ -180,6 +199,11 @@ class AppButtonStyles {
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(0),
       side: BorderSide(color: AppColors.secondaryBorderColor),
+    ),
+    textStyle: const TextStyle(
+      fontFamily: AppTextStyles.fontFamily,
+      fontSize: 15,
+      fontWeight: FontWeight.bold,
     ),
   );
 }
@@ -211,6 +235,10 @@ class AppInputDecorations {
       borderSide: BorderSide(color: AppColors.errorColor),
     ),
     errorStyle: AppTextStyles.errorTextStyle,
+    hintStyle: TextStyle(
+      fontFamily: AppTextStyles.fontFamily,
+      color: Colors.grey[400],
+    ),
   );
 
   // 下拉選單樣式
@@ -224,6 +252,10 @@ class AppInputDecorations {
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(2),
       borderSide: BorderSide(color: AppColors.primaryBorderColor),
+    ),
+    hintStyle: TextStyle(
+      fontFamily: AppTextStyles.fontFamily,
+      color: Colors.grey[400],
     ),
   );
 }
@@ -256,21 +288,74 @@ class AppTheme {
     return ThemeData(
       primarySwatch: Colors.grey,
       scaffoldBackgroundColor: AppColors.mainBackgroundColor,
-      textTheme: const TextTheme(
+      fontFamily: AppTextStyles.fontFamily, // 設置全局字體
+      textTheme: TextTheme(
+        // 使用新版的文字主題設定（Flutter 2.0以後）
         displayLarge: AppTextStyles.titleStyle,
         displayMedium: AppTextStyles.subtitleStyle,
         bodyLarge: AppTextStyles.bodyStyle,
         bodyMedium: AppTextStyles.smallTextStyle,
+        // 添加更多文字樣式...
+        labelLarge: AppTextStyles.labelStyle,
+        titleMedium: AppTextStyles.subtitleStyle.copyWith(fontWeight: FontWeight.w500),
+        titleSmall: AppTextStyles.labelStyle.copyWith(fontWeight: FontWeight.w500),
       ),
+      // 按鈕主題
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: AppButtonStyles.standardButtonStyle,
       ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          textStyle: TextStyle(fontFamily: AppTextStyles.fontFamily),
+        ),
+      ),
+      // 輸入框主題
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.inputBackgroundColor,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(2),
         ),
+        hintStyle: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          color: Colors.grey[400],
+        ),
+        // 確保所有輸入文字使用 Segoe UI
+        labelStyle: TextStyle(fontFamily: AppTextStyles.fontFamily),
+        helperStyle: TextStyle(fontFamily: AppTextStyles.fontFamily),
+        errorStyle: TextStyle(fontFamily: AppTextStyles.fontFamily, color: AppColors.errorColor),
+        // 確保輸入文字使用 Segoe UI
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.inputFieldPadding,
+          vertical: AppSpacing.inputFieldPadding,
+        ),
+      ),
+      // 對話框主題
+      dialogTheme: DialogTheme(
+        titleTextStyle: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+          color: AppColors.primaryTextColor,
+        ),
+        contentTextStyle: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: 16,
+          color: AppColors.primaryTextColor,
+        ),
+      ),
+      // 應用欄主題
+      appBarTheme: AppBarTheme(
+        titleTextStyle: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: AppColors.primaryTextColor,
+        ),
+      ),
+      // 確保所有文字欄位都使用 Segoe UI
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: AppColors.primaryTextColor,
       ),
     );
   }

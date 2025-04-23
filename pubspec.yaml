@@ -92,3 +92,27 @@ flutter:
   # see https://flutter.dev/to/font-from-package
   assets:
     - lib/shared/config/flows/initialization/wifi.json
+
+  fonts:
+    - family: Segoe UI
+      fonts:
+        - asset: fonts/segoeui.ttf        # 正常字體
+        - asset: fonts/segoeuib.ttf       # 粗體
+          weight: 700
+        - asset: fonts/segoeuii.ttf       # 斜體
+          style: italic
+        - asset: fonts/segoeuil.ttf       # 細體
+          weight: 300
+        - asset: fonts/segoeuisl.ttf      # 半細體
+        - asset: fonts/segoeuiz.ttf       # 黑體
+          weight: 900
+        - asset: fonts/seguisb.ttf        # 半粗體
+          weight: 600
+        - asset: fonts/seguili.ttf        # 細斜體
+          weight: 300
+          style: italic
+        - asset: fonts/seguisbi.ttf       # 半粗斜體
+          weight: 600
+          style: italic
+        - asset: fonts/seguisli.ttf       # 半細斜體
+          style: italic

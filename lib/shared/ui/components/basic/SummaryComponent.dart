@@ -149,18 +149,6 @@ class _SummaryComponentState extends State<SummaryComponent> {
             ),
             // 最後一個項目後不需要分隔線
           ],
-
-          const SizedBox(height: 30),
-
-          // 底部提示
-          const Text(
-            'Press "Finish" to confirm the settings above',
-            style: TextStyle(
-              fontSize: 14,
-              fontStyle: FontStyle.italic,
-              color: Colors.grey,
-            ),
-          ),
         ],
       ),
     );
