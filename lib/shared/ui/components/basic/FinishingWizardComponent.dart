@@ -101,32 +101,6 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
         children: [
           // 進程列表
           ..._processes.map((process) => _buildProcessItem(process)),
-
-          const SizedBox(height: 30),
-
-          // 總進度指示器
-          LinearProgressIndicator(
-            value: _calculateTotalProgress(),
-            minHeight: 10,
-            backgroundColor: Colors.grey[300],
-            color: Colors.black,
-          ),
-
-          const SizedBox(height: 15),
-
-          // 總進度百分比
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                '${(_calculateTotalProgress() * 100).toInt()}%',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -169,19 +143,97 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
             ),
           ],
         ),
-        const SizedBox(height: 10),
-        // 進度條
-        ClipRRect(
-          borderRadius: BorderRadius.circular(2.0),
-          child: LinearProgressIndicator(
-            value: process.percentage / 100.0,
-            minHeight: 8,
-            backgroundColor: Colors.grey[300],
-            color: Colors.black,
-          ),
+        const SizedBox(height: 15),
+        // 進度條 - 使用自定義虛線進度條
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30.0), // 左右縮短進度條
+          child: _buildDashedProgressBar(process.percentage / 100.0),
         ),
         const SizedBox(height: 30),
       ],
     );
+  }
+
+  // 建立虛線進度條
+  Widget _buildDashedProgressBar(double progress) {
+    return CustomPaint(
+      painter: DashedProgressBarPainter(
+        progress: progress,
+        backgroundColor: Colors.grey[300]!,
+        progressColor: Colors.black,
+      ),
+      child: Container(
+        width: double.infinity,
+        height: 2.0,
+      ),
+    );
+  }
+}
+
+// 自定義虛線進度條繪製器
+class DashedProgressBarPainter extends CustomPainter {
+  final double progress;
+  final Color backgroundColor;
+  final Color progressColor;
+
+  // 虛線參數
+  final double dashWidth = 10.0;
+  final double dashSpacing = 3.0;
+
+  DashedProgressBarPainter({
+    required this.progress,
+    required this.backgroundColor,
+    required this.progressColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 繪製背景
+    final Paint backgroundPaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        const Radius.circular(2.0),
+      ),
+      backgroundPaint,
+    );
+
+    // 計算進度條寬度
+    final double progressWidth = size.width * progress;
+
+    // 繪製進度虛線
+    if (progress > 0) {
+      final Paint progressPaint = Paint()
+        ..color = progressColor
+        ..style = PaintingStyle.fill;
+
+      // 繪製虛線
+      double startX = 0;
+      while (startX < progressWidth) {
+        // 確保不超出進度範圍
+        double currentDashWidth = dashWidth;
+        if (startX + dashWidth > progressWidth) {
+          currentDashWidth = progressWidth - startX;
+        }
+
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(startX, 0, currentDashWidth, size.height),
+            const Radius.circular(1.0),
+          ),
+          progressPaint,
+        );
+
+        startX += dashWidth + dashSpacing;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant DashedProgressBarPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
