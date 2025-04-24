@@ -129,14 +129,14 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
             Text(
               process.name,
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
               ),
             ),
             Text(
               '${process.percentage.toInt()}%',
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
                 color: Colors.grey,
               ),

@@ -440,13 +440,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                   : Column(
                 children: [
                   Expanded(
-                    flex: 10,
+                    flex: 12,
                     child: Container(
                       width: double.infinity,
                       alignment: Alignment.center,
                       child: Text(
                         _getCurrentStepName(),
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 36, fontWeight: FontWeight.normal),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -474,13 +474,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       children: [
         // 將標題修改為「Finishing Wizard...」，並加入動態省略號
         Expanded(
-          flex: 10,
+          flex: 12,
           child: Container(
             width: double.infinity,
             alignment: Alignment.center,
             child: Text(
               'Finishing Wizard$_ellipsis',
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.normal),
               textAlign: TextAlign.center,
             ),
           ),
