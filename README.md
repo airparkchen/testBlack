@@ -23,6 +23,8 @@
 - **QR碼掃描**：支援透過QR碼快速添加設備
 - **Wi-Fi掃描**：自動發現可用的Wi-Fi設備
 - **多設備型號配置**：通過JSON文件支援不同設備型號
+- **安全機制**：支援初始密碼計算和API身份驗證
+- **流程進度顯示**：支援設定完成時的進度顯示
 
 ## 專案結構
 
@@ -32,10 +34,16 @@
 lib/
 ├── main.dart                            # 應用程式入口點
 ├── shared/
+    ├── api/
+    │   └── wifi_api_service.dart        # Wi-Fi API服務封裝
     ├── config/
     │   └── flows/
     │       └── initialization/
     │           └── wifi.json            # Wi-Fi 初始化流程配置
+    ├── models/
+    │   └── StaticIpConfig.dart          # 靜態IP配置模型
+    ├── theme/
+    │   └── app_theme.dart               # 應用程式主題設定
     └── ui/
         ├── components/
         │   └── basic/                   # 基礎UI組件
@@ -63,9 +71,13 @@ lib/
 - Dart SDK (與Flutter版本兼容)
 - Android Studio 或 Visual Studio Code 並安裝Flutter插件
 - 以下套件：
-   - wifi_scan: Wi-Fi網絡掃描
-   - mobile_scanner: QR碼掃描
-   - json序列化相關套件
+    - wifi_scan: Wi-Fi網絡掃描
+    - mobile_scanner: QR碼掃描
+    - http: 網絡請求
+    - connectivity_plus: 網絡連接管理
+    - network_info_plus: 網絡信息獲取
+    - crypto: 加密運算
+    - json序列化相關套件
 
 ### 安裝
 
@@ -97,6 +109,15 @@ lib/
 - **按鈕樣式**：方形，無圓角，灰色背景
 - **元件佈局**：清晰的邊界和簡潔的元素間距
 - **統一文字樣式**：標題 32px，副標題 22px，正文 16px
+
+## 安全機制
+
+框架內置多層安全機制：
+
+- **初始密碼計算**：基於設備序號、登入鹽值和SSID計算初始密碼
+- **JWT身份驗證**：支援基於JWT的API訪問授權
+- **通訊加密**：使用標準加密方式保護數據傳輸
+- **密碼複雜度校驗**：確保用戶設置的密碼符合安全要求
 
 ## 開發指南
 
@@ -136,13 +157,32 @@ lib/
 2. 為該型號實現特定的組件和流程
 3. 確保在設備選擇頁面中註冊新型號
 
+### API服務使用方式
+
+框架通過 `WifiApiService` 類提供與設備通信的API封裝：
+
+```dart
+// 獲取系統信息
+final systemInfo = await WifiApiService.getSystemInfo();
+
+// 設置無線網絡參數
+await WifiApiService.updateWirelessBasic({
+  'ssid': 'MyNetwork',
+  'security': 'WPA3',
+  'password': 'SecurePassword'
+});
+
+// 使用計算的初始密碼登入
+await WifiApiService.loginWithInitialPassword();
+```
+
 ## 待實現功能
 
-1. **設備API整合**：實現與實際硬體的通信
-2. **儀表板/設備狀態監控**：設備運行狀態顯示
-3. **高級設定選項**：更多針對特定設備的設定
-4. **設備管理功能**：添加和管理多設備
-5. **多設備協同控制**：IoT設備間的聯動
+1. **設備儀表板**：實現設備運行狀態顯示和管理界面
+2. **高級設定選項**：更多針對特定設備的設定
+3. **設備管理功能**：多設備添加、刪除和管理
+4. **多設備協同控制**：IoT設備間的聯動設定
+5. **固件升級**：支援設備固件更新
 
 ## 貢獻
 
