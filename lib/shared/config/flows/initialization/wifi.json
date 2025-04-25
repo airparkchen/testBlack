@@ -59,7 +59,7 @@
         }
       ],
       "type": "JSON",
-      "API": "WifiAPI"
+      "API": "WiifAPI"
     }
   }
 }
