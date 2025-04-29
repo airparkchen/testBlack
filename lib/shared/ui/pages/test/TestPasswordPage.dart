@@ -20,7 +20,12 @@ class _TestPasswordPageState extends State<TestPasswordPage> {
   final String testSalt = 'bcaab16272c7819b855755157fa679ad60cf733fbc7bfc37b883381bef31886f';
   final String testSSID = 'EG65BE_5G';
   final String testSerialNumber = '8C16451AF919';
-  final String expectedPassword = 'ce07fda6c9b793bc6d5c0685542c682014c2c93b3f692383f43b6ead0a796c30';
+
+  // 根據您提供的新信息
+  final String expectedSha256SN = '937fe0cbc16e4d192401368f00c2271a1d15b05e1b2c2244fb275059083dfab4';
+  final String expectedHash = '1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f809';
+  final String expectedMessage = 'EG65BE_5Gbcaab16272c7819b855755157fa679ad60cf733fbc7bfc37b883381bef31886f';
+  final String expectedPassword = '4744889708859b259d7d8e695bc7b5723e834a5c81d1534bb9ab4d370198829a';
 
   // 預設 Hash 數組（與規則一致）
   static const List<String> DEFAULT_HASHES = [
@@ -54,6 +59,9 @@ class _TestPasswordPageState extends State<TestPasswordPage> {
     Digest digest = sha256.convert(utf8.encode(serialNumber));
     String hexDigest = digest.toString();
     _addLog('序號 SHA256: $hexDigest');
+    _addLog('預期的序號 SHA256: $expectedSha256SN');
+    _addLog('SHA256計算' + (hexDigest == expectedSha256SN ? '正確' : '不正確'));
+
     String lastByte = hexDigest.substring(hexDigest.length - 2);
     int lastByteValue = int.parse(lastByte, radix: 16);
     _addLog('最後字節（十六進制）: $lastByte, 十進制: $lastByteValue');
@@ -96,6 +104,8 @@ class _TestPasswordPageState extends State<TestPasswordPage> {
       _addLog('\n步驟 2: 選擇預設 Hash');
       String selectedHash = DEFAULT_HASHES[combinationIndex];
       _addLog('選擇的 Hash (組合編號 $combinationIndex): $selectedHash');
+      _addLog('預期的 Hash: $expectedHash');
+      _addLog('Hash選擇' + (selectedHash == expectedHash ? '正確' : '不正確'));
 
       // 步驟 3: 拆分 Salt
       _addLog('\n步驟 3: 拆分 Salt');
@@ -134,56 +144,139 @@ class _TestPasswordPageState extends State<TestPasswordPage> {
           messageDesc = 'Salt 後段 + Salt 前段 + SSID';
           break;
       }
-      _addLog('生成的規則消息 (組合編號 $combinationIndex): $message');
+      _addLog('生成的消息 (組合編號 $combinationIndex): $message');
       _addLog('消息組合方式: $messageDesc');
+      _addLog('預期的消息: $expectedMessage');
+      _addLog('消息生成' + (message == expectedMessage ? '正確' : '不正確'));
 
-      // 步驟 5: 計算 HMAC-SHA256（使用 UTF-8 編碼的 Hash）
-      _addLog('\n步驟 5: 計算 HMAC-SHA256（使用 UTF-8 編碼的 Hash）');
-      List<int> keyBytes = utf8.encode(selectedHash);
-      List<int> messageBytes = utf8.encode(message);
-      Hmac hmacSha256 = Hmac(sha256, keyBytes);
-      Digest digest = hmacSha256.convert(messageBytes);
-      String result = digest.toString();
-      _addLog('HMAC-SHA256 結果: $result');
-
-      // 步驟 6: 比較結果
-      _addLog('\n步驟 6: 比較結果');
-      _addLog('計算的密碼: $result');
-      _addLog('預期的密碼: $expectedPassword');
-      if (result == expectedPassword) {
-        _addLog('✅ 計算結果與預期相符！');
-      } else {
-        _addLog('❌ 計算結果與預期不符');
-        _addLog('\n進一步分析：');
-
-        // 額外測試：使用開發者給定的消息和 Hash
-        _addLog('\n測試開發者給定的消息和 Hash：');
-        String devHash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-        String devMessage = testSalt + testSSID;
-        _addLog('開發者給定的 Hash (組合編號 3): $devHash');
-        _addLog('開發者給定的消息: $devMessage (Salt + SSID)');
-
-        // 使用 UTF-8 編碼
-        List<int> devKeyBytes = utf8.encode(devHash);
-        List<int> devMessageBytes = utf8.encode(devMessage);
-        Hmac devHmacSha256 = Hmac(sha256, devKeyBytes);
-        Digest devDigest = devHmacSha256.convert(devMessageBytes);
-        String devResult = devDigest.toString();
-        _addLog('HMAC-SHA256 結果（開發者格式，UTF-8 編碼）: $devResult');
-        _addLog('與預期比較: ' + (devResult == expectedPassword ? '匹配' : '不匹配'));
-
-        // 測試 hexToBytes 編碼
-        List<int> devKeyBytesHex = _hexToBytes(devHash);
-        Hmac devHmacSha256Hex = Hmac(sha256, devKeyBytesHex);
-        Digest devDigestHex = devHmacSha256Hex.convert(devMessageBytes);
-        String devResultHex = devDigestHex.toString();
-        _addLog('HMAC-SHA256 結果（開發者格式，hexToBytes 編碼）: $devResultHex');
-        _addLog('與預期比較: ' + (devResultHex == expectedPassword ? '匹配' : '不匹配'));
+      if (message != expectedMessage) {
+        _addLog('\n注意：生成的消息與預期不符，嘗試手動組合...');
+        message = expectedMessage;
+        _addLog('使用預期的消息進行後續計算: $message');
       }
 
-      setState(() {
-        calculatedPassword = result;
-      });
+      // 步驟 5: 計算 HMAC-SHA256（標準方法 - hexToBytes）
+      _addLog('\n步驟 5.1: 計算 HMAC-SHA256（標準方法 - hexToBytes）');
+      List<int> keyBytesHex = _hexToBytes(selectedHash);
+      List<int> messageBytes = utf8.encode(message);
+      Hmac hmacSha256Hex = Hmac(sha256, keyBytesHex);
+      Digest digestHex = hmacSha256Hex.convert(messageBytes);
+      String resultHex = digestHex.toString();
+      _addLog('HMAC-SHA256 結果 (hexToBytes): $resultHex');
+      _addLog('與預期密碼比較: ' + (resultHex == expectedPassword ? '匹配' : '不匹配'));
+
+      // 步驟 5.2: 計算 HMAC-SHA256（UTF-8編碼方式）
+      _addLog('\n步驟 5.2: 計算 HMAC-SHA256（UTF-8編碼方式）');
+      List<int> keyBytesUtf8 = utf8.encode(selectedHash);
+      Hmac hmacSha256Utf8 = Hmac(sha256, keyBytesUtf8);
+      Digest digestUtf8 = hmacSha256Utf8.convert(messageBytes);
+      String resultUtf8 = digestUtf8.toString();
+      _addLog('HMAC-SHA256 結果 (UTF-8編碼): $resultUtf8');
+      _addLog('與預期密碼比較: ' + (resultUtf8 == expectedPassword ? '匹配' : '不匹配'));
+
+      // 步驟 6: 綜合分析
+      _addLog('\n步驟 6: 綜合分析');
+
+      if (resultHex == expectedPassword || resultUtf8 == expectedPassword) {
+        _addLog('✅ 已找到匹配的計算方法！');
+
+        if (resultHex == expectedPassword) {
+          _addLog('正確的計算方法是：使用標準方法 (hexToBytes)');
+          setState(() {
+            calculatedPassword = resultHex;
+          });
+        }
+
+        if (resultUtf8 == expectedPassword) {
+          _addLog('正確的計算方法是：使用UTF-8編碼方式');
+          setState(() {
+            calculatedPassword = resultUtf8;
+          });
+        }
+
+        _addLog('\n建議修改 calculateInitialPassword 方法：');
+        _addLog('1. 根據文檔計算組合編號: $combinationIndex');
+        _addLog('2. 選擇對應的Hash: ${DEFAULT_HASHES[combinationIndex]}');
+        _addLog('3. 消息組合按照規則: $messageDesc');
+        _addLog('4. HMAC計算使用 ' + (resultUtf8 == expectedPassword ? 'UTF-8編碼' : '標準 hexToBytes 方法'));
+      } else {
+        _addLog('❌ 未找到匹配的計算方法，繼續測試其他可能性...');
+
+        // 測試使用完整測試集
+        _addLog('\n嘗試所有可能的組合:');
+        bool found = false;
+
+        for (int i = 0; i < DEFAULT_HASHES.length; i++) {
+          String hash = DEFAULT_HASHES[i];
+
+          for (int j = 0; j < 6; j++) {
+            String testMessage = '';
+            switch (j) {
+              case 0:
+                testMessage = testSSID + saltFront + saltBack;
+                break;
+              case 1:
+                testMessage = testSSID + saltBack + saltFront;
+                break;
+              case 2:
+                testMessage = saltFront + testSSID + saltBack;
+                break;
+              case 3:
+                testMessage = saltFront + saltBack + testSSID;
+                break;
+              case 4:
+                testMessage = saltBack + testSSID + saltFront;
+                break;
+              case 5:
+                testMessage = saltBack + saltFront + testSSID;
+                break;
+            }
+
+            // 使用UTF-8編碼
+            List<int> testKeyUtf8 = utf8.encode(hash);
+            List<int> testMessageBytes = utf8.encode(testMessage);
+            Hmac testHmacUtf8 = Hmac(sha256, testKeyUtf8);
+            Digest testDigestUtf8 = testHmacUtf8.convert(testMessageBytes);
+            String testResultUtf8 = testDigestUtf8.toString();
+
+            if (testResultUtf8 == expectedPassword) {
+              _addLog('\n✅ 找到匹配組合!');
+              _addLog('Hash編號: $i');
+              _addLog('消息組合編號: $j');
+              _addLog('結果: $testResultUtf8');
+              found = true;
+              setState(() {
+                calculatedPassword = testResultUtf8;
+              });
+              break;
+            }
+
+            // 使用hexToBytes
+            List<int> testKeyHex = _hexToBytes(hash);
+            Hmac testHmacHex = Hmac(sha256, testKeyHex);
+            Digest testDigestHex = testHmacHex.convert(testMessageBytes);
+            String testResultHex = testDigestHex.toString();
+
+            if (testResultHex == expectedPassword) {
+              _addLog('\n✅ 找到匹配組合!');
+              _addLog('Hash編號: $i (使用hexToBytes)');
+              _addLog('消息組合編號: $j');
+              _addLog('結果: $testResultHex');
+              found = true;
+              setState(() {
+                calculatedPassword = testResultHex;
+              });
+              break;
+            }
+          }
+
+          if (found) break;
+        }
+
+        if (!found) {
+          _addLog('\n❌ 測試了所有組合，仍未找到匹配方式');
+        }
+      }
     } catch (e) {
       _addLog('測試出錯: $e');
     }
