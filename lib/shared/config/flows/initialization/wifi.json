@@ -28,7 +28,13 @@
           "name": "Summary",
           "next": null,
           "components": ["SummaryComponent"],
-          "detail": ["Model Name", "Operation Mode", "Wireless SSID", "Wireless Key"]
+          "detail": ["Model Name", "Operation Mode", "Wireless SSID", "Wireless Key"],
+          "apiCalls": [
+            {
+              "type": "finish",
+              "method": "postWizardFinish"
+            }
+          ]
         }
       ],
       "type": "JSON",
@@ -55,11 +61,17 @@
           "name": "Summary",
           "next": null,
           "components": ["SummaryComponent"],
-          "detail": ["Model Name", "Operation Mode"]
+          "detail": ["Model Name", "Operation Mode"],
+          "apiCalls": [
+            {
+              "type": "finish",
+              "method": "postConfigFinish"
+            }
+          ]
         }
       ],
       "type": "JSON",
-      "API": "WiifAPI"
+      "API": "WifiAPI"
     }
   }
 }

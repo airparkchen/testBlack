@@ -1,25 +1,76 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:crypto/crypto.dart'; // 添加加密套件
-import 'package:connectivity_plus/connectivity_plus.dart'; // 添加網絡連接套件
-import 'package:network_info_plus/network_info_plus.dart'; // 添加網絡資訊套件，用於獲取SSID
+import 'package:crypto/crypto.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:network_info_plus/network_info_plus.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
-/// 簡化版的 WiFi API 服務類
-/// 提供基本的 HTTP 方法和常用 API 端點
+/// API 請求方法枚舉
+enum ApiMethod {
+  get,
+  post,
+  put,
+  delete
+}
+
+/// API 端點配置類
+class ApiEndpoint {
+  final String path;
+  final ApiMethod defaultMethod;
+  final Map<String, dynamic> defaultData;
+
+  ApiEndpoint({
+    required this.path,
+    this.defaultMethod = ApiMethod.get,
+    this.defaultData = const {},
+  });
+
+  factory ApiEndpoint.fromJson(Map<String, dynamic> json) {
+    ApiMethod method = ApiMethod.get;
+    if (json.containsKey('method')) {
+      switch (json['method'].toString().toLowerCase()) {
+        case 'post':
+          method = ApiMethod.post;
+          break;
+        case 'put':
+          method = ApiMethod.put;
+          break;
+        case 'delete':
+          method = ApiMethod.delete;
+          break;
+        default:
+          method = ApiMethod.get;
+      }
+    }
+
+    return ApiEndpoint(
+      path: json['path'] ?? '',
+      defaultMethod: method,
+      defaultData: json['defaultData'] ?? {},
+    );
+  }
+}
+
+/// WiFi API 服務類
 class WifiApiService {
-  // API 基礎 URL，可以根據環境配置更改
+  // API 相關設定
   static String baseUrl = 'http://192.168.1.1';
+  static String apiVersion = '/api/v1';
+  static int timeoutSeconds = 10;
 
-  // API 版本
-  static const String apiVersion = '/api/v1';
+  // API 端點映射表
+  static final Map<String, ApiEndpoint> _endpoints = {};
 
-  // HTTP 請求超時時間（秒）
-  static const int timeoutSeconds = 10;
+  // 初始化狀態
+  static bool _isInitialized = false;
+
+  // 動態方法呼叫處理器
+  static final Map<String, Function> _dynamicMethods = {};
 
   // JWT Token，用於身份驗證
   static String? _jwtToken;
 
-  // 預設 Hash 數組（SHA-256，以十六進位制表示）
+  // 預設 Hash 數組
   static const List<String> DEFAULT_HASHES = [
     '1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f809',
     '9876543210abcdef9876543210abcdef9876543210abcdef9876543210abcdef',
@@ -28,6 +79,143 @@ class WifiApiService {
     'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
     '7890abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456',
   ];
+
+  /// 初始化 API 服務
+  static Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    try {
+      // 讀取 API 配置文件
+      final jsonString = await rootBundle.loadString('lib/shared/config/api/wifi.json');
+      final config = json.decode(jsonString);
+
+      // 設置基本配置
+      baseUrl = config['baseUrl'] ?? baseUrl;
+      apiVersion = config['apiVersion'] ?? apiVersion;
+      timeoutSeconds = config['timeoutSeconds'] ?? timeoutSeconds;
+
+      // 解析端點
+      final endpointsMap = config['endpoints'] as Map<String, dynamic>;
+
+      endpointsMap.forEach((key, value) {
+        if (value is String) {
+          // 簡單字串格式: "systemInfo": "$apiVersion/system/info"
+          final endpoint = value.toString().replaceAll('\$apiVersion', apiVersion);
+          _endpoints[key] = ApiEndpoint(path: endpoint);
+        } else if (value is Map<String, dynamic>) {
+          // 擴展格式: "systemInfo": {"path": "$apiVersion/system/info", "method": "get"}
+          final path = value['path'].toString().replaceAll('\$apiVersion', apiVersion);
+          _endpoints[key] = ApiEndpoint.fromJson({...value, 'path': path});
+        }
+
+        // 為每個端點動態建立方法
+        _createDynamicMethod(key);
+      });
+
+      _isInitialized = true;
+      print('WifiApiService 初始化成功，載入了 ${_endpoints.length} 個 API 端點');
+    } catch (e) {
+      print('WifiApiService 初始化失敗: $e');
+      // 失敗時使用預設端點
+      _setupDefaultEndpoints();
+    }
+  }
+
+  /// 設置預設端點（向後兼容）
+  static void _setupDefaultEndpoints() {
+    final defaultEndpoints = {
+      'configStart': '$apiVersion/config/start',
+      'configFinish': '$apiVersion/config/finish',
+      'systemInfo': '$apiVersion/system/info',
+      'wan5g': '$apiVersion/network/wan_5g',
+      'wanEth': '$apiVersion/network/wan_eth',
+      'networkStatus': '$apiVersion/network/status',
+      'wirelessBasic': '$apiVersion/wireless/basic',
+      'wirelessAdvanced': '$apiVersion/wireless/advanced',
+      'wizardChangePassword': '$apiVersion/wizard/change_password',
+      'wizardWanEth': '$apiVersion/wizard/wan_eth',
+      'userLogin': '$apiVersion/user/login',
+    };
+
+    defaultEndpoints.forEach((key, path) {
+      _endpoints[key] = ApiEndpoint(path: path);
+      _createDynamicMethod(key);
+    });
+
+    _isInitialized = true;
+    print('使用預設 API 端點');
+  }
+
+  /// 為端點動態建立方法
+  static void _createDynamicMethod(String endpointKey) {
+    final methodName = _endpointToMethodName(endpointKey);
+
+    // 建立GET方法
+    _dynamicMethods['get$methodName'] = ([Map<String, dynamic>? params]) async {
+      final endpoint = _endpoints[endpointKey]!;
+      return await get(endpoint.path, queryParams: params);
+    };
+
+    // 建立POST方法
+    _dynamicMethods['post$methodName'] = (Map<String, dynamic>? data) async {
+      final endpoint = _endpoints[endpointKey]!;
+      return await post(endpoint.path, data: data);
+    };
+
+    // 建立PUT方法
+    _dynamicMethods['update$methodName'] = (Map<String, dynamic>? data) async {
+      final endpoint = _endpoints[endpointKey]!;
+      return await put(endpoint.path, data: data);
+    };
+
+    // 建立DELETE方法
+    _dynamicMethods['delete$methodName'] = (Map<String, dynamic>? data) async {
+      final endpoint = _endpoints[endpointKey]!;
+      return await delete(endpoint.path, data: data);
+    };
+  }
+
+  /// 將端點鍵轉換為方法名稱（駝峰命名法）
+  static String _endpointToMethodName(String key) {
+    // 分割字串並轉換為駝峰命名法
+    final parts = key.split('_');
+    String result = parts[0];
+
+    for (int i = 1; i < parts.length; i++) {
+      if (parts[i].isNotEmpty) {
+        result += parts[i][0].toUpperCase() + parts[i].substring(1);
+      }
+    }
+
+    // 首字母大寫
+    if (result.isNotEmpty) {
+      result = result[0].toUpperCase() + result.substring(1);
+    }
+
+    return result;
+  }
+
+  /// 獲取API端點配置
+  static ApiEndpoint? getEndpointConfig(String key) {
+    if (!_isInitialized) {
+      _setupDefaultEndpoints();
+    }
+
+    return _endpoints[key];
+  }
+
+  /// 獲取API端點路徑
+  static String getEndpoint(String key) {
+    if (!_isInitialized) {
+      _setupDefaultEndpoints();
+    }
+
+    if (!_endpoints.containsKey(key)) {
+      print('警告: API端點 "$key" 不存在，請檢查配置');
+      return '';
+    }
+    return _endpoints[key]!.path;
+  }
 
   /// 設置 JWT Token
   static void setJwtToken(String token) {
@@ -54,11 +242,21 @@ class WifiApiService {
   }
 
   /// 發送 GET 請求
-  static Future<Map<String, dynamic>> get(String path) async {
+  static Future<Map<String, dynamic>> get(String endpoint, {Map<String, dynamic>? queryParams}) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
     try {
-      final url = Uri.parse('$baseUrl$path');
+      var uri = Uri.parse('$baseUrl$endpoint');
+
+      // 如果有查詢參數，將其添加到 URL 中
+      if (queryParams != null && queryParams.isNotEmpty) {
+        uri = uri.replace(queryParameters: queryParams.map((key, value) => MapEntry(key, value.toString())));
+      }
+
       final response = await http.get(
-        url,
+        uri,
         headers: getHeaders(),
       ).timeout(Duration(seconds: timeoutSeconds));
 
@@ -70,9 +268,13 @@ class WifiApiService {
   }
 
   /// 發送 POST 請求
-  static Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? data}) async {
+  static Future<Map<String, dynamic>> post(String endpoint, {Map<String, dynamic>? data}) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
     try {
-      final url = Uri.parse('$baseUrl$path');
+      final url = Uri.parse('$baseUrl$endpoint');
       final response = await http.post(
         url,
         headers: getHeaders(),
@@ -87,9 +289,13 @@ class WifiApiService {
   }
 
   /// 發送 PUT 請求
-  static Future<Map<String, dynamic>> put(String path, {Map<String, dynamic>? data}) async {
+  static Future<Map<String, dynamic>> put(String endpoint, {Map<String, dynamic>? data}) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
     try {
-      final url = Uri.parse('$baseUrl$path');
+      final url = Uri.parse('$baseUrl$endpoint');
       final response = await http.put(
         url,
         headers: getHeaders(),
@@ -104,9 +310,13 @@ class WifiApiService {
   }
 
   /// 發送 DELETE 請求
-  static Future<Map<String, dynamic>> delete(String path, {Map<String, dynamic>? data}) async {
+  static Future<Map<String, dynamic>> delete(String endpoint, {Map<String, dynamic>? data}) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
     try {
-      final url = Uri.parse('$baseUrl$path');
+      final url = Uri.parse('$baseUrl$endpoint');
       final response = await http.delete(
         url,
         headers: getHeaders(),
@@ -125,7 +335,7 @@ class WifiApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return {};
 
-      // 處理特殊格式的響應（例如帶有fdsafdsafd的前綴）
+      // 處理特殊格式的響應
       String responseBody = response.body;
       int jsonStart = responseBody.indexOf('{');
       if (jsonStart > 0) {
@@ -142,7 +352,6 @@ class WifiApiService {
           message: errorData['message'] ?? 'Unknown error',
         );
       } catch (e) {
-        // 如果無法解析錯誤回應
         throw ApiException(
           statusCode: response.statusCode,
           errorCode: 'parse_error',
@@ -152,73 +361,29 @@ class WifiApiService {
     }
   }
 
-  // ========== API 路徑定義 ==========
-  // 您可以在這裡新增更多 API 路徑
+  /// 動態調用方法
+  static Future<Map<String, dynamic>> call(String methodName, [dynamic params]) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
 
-  static const String configStartPath = '$apiVersion/config/start';
-  static const String configFinishPath = '$apiVersion/config/finish';
-  static const String systemInfoPath = '$apiVersion/system/info';
-  static const String wan5gPath = '$apiVersion/network/wan_5g';
-  static const String wanEthPath = '$apiVersion/network/wan_eth';
-  static const String networkStatusPath = '$apiVersion/network/status';
-  static const String wirelessBasicPath = '$apiVersion/wireless/basic';
-  static const String wirelessAdvancedPath = '$apiVersion/wireless/advanced';
-  static const String wizardChangePasswordPath = '$apiVersion/wizard/change_password';
-  static const String wizardWanEthPath = '$apiVersion/wizard/wan_eth';
-  static const String userLoginPath = '$apiVersion/user/login';
+    if (!_dynamicMethods.containsKey(methodName)) {
+      throw Exception('方法 "$methodName" 不存在');
+    }
 
-  // ========== API 功能實現 ==========
-  // 這些函數封裝了 API 呼叫，使用上面定義的路徑
-
-  /// 獲取系統資訊
-  static Future<Map<String, dynamic>> getSystemInfo() async {
-    return await get(systemInfoPath);
+    return await _dynamicMethods[methodName]!(params);
   }
 
-  /// 獲取網路狀態
-  static Future<Map<String, dynamic>> getNetworkStatus() async {
-    return await get(networkStatusPath);
+  /// 獲取所有可用的 API 方法名稱
+  static List<String> getAllMethodNames() {
+    if (!_isInitialized) {
+      _setupDefaultEndpoints();
+    }
+    return _dynamicMethods.keys.toList();
   }
 
-  /// 獲取無線基本設定
-  static Future<Map<String, dynamic>> getWirelessBasic() async {
-    return await get(wirelessBasicPath);
-  }
-
-  /// 更新無線基本設定
-  static Future<Map<String, dynamic>> updateWirelessBasic(Map<String, dynamic> config) async {
-    return await put(wirelessBasicPath, data: config);
-  }
-
-  /// 獲取以太網廣域網路設定
-  static Future<Map<String, dynamic>> getWanEth() async {
-    return await get(wanEthPath);
-  }
-
-  /// 更新以太網廣域網路設定
-  static Future<Map<String, dynamic>> updateWanEth(Map<String, dynamic> config) async {
-    return await put(wanEthPath, data: config);
-  }
-
-  /// 開始設定
-  static Future<Map<String, dynamic>> configStart() async {
-    return await post(configStartPath);
-  }
-
-  /// 完成設定
-  static Future<Map<String, dynamic>> configFinish() async {
-    return await post(configFinishPath);
-  }
-
-  /// 登入（SRP 方式）
-  static Future<Map<String, dynamic>> login(Map<String, dynamic> loginData) async {
-    return await post(userLoginPath, data: loginData);
-  }
-
-  /// 變更密碼（精靈模式）
-  static Future<Map<String, dynamic>> changePassword(Map<String, dynamic> passwordData) async {
-    return await put(wizardChangePasswordPath, data: passwordData);
-  }
+  // ======================= 自定義方法 =======================
+  // 以下是無法自動生成的自定義方法
 
   /// 獲取當前連接的 SSID
   static Future<String?> getCurrentSSID() async {
@@ -226,10 +391,9 @@ class WifiApiService {
       final connectivity = await Connectivity().checkConnectivity();
       if (connectivity == ConnectivityResult.wifi) {
         final info = NetworkInfo();
-        final ssid = await info.getWifiName(); // 返回格式可能是 "\"SSID名稱\""
+        final ssid = await info.getWifiName();
 
         if (ssid != null && ssid.isNotEmpty) {
-          // 去除可能的引號
           return ssid.replaceAll('"', '');
         }
       }
@@ -242,14 +406,9 @@ class WifiApiService {
 
   /// 計算組合編號
   static int _calculateCombinationIndex(String serialNumber) {
-    // 對序號計算 SHA-256
     Digest digest = sha256.convert(utf8.encode(serialNumber));
     String hexDigest = digest.toString();
-
-    // 取最後一個位元組（最後兩個16進制字符）
     String lastByte = hexDigest.substring(hexDigest.length - 2);
-
-    // 轉換為整數並取餘數
     int lastByteValue = int.parse(lastByte, radix: 16);
     return lastByteValue % 6;
   }
@@ -264,14 +423,10 @@ class WifiApiService {
   }
 
   /// 計算初始密碼
-  ///
-  /// 使用設備序號、登入鹽值和SSID計算初始密碼
-  /// 如果沒有提供SSID，將嘗試獲取當前連接的SSID
-  /// 如果無法獲取SSID，則使用設備型號作為SSID
   static Future<String> calculateInitialPassword({
-    String? providedSSID, // 可選提供的SSID
-    String? serialNumber, // 可選提供的序號
-    String? loginSalt, // 可選提供的鹽值
+    String? providedSSID,
+    String? serialNumber,
+    String? loginSalt,
   }) async {
     Map<String, dynamic> systemInfo;
     String ssid;
@@ -286,8 +441,8 @@ class WifiApiService {
         if (currentSSID != null) {
           ssid = currentSSID;
         } else {
-          // 如果無法獲取當前SSID，則從系統信息中取得設備型號作為SSID
-          systemInfo = await getSystemInfo();
+          // 使用動態方法獲取系統信息
+          systemInfo = await call('getSystemInfo');
           ssid = systemInfo['model_name'] ?? 'UNKNOWN';
         }
       } else {
@@ -296,7 +451,7 @@ class WifiApiService {
 
       // 如果沒有提供序號或鹽值，從系統信息中獲取
       if (serialNumber == null || loginSalt == null) {
-        systemInfo = await getSystemInfo();
+        systemInfo = await call('getSystemInfo');
 
         salt = loginSalt ?? systemInfo['login_salt'];
         serial = serialNumber ?? systemInfo['serial_number'];
@@ -316,8 +471,8 @@ class WifiApiService {
       String defaultHash = DEFAULT_HASHES[combinationIndex];
 
       // 分割 Salt
-      String saltFront = salt.substring(0, 32); // 前128位（32個16進制字符）
-      String saltBack = salt.substring(32);     // 後128位
+      String saltFront = salt.substring(0, 32);
+      String saltBack = salt.substring(32);
 
       // 根據組合編號選擇 Message 組合順序
       String message = '';
@@ -375,7 +530,7 @@ class WifiApiService {
       // 如果沒有提供用戶名，從系統信息中獲取
       String user;
       if (username == null) {
-        final systemInfo = await getSystemInfo();
+        final systemInfo = await call('getSystemInfo');
         user = systemInfo['default_user'] ?? 'admin';
       } else {
         user = username;
@@ -387,7 +542,7 @@ class WifiApiService {
         'password': password,
       };
 
-      final response = await login(loginData);
+      final response = await call('postUserLogin', loginData);
 
       // 如果登入成功，保存token
       if (response.containsKey('token')) {
@@ -399,6 +554,59 @@ class WifiApiService {
       print('初始密碼登入錯誤: $e');
       rethrow;
     }
+  }
+
+  // ======================= 兼容性方法 =======================
+  // 以下是為了向後兼容而提供的方法
+
+  /// 獲取系統資訊
+  static Future<Map<String, dynamic>> getSystemInfo() async {
+    return await call('getSystemInfo');
+  }
+
+  /// 獲取網路狀態
+  static Future<Map<String, dynamic>> getNetworkStatus() async {
+    return await call('getNetworkStatus');
+  }
+
+  /// 獲取無線基本設定
+  static Future<Map<String, dynamic>> getWirelessBasic() async {
+    return await call('getWirelessBasic');
+  }
+
+  /// 更新無線基本設定
+  static Future<Map<String, dynamic>> updateWirelessBasic(Map<String, dynamic> config) async {
+    return await call('updateWirelessBasic', config);
+  }
+
+  /// 獲取以太網廣域網路設定
+  static Future<Map<String, dynamic>> getWanEth() async {
+    return await call('getWanEth');
+  }
+
+  /// 更新以太網廣域網路設定
+  static Future<Map<String, dynamic>> updateWanEth(Map<String, dynamic> config) async {
+    return await call('updateWanEth', config);
+  }
+
+  /// 開始設定
+  static Future<Map<String, dynamic>> configStart() async {
+    return await call('postConfigStart');
+  }
+
+  /// 完成設定
+  static Future<Map<String, dynamic>> configFinish() async {
+    return await call('postConfigFinish');
+  }
+
+  /// 登入（SRP 方式）
+  static Future<Map<String, dynamic>> login(Map<String, dynamic> loginData) async {
+    return await call('postUserLogin', loginData);
+  }
+
+  /// 變更密碼（精靈模式）
+  static Future<Map<String, dynamic>> changePassword(Map<String, dynamic> passwordData) async {
+    return await call('updateWizardChangePassword', passwordData);
   }
 }
 
