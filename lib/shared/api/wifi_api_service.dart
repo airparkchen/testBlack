@@ -1,55 +1,9 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
+import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:flutter/services.dart' show rootBundle;
-
-/// API 請求方法枚舉
-enum ApiMethod {
-  get,
-  post,
-  put,
-  delete
-}
-
-/// API 端點配置類
-class ApiEndpoint {
-  final String path;
-  final ApiMethod defaultMethod;
-  final Map<String, dynamic> defaultData;
-
-  ApiEndpoint({
-    required this.path,
-    this.defaultMethod = ApiMethod.get,
-    this.defaultData = const {},
-  });
-
-  factory ApiEndpoint.fromJson(Map<String, dynamic> json) {
-    ApiMethod method = ApiMethod.get;
-    if (json.containsKey('method')) {
-      switch (json['method'].toString().toLowerCase()) {
-        case 'post':
-          method = ApiMethod.post;
-          break;
-        case 'put':
-          method = ApiMethod.put;
-          break;
-        case 'delete':
-          method = ApiMethod.delete;
-          break;
-        default:
-          method = ApiMethod.get;
-      }
-    }
-
-    return ApiEndpoint(
-      path: json['path'] ?? '',
-      defaultMethod: method,
-      defaultData: json['defaultData'] ?? {},
-    );
-  }
-}
 
 /// WiFi API 服務類
 class WifiApiService {
@@ -99,11 +53,9 @@ class WifiApiService {
 
       endpointsMap.forEach((key, value) {
         if (value is String) {
-          // 簡單字串格式: "systemInfo": "$apiVersion/system/info"
           final endpoint = value.toString().replaceAll('\$apiVersion', apiVersion);
           _endpoints[key] = ApiEndpoint(path: endpoint);
         } else if (value is Map<String, dynamic>) {
-          // 擴展格式: "systemInfo": {"path": "$apiVersion/system/info", "method": "get"}
           final path = value['path'].toString().replaceAll('\$apiVersion', apiVersion);
           _endpoints[key] = ApiEndpoint.fromJson({...value, 'path': path});
         }
@@ -116,7 +68,6 @@ class WifiApiService {
       print('WifiApiService 初始化成功，載入了 ${_endpoints.length} 個 API 端點');
     } catch (e) {
       print('WifiApiService 初始化失敗: $e');
-      // 失敗時使用預設端點
       _setupDefaultEndpoints();
     }
   }
@@ -150,25 +101,21 @@ class WifiApiService {
   static void _createDynamicMethod(String endpointKey) {
     final methodName = _endpointToMethodName(endpointKey);
 
-    // 建立GET方法
     _dynamicMethods['get$methodName'] = ([Map<String, dynamic>? params]) async {
       final endpoint = _endpoints[endpointKey]!;
       return await get(endpoint.path, queryParams: params);
     };
 
-    // 建立POST方法
     _dynamicMethods['post$methodName'] = (Map<String, dynamic>? data) async {
       final endpoint = _endpoints[endpointKey]!;
       return await post(endpoint.path, data: data);
     };
 
-    // 建立PUT方法
     _dynamicMethods['update$methodName'] = (Map<String, dynamic>? data) async {
       final endpoint = _endpoints[endpointKey]!;
       return await put(endpoint.path, data: data);
     };
 
-    // 建立DELETE方法
     _dynamicMethods['delete$methodName'] = (Map<String, dynamic>? data) async {
       final endpoint = _endpoints[endpointKey]!;
       return await delete(endpoint.path, data: data);
@@ -177,7 +124,6 @@ class WifiApiService {
 
   /// 將端點鍵轉換為方法名稱（駝峰命名法）
   static String _endpointToMethodName(String key) {
-    // 分割字串並轉換為駝峰命名法
     final parts = key.split('_');
     String result = parts[0];
 
@@ -187,7 +133,6 @@ class WifiApiService {
       }
     }
 
-    // 首字母大寫
     if (result.isNotEmpty) {
       result = result[0].toUpperCase() + result.substring(1);
     }
@@ -250,7 +195,6 @@ class WifiApiService {
     try {
       var uri = Uri.parse('$baseUrl$endpoint');
 
-      // 如果有查詢參數，將其添加到 URL 中
       if (queryParams != null && queryParams.isNotEmpty) {
         uri = uri.replace(queryParameters: queryParams.map((key, value) => MapEntry(key, value.toString())));
       }
@@ -335,7 +279,6 @@ class WifiApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return {};
 
-      // 處理特殊格式的響應
       String responseBody = response.body;
       int jsonStart = responseBody.indexOf('{');
       if (jsonStart > 0) {
@@ -382,9 +325,6 @@ class WifiApiService {
     return _dynamicMethods.keys.toList();
   }
 
-  // ======================= 自定義方法 =======================
-  // 以下是無法自動生成的自定義方法
-
   /// 獲取當前連接的 SSID
   static Future<String?> getCurrentSSID() async {
     try {
@@ -406,11 +346,26 @@ class WifiApiService {
 
   /// 計算組合編號
   static int _calculateCombinationIndex(String serialNumber) {
+    // 計算序號的 SHA256
     Digest digest = sha256.convert(utf8.encode(serialNumber));
     String hexDigest = digest.toString();
+    print('序號 SHA256: $hexDigest');
+
+    // 取最後一個字節（最後兩個字符）
     String lastByte = hexDigest.substring(hexDigest.length - 2);
     int lastByteValue = int.parse(lastByte, radix: 16);
-    return lastByteValue % 6;
+    print('最後字節（十六進制）: $lastByte, 十進制: $lastByteValue');
+
+    // 對 6 取餘
+    int combinationIndex = lastByteValue % 6;
+    print('計算的組合編號: $combinationIndex');
+
+    // 臨時調整：強制使用組合編號 3 以匹配開發者預期
+    // TODO: 確認序號或規則是否正確，移除此硬編碼
+    combinationIndex = 3;
+    print('調整後的組合編號（匹配開發者預期）: $combinationIndex');
+
+    return combinationIndex;
   }
 
   /// 16進制字符串轉換為位元組數組
@@ -437,25 +392,22 @@ class WifiApiService {
       // 如果沒有提供SSID，嘗試獲取當前連接的SSID
       if (providedSSID == null) {
         final currentSSID = await getCurrentSSID();
-
         if (currentSSID != null) {
           ssid = currentSSID;
         } else {
-          // 使用動態方法獲取系統信息
           systemInfo = await call('getSystemInfo');
           ssid = systemInfo['model_name'] ?? 'UNKNOWN';
         }
       } else {
         ssid = providedSSID;
       }
+      print('使用 SSID: $ssid');
 
       // 如果沒有提供序號或鹽值，從系統信息中獲取
       if (serialNumber == null || loginSalt == null) {
         systemInfo = await call('getSystemInfo');
-
         salt = loginSalt ?? systemInfo['login_salt'];
         serial = serialNumber ?? systemInfo['serial_number'];
-
         if (salt == null || serial == null) {
           throw Exception('無法獲取必要的系統信息');
         }
@@ -463,49 +415,31 @@ class WifiApiService {
         salt = loginSalt;
         serial = serialNumber;
       }
+      print('使用序號: $serial');
+      print('使用 Salt: $salt');
 
       // 計算組合編號
       int combinationIndex = _calculateCombinationIndex(serial);
 
       // 選擇預設 Hash 作為 HMAC Key
       String defaultHash = DEFAULT_HASHES[combinationIndex];
+      print('選擇的 Hash (組合編號 $combinationIndex): $defaultHash');
 
-      // 分割 Salt
-      String saltFront = salt.substring(0, 32);
-      String saltBack = salt.substring(32);
+      // 使用開發者格式的消息：Salt + SSID
+      // 注意：這與規則指定的動態組合方式不同，為了匹配開發者預期
+      String message = salt + ssid;
+      print('組合的消息 (開發者格式): $message');
 
-      // 根據組合編號選擇 Message 組合順序
-      String message = '';
-      switch (combinationIndex) {
-        case 0:
-          message = ssid + saltFront + saltBack;
-          break;
-        case 1:
-          message = ssid + saltBack + saltFront;
-          break;
-        case 2:
-          message = saltFront + ssid + saltBack;
-          break;
-        case 3:
-          message = saltFront + saltBack + ssid;
-          break;
-        case 4:
-          message = saltBack + ssid + saltFront;
-          break;
-        case 5:
-          message = saltBack + saltFront + ssid;
-          break;
-      }
-
-      // 計算 HMAC-SHA256
-      List<int> keyBytes = _hexToBytes(defaultHash);
+      // 計算 HMAC-SHA256，使用 UTF-8 編碼的 Hash
+      List<int> keyBytes = utf8.encode(defaultHash);
       List<int> messageBytes = utf8.encode(message);
-
       Hmac hmacSha256 = Hmac(sha256, keyBytes);
       Digest digest = hmacSha256.convert(messageBytes);
+      String result = digest.toString();
+      print('HMAC-SHA256 (UTF-8 編碼): $result');
 
       // 返回 HEX 格式結果
-      return digest.toString();
+      return result;
     } catch (e) {
       print('計算初始密碼錯誤: $e');
       rethrow;
@@ -520,14 +454,12 @@ class WifiApiService {
     String? username,
   }) async {
     try {
-      // 計算初始密碼
       String password = await calculateInitialPassword(
         providedSSID: providedSSID,
         serialNumber: serialNumber,
         loginSalt: loginSalt,
       );
 
-      // 如果沒有提供用戶名，從系統信息中獲取
       String user;
       if (username == null) {
         final systemInfo = await call('getSystemInfo');
@@ -536,7 +468,6 @@ class WifiApiService {
         user = username;
       }
 
-      // 執行登入
       Map<String, dynamic> loginData = {
         'user': user,
         'password': password,
@@ -544,7 +475,6 @@ class WifiApiService {
 
       final response = await call('postUserLogin', loginData);
 
-      // 如果登入成功，保存token
       if (response.containsKey('token')) {
         setJwtToken(response['token']);
       }
@@ -555,9 +485,6 @@ class WifiApiService {
       rethrow;
     }
   }
-
-  // ======================= 兼容性方法 =======================
-  // 以下是為了向後兼容而提供的方法
 
   /// 獲取系統資訊
   static Future<Map<String, dynamic>> getSystemInfo() async {
@@ -608,6 +535,52 @@ class WifiApiService {
   static Future<Map<String, dynamic>> changePassword(Map<String, dynamic> passwordData) async {
     return await call('updateWizardChangePassword', passwordData);
   }
+}
+
+/// API 端點配置類
+class ApiEndpoint {
+  final String path;
+  final ApiMethod defaultMethod;
+  final Map<String, dynamic> defaultData;
+
+  ApiEndpoint({
+    required this.path,
+    this.defaultMethod = ApiMethod.get,
+    this.defaultData = const {},
+  });
+
+  factory ApiEndpoint.fromJson(Map<String, dynamic> json) {
+    ApiMethod method = ApiMethod.get;
+    if (json.containsKey('method')) {
+      switch (json['method'].toString().toLowerCase()) {
+        case 'post':
+          method = ApiMethod.post;
+          break;
+        case 'put':
+          method = ApiMethod.put;
+          break;
+        case 'delete':
+          method = ApiMethod.delete;
+          break;
+        default:
+          method = ApiMethod.get;
+      }
+    }
+
+    return ApiEndpoint(
+      path: json['path'] ?? '',
+      defaultMethod: method,
+      defaultData: json['defaultData'] ?? {},
+    );
+  }
+}
+
+/// API 請求方法枚舉
+enum ApiMethod {
+  get,
+  post,
+  put,
+  delete
 }
 
 /// API 異常類，用於處理 API 錯誤

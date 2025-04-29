@@ -38,6 +38,10 @@ dependencies:
   crypto: ^3.0.3
   connectivity_plus: ^4.0.1
   network_info_plus: ^4.0.2
+  path_provider: ^2.1.1
+  pointycastle: ^3.7.3  # 使用 PointyCastle 密碼學庫替代 flutter_srp
+  convert: ^3.1.1      # 用於十六進制轉換
+  hex: ^0.2.0
 
 dev_dependencies:
   flutter_test:
