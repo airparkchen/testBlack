@@ -1,103 +1,100 @@
 name: whitebox
 description: "A new Flutter project."
-# The following line prevents the package from being accidentally published to
-# pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+# 下面這行防止套件被意外發布到 pub.dev
+publish_to: 'none'
 
-# The following defines the version and build number for your application.
-# A version number is three numbers separated by dots, like 1.2.43
-# followed by an optional build number separated by a +.
-# Both the version and the builder number may be overridden in flutter
-# build by specifying --build-name and --build-number, respectively.
-# In Android, build-name is used as versionName while build-number used as versionCode.
-# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
-# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
-# Read more about iOS versioning at
-# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-# In Windows, build-name is used as the major, minor, and patch parts
-# of the product and file versions while build-number is used as the build suffix.
+# 定義應用程式的版本和構建號
 version: 1.0.0+1
 
+# 指定 Dart SDK 版本要求
 environment:
   sdk: ^3.7.2
 
-# Dependencies specify other packages that your package needs in order to work.
-# To automatically upgrade your package dependencies to the latest versions
-# consider running `flutter pub upgrade --major-versions`. Alternatively,
-# dependencies can be manually updated by changing the version numbers below to
-# the latest version available on pub.dev. To see which dependencies have newer
-# versions available, run `flutter pub outdated`.
+# 指定專案所需的相依套件
 dependencies:
   flutter:
     sdk: flutter
+  # 網路連接狀態管理套件（升級版本以解決相依性衝突）
+  connectivity_plus: ^6.1.4
+  # iOS 風格圖示
   cupertino_icons: ^1.0.8
+  # 行動裝置掃描器（條碼/QR碼）
   mobile_scanner: ^5.0.0
+  # WiFi 掃描功能
   wifi_scan: ^0.4.1+2
+  # HTTP 請求處理
   http: ^1.2.0
-  webview_flutter: ^4.9.0  # 添加 WebView 套件
+  # 網頁視圖
+  webview_flutter: ^4.9.0
+  # 加密相關功能
   crypto: ^3.0.3
-  connectivity_plus: ^4.0.1
+  # 網路資訊獲取
   network_info_plus: ^4.0.2
+  # 檔案路徑管理
   path_provider: ^2.1.1
-  pointycastle: ^3.7.3  # 使用 PointyCastle 密碼學庫替代 flutter_srp
-  convert: ^3.1.1      # 用於十六進制轉換
+  # 進階密碼學庫
+  pointycastle: ^3.7.3
+  # 數據轉換工具
+  convert: ^3.1.1
+  # 十六進制處理
   hex: ^0.2.0
+  # 狀態管理
+  provider: ^6.0.5
+  # 側邊欄抽屜
+  flutter_slider_drawer: ^2.1.3
+  # 響應式螢幕尺寸調整
+  flutter_screenutil: ^5.9.3
+  # 裝置預覽工具
+  device_preview: ^1.2.0
+  # 可擴展頁面視圖
+  expandable_page_view: ^1.0.17
+  # 動畫支援
+  lottie: ^3.3.1
+  # 啟動頁面配置
+  flutter_native_splash: ^2.4.4
+  # 實用工具集合
+  nb_utils: ^7.0.8
+  # 影片播放器
+  video_player: ^2.9.2
+  # 表單驗證工具
+  form_field_validator: ^1.1.0
+  # 輸入格式化工具
+  flutter_multi_formatter: ^2.13.0
+  # 文字輸入遮罩工具
+  mask_text_input_formatter: ^2.9.0
+  # 遮罩文字輸入欄位
+  masked_text_field: ^1.0.2
+  # 同步鎖工具
+  synchronized: ^3.0.0
+  # 安全存儲功能
+  flutter_secure_storage: ^9.2.4
+  # QR碼生成器
+  qr_flutter: ^4.1.0
 
+# 啟動頁面配置
+flutter_native_splash:
+  color: "#FFFFFF"  # 背景顏色
+  image: assets/images/pegatron_logo.png  # Logo 圖片
+  android: true  # 啟用 Android 啟動頁面
+  ios: true  # 啟用 iOS 啟動頁面
+
+# 開發相依套件
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
+  # 代碼風格檢查工具
   flutter_lints: ^5.0.0
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
+# Flutter 特定配置
 flutter:
-
-  # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
+  # 啟用 Material Design 圖示
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
-
-  # An image asset can refer to one or more resolution-specific "variants", see
-  # https://flutter.dev/to/resolution-aware-images
-
-  # For details regarding adding assets from package dependencies, see
-  # https://flutter.dev/to/asset-from-package
-
-  # To add custom fonts to your application, add a fonts section here,
-  # in this "flutter" section. Each entry in this list should have a
-  # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
+  # 資源文件配置
   assets:
-    - lib/shared/config/flows/initialization/wifi.json
+    - lib/shared/config/flows/initialization/wifi.json  # WiFi 初始化配置檔案
 
+  # 字體配置
   fonts:
     - family: Segoe UI
       fonts:

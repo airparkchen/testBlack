@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:math';
 import 'package:crypto/crypto.dart';
-import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:hex/hex.dart';
-import 'package:whitebox/shared/utils/srp_helper.dart'; // 確保導入 SRP 幫助類
+import 'dart:typed_data';
 
 class SrpLoginTestPage extends StatefulWidget {
   const SrpLoginTestPage({Key? key}) : super(key: key);
@@ -17,112 +14,222 @@ class SrpLoginTestPage extends StatefulWidget {
 }
 
 class _SrpLoginTestPageState extends State<SrpLoginTestPage> {
-  final TextEditingController _ipController = TextEditingController(text: "192.168.1.1");
-  final TextEditingController _usernameController = TextEditingController(text: "admin");
-  final TextEditingController _passwordController = TextEditingController();
-
-  String _logOutput = "等待操作...";
+  String _statusMessage = "點擊按鈕開始測試";
   bool _isLoading = false;
   String _csrfToken = "";
-  String _sessionId = "";
-  Map<String, String> _srpData = {};
+  bool _loginSuccess = false;
+  String _logOutput = "準備開始測試...";
   final _scrollController = ScrollController();
+  http.Client? _client;
 
-  @override
-  void initState() {
-    super.initState();
-
-    // 自動檢測網絡狀態，確定是否連接到正確的 WiFi
-    _checkNetworkConnection();
-  }
+  // SRP 參數 - RFC 5054 中定義的 1024 位元素模安全數
+  static final BigInt N = BigInt.parse(
+    'EEAF0AB9ADB38DD69C33F80AFA8FC5E86072618775FF3C0B9EA2314C9C256576D674DF7496EA81D3383B4813D692C6E0E0D5D8E250B98BE48E495C1D6089DAD15DC7D7B46154D6B6CE8EF4AD69B15D4982559B297BCF1885C529F566660E57EC68EDBC3C05726CC02FD4CBF4976EAA9AFD5138FE8376435B9FC61D2FC0EB06E3',
+    radix: 16,
+  );
+  static final BigInt g = BigInt.from(2);
+  static final BigInt k = BigInt.from(3);
 
   @override
   void dispose() {
-    _ipController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
     _scrollController.dispose();
+    _client?.close();
     super.dispose();
   }
 
-  // 檢查網絡連接
-  Future<void> _checkNetworkConnection() async {
-    _appendLog("檢查網絡連接...");
-
-    var connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult == ConnectivityResult.wifi) {
-      _appendLog("已連接到 WiFi");
-    } else {
-      _appendLog("警告: 未連接到 WiFi，請先連接到路由器的 WiFi");
-    }
-  }
-
-  // 向日誌添加訊息並自動捲動到底部
-  void _appendLog(String message) {
+  // 日誌輸出並滾動
+  void _logAdd(String msg) {
     setState(() {
-      _logOutput += "\n$message";
+      _logOutput += "\n$msg";
     });
 
-    // 確保捲動到底部
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 50), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  // 獲取 CSRF 令牌
-  Future<void> _getCsrfToken() async {
+  // 更新狀態消息
+  void _updateStatus(String status) {
+    setState(() {
+      _statusMessage = status;
+    });
+  }
+
+  // 登入過程（和Python版本一樣）
+  Future<void> _performLogin() async {
+    if (_isLoading) return;
+
     setState(() {
       _isLoading = true;
-      _logOutput = "開始獲取 CSRF 令牌...";
+      _loginSuccess = false;
+      _logOutput = "開始 SRP 登入流程...";
     });
 
+    // 建立一個 HTTP 客戶端，保持 Cookie
+    _client = http.Client();
+
     try {
-      final ipAddress = _ipController.text;
-      final url = 'http://$ipAddress/login.html';
+      // 設定參數
+      final username = "admin";
+      final password = "3033b8c2f480de5d01a310d198e74b84d5ddeb73a40b04bef95a7ce167cce6f7";
+      final baseUrl = "http://192.168.1.1";
 
-      _appendLog("請求 URL: $url");
+      // 步驟 1: 獲取登入頁面，提取 CSRF 令牌
+      _updateStatus("步驟 1/3: 獲取登入頁面...");
+      _logAdd("Step 1: Getting login page from $baseUrl/login.html");
 
-      final response = await http.get(Uri.parse(url))
-          .timeout(const Duration(seconds: 10));
+      final loginResponse = await _client!.get(Uri.parse("$baseUrl/login.html"));
+      _logAdd("Status: ${loginResponse.statusCode} ${loginResponse.statusCode == 200 ? 'OK' : ''}");
 
-      _appendLog("收到回應: 狀態碼 ${response.statusCode}");
+      if (loginResponse.statusCode == 200) {
+        _logAdd("Headers from login page:");
+        loginResponse.headers.forEach((key, value) {
+          _logAdd("$key: $value");
+        });
 
-      if (response.statusCode == 200) {
-        // 從回應中提取 CSRF 令牌
+        // 提取 CSRF 令牌
         final csrfRegex = RegExp(r'CSRF_TOKEN\s*=\s*"([a-f0-9]{32})"');
-        final match = csrfRegex.firstMatch(response.body);
+        final match = csrfRegex.firstMatch(loginResponse.body);
 
         if (match != null) {
           _csrfToken = match.group(1)!;
-          _appendLog("成功獲取 CSRF 令牌: $_csrfToken");
+          _logAdd("CSRF token = $_csrfToken");
+          _logAdd("CSRF Token: $_csrfToken");
+        } else {
+          _logAdd("No CSRF token found, trying to get from wizard page...");
+          await _getCsrfFromWizard(baseUrl);
+        }
 
-          // 提取 sessionID
-          if (response.headers.containsKey('set-cookie')) {
-            final cookieHeader = response.headers['set-cookie']!;
-            final sessionMatch = RegExp(r'sessionID=([^;]+)').firstMatch(cookieHeader);
-            if (sessionMatch != null) {
-              _sessionId = sessionMatch.group(1)!;
-              _appendLog("成功獲取 SessionID: $_sessionId");
+        if (_csrfToken.isEmpty) {
+          _updateStatus("無法獲取 CSRF 令牌，登入失敗");
+          setState(() { _isLoading = false; });
+          return;
+        }
+
+        // 步驟 2: 生成 SRP 參數並發送公鑰
+        _updateStatus("步驟 2/3: 生成並發送公鑰...");
+
+        // 生成隨機私鑰 a
+        final a = _generateRandomBigInt(32);
+
+        // 計算公鑰 A = g^a % N
+        final A = g.modPow(a, N);
+        final clientPublic = A.toRadixString(16);
+        _logAdd("Client public key (A): $clientPublic");
+
+        // 發送公鑰到服務器
+        final postUrl = "$baseUrl/cgi-bin/webPost.plua?csrftoken=$_csrfToken";
+        final headers = {
+          'Content-Type': 'application/json',
+          'Referer': '$baseUrl/login.html',
+        };
+
+        final data = {
+          'function': 'authenticate',
+          'data': {
+            'CSRFtoken': _csrfToken,
+            'I': username,
+            'A': clientPublic,
+          }
+        };
+
+        _logAdd("Step 2: Sending public key to $postUrl");
+        _logAdd("Headers: $headers");
+        _logAdd("Data: ${json.encode(data)}");
+
+        final step2Response = await _client!.post(
+          Uri.parse(postUrl),
+          headers: headers,
+          body: json.encode(data),
+        );
+
+        _logAdd("Status: ${step2Response.statusCode}");
+        _logAdd("Headers from step 2:");
+        step2Response.headers.forEach((key, value) {
+          _logAdd("$key: $value");
+        });
+
+        if (step2Response.statusCode == 200) {
+          final responseData = json.decode(step2Response.body);
+          _logAdd("Response data: $responseData");
+
+          if (!responseData.containsKey('s') || !responseData.containsKey('B')) {
+            _updateStatus("服務器沒有返回必要的參數");
+            setState(() { _isLoading = false; });
+            return;
+          }
+
+          final saltHex = responseData['s'];
+          final serverPublicHex = responseData['B'];
+
+          _logAdd("Received salt (s): $saltHex");
+          _logAdd("Received server public key (B): $serverPublicHex");
+
+          // 轉換 salt 和 B 為二進制格式
+          final saltBytes = _hexToBytes(saltHex);
+          final serverPublicBytes = _hexToBytes(serverPublicHex);
+
+          try {
+            // 步驟 3: 計算 SRP 證明並發送
+            _updateStatus("步驟 3/3: 計算並發送證明...");
+
+            // 生成 M1 證明 (使用與Python版本相同的方法)
+            final clientProof = _computeSrpProof(
+              username: username,
+              password: password,
+              salt: saltBytes,
+              serverPublic: serverPublicBytes,
+              clientPublic: _hexToBytes(clientPublic),
+              privateKey: a,
+            );
+
+            final clientProofHex = _bytesToHex(clientProof);
+            _logAdd("Generated proof (M1): $clientProofHex");
+
+            // 先嘗試使用 M 參數發送
+            _logAdd("First attempt with 'M' parameter");
+            var success = await _sendProof(baseUrl, clientProofHex, "M");
+
+            // 如果使用 M 失敗，嘗試使用 M1
+            if (!success) {
+              _logAdd("Attempting with 'M1' parameter");
+              success = await _sendProof(baseUrl, clientProofHex, "M1");
             }
+
+            // 嘗試獲取dashboard，即使前面的驗證可能有錯誤
+            _logAdd("Attempting to load dashboard...");
+            final dashboardSuccess = await _getDashboard(baseUrl);
+
+            if (dashboardSuccess) {
+              _logAdd("Dashboard loaded successfully");
+              setState(() {
+                _loginSuccess = true;
+                _updateStatus("登入成功！已載入儀表板");
+              });
+            } else {
+              _updateStatus("登入可能成功，但無法載入儀表板");
+            }
+          } catch (e) {
+            _logAdd("Error in SRP process: $e");
+            _updateStatus("SRP 計算過程出錯");
           }
         } else {
-          _appendLog("在回應中未找到 CSRF 令牌，嘗試獲取 wizard.html");
-          await _getCsrfFromWizard();
+          _logAdd("Step 2 failed with status code: ${step2Response.statusCode}");
+          _updateStatus("發送公鑰失敗");
         }
-      } else if (response.statusCode == 302) {
-        _appendLog("收到重定向，嘗試獲取 wizard.html");
-        await _getCsrfFromWizard();
       } else {
-        _appendLog("錯誤: 不支援的回應代碼 ${response.statusCode}");
+        _logAdd("Failed to get login page: ${loginResponse.statusCode}");
+        _updateStatus("無法獲取登入頁面");
       }
     } catch (e) {
-      _appendLog("錯誤: 獲取 CSRF 令牌失敗 - $e");
+      _logAdd("Error during login process: $e");
+      _updateStatus("登入過程出錯: ${e.toString().split('\n')[0]}");
     } finally {
       setState(() {
         _isLoading = false;
@@ -131,310 +238,209 @@ class _SrpLoginTestPageState extends State<SrpLoginTestPage> {
   }
 
   // 從 wizard.html 獲取 CSRF 令牌
-  Future<void> _getCsrfFromWizard() async {
+  Future<void> _getCsrfFromWizard(String baseUrl) async {
+    _logAdd("Getting CSRF from: $baseUrl/wizard.html");
+
     try {
-      final ipAddress = _ipController.text;
-      final url = 'http://$ipAddress/wizard.html';
-
-      _appendLog("請求 URL: $url");
-
-      final response = await http.get(Uri.parse(url))
-          .timeout(const Duration(seconds: 10));
-
-      _appendLog("收到回應: 狀態碼 ${response.statusCode}");
+      final response = await _client!.get(Uri.parse("$baseUrl/wizard.html"));
 
       if (response.statusCode == 200) {
-        // 從回應中提取 CSRF 令牌
+        _logAdd("Headers from wizard page:");
+        response.headers.forEach((key, value) {
+          _logAdd("$key: $value");
+        });
+
+        // 提取 CSRF 令牌
         final csrfRegex = RegExp(r'CSRF_TOKEN\s*=\s*"([a-f0-9]{32})"');
         final match = csrfRegex.firstMatch(response.body);
 
         if (match != null) {
           _csrfToken = match.group(1)!;
-          _appendLog("從 wizard.html 成功獲取 CSRF 令牌: $_csrfToken");
-
-          // 提取 sessionID
-          if (response.headers.containsKey('set-cookie')) {
-            final cookieHeader = response.headers['set-cookie']!;
-            final sessionMatch = RegExp(r'sessionID=([^;]+)').firstMatch(cookieHeader);
-            if (sessionMatch != null) {
-              _sessionId = sessionMatch.group(1)!;
-              _appendLog("成功獲取 SessionID: $_sessionId");
-            }
-          }
+          _logAdd("CSRF token = $_csrfToken");
         } else {
-          _appendLog("在 wizard.html 回應中未找到 CSRF 令牌");
+          _logAdd("CSRF_TOKEN not found in wizard.html response body");
         }
       } else {
-        _appendLog("從 wizard.html 獲取 CSRF 令牌失敗: ${response.statusCode}");
+        _logAdd("Failed to get wizard page: ${response.statusCode}");
       }
     } catch (e) {
-      _appendLog("從 wizard.html 獲取 CSRF 令牌錯誤: $e");
+      _logAdd("Error getting wizard page: $e");
     }
   }
 
-  // 執行 SRP 登入
-  Future<void> _performSrpLogin() async {
-    if (_csrfToken.isEmpty) {
-      _appendLog("請先獲取 CSRF 令牌");
-      return;
-    }
+  // 發送 SRP 證明
+  Future<bool> _sendProof(String baseUrl, String proof, String paramName) async {
+    final postUrl = "$baseUrl/cgi-bin/webPost.plua?csrftoken=$_csrfToken";
+    final headers = {
+      'Content-Type': 'application/json',
+      'Origin': baseUrl,
+      'Referer': '$baseUrl/login.html',
+    };
 
-    setState(() {
-      _isLoading = true;
-      _appendLog("\n開始 SRP 登入流程...");
-    });
-
-    try {
-      final ipAddress = _ipController.text;
-      final username = _usernameController.text;
-      final password = _passwordController.text.isEmpty
-          ? "3033b8c2f480de5d01a310d198e74b84d5ddeb73a40b04bef95a7ce167cce6f7"  // 默認密碼
-          : _passwordController.text;
-
-      _appendLog("使用用戶名: $username");
-      _appendLog("使用 CSRF 令牌: $_csrfToken");
-
-      // 步驟 1: 生成 SRP 密鑰
-      _appendLog("步驟 1: 生成客戶端 SRP 密鑰...");
-      final keys = SrpHelper.generateKeys(username, password);
-      final clientPrivateKey = keys['privateKey']!;
-      final clientPublicKey = keys['publicKey']!;
-
-      _srpData = {
-        'username': username,
-        'password': password,
-        'privateKey': clientPrivateKey,
-        'publicKey': clientPublicKey,
-      };
-
-      _appendLog("生成客戶端公鑰 (A): $clientPublicKey");
-
-      // 步驟 2: 發送公鑰到服務器
-      final step2Url = Uri.parse('http://$ipAddress/cgi-bin/webPost.plua?csrftoken=$_csrfToken');
-      final step2Headers = {
-        'Content-Type': 'application/json',
-        'Referer': 'http://$ipAddress/login.html',
-      };
-
-      final step2Data = {
-        'function': 'authenticate',
-        'data': {
-          'CSRFtoken': _csrfToken,
-          'I': username,
-          'A': clientPublicKey,
-        }
-      };
-
-      _appendLog("步驟 2: 發送公鑰到 $step2Url");
-      _appendLog("數據: ${json.encode(step2Data)}");
-
-      final step2Response = await http.post(
-        step2Url,
-        headers: step2Headers,
-        body: json.encode(step2Data),
-      ).timeout(const Duration(seconds: 10));
-
-      _appendLog("步驟 2 回應: 狀態碼 ${step2Response.statusCode}");
-
-      if (step2Response.statusCode == 200) {
-        final step2Result = json.decode(step2Response.body);
-        _appendLog("收到服務器數據: $step2Result");
-
-        if (step2Result.containsKey('s') && step2Result.containsKey('B')) {
-          final saltHex = step2Result['s'];
-          final serverPublicHex = step2Result['B'];
-
-          _appendLog("接收到鹽值 (s): $saltHex");
-          _appendLog("接收到服務器公鑰 (B): $serverPublicHex");
-
-          // 步驟 3: 計算客戶端證明 M1
-          try {
-            _appendLog("步驟 3: 計算客戶端證明 M1...");
-
-            final clientProofHex = SrpHelper.calculateM1(
-                username,
-                password,
-                saltHex,
-                clientPublicKey,
-                serverPublicHex,
-                clientPrivateKey
-            );
-
-            _appendLog("生成客戶端證明 (M1): $clientProofHex");
-
-            // 步驟 4: 發送 M1 到服務器
-            final step3Url = Uri.parse('http://$ipAddress/cgi-bin/webPost.plua?csrftoken=$_csrfToken');
-            final step3Headers = {
-              'Content-Type': 'application/json',
-              'Origin': 'http://$ipAddress',
-              'Referer': 'http://$ipAddress/login.html',
-            };
-
-            // 嘗試使用 M 參數
-            final step3DataM = {
-              'function': 'authenticate',
-              'data': {
-                'CSRFtoken': _csrfToken,
-                'M': clientProofHex,
-              }
-            };
-
-            _appendLog("步驟 4: 發送證明 (使用 M)...");
-            _appendLog("數據: ${json.encode(step3DataM)}");
-
-            final step3Response = await http.post(
-              step3Url,
-              headers: step3Headers,
-              body: json.encode(step3DataM),
-            ).timeout(const Duration(seconds: 10));
-
-            _appendLog("步驟 4 回應: 狀態碼 ${step3Response.statusCode}");
-
-            if (step3Response.statusCode == 200) {
-              try {
-                final step3Result = json.decode(step3Response.body);
-                _appendLog("步驟 4 解析結果: $step3Result");
-
-                if (step3Result.containsKey('error')) {
-                  _appendLog("錯誤: ${step3Result['error']['msg']}");
-
-                  // 如果使用 M 參數失敗，嘗試使用 M1 參數
-                  _appendLog("嘗試使用 M1 參數...");
-                  final step3DataM1 = {
-                    'function': 'authenticate',
-                    'data': {
-                      'CSRFtoken': _csrfToken,
-                      'M1': clientProofHex,
-                    }
-                  };
-
-                  _appendLog("步驟 4 (使用 M1): 發送證明...");
-                  _appendLog("數據: ${json.encode(step3DataM1)}");
-
-                  final step3ResponseM1 = await http.post(
-                    step3Url,
-                    headers: step3Headers,
-                    body: json.encode(step3DataM1),
-                  ).timeout(const Duration(seconds: 10));
-
-                  _appendLog("步驟 4 (M1) 回應: 狀態碼 ${step3ResponseM1.statusCode}");
-
-                  if (step3ResponseM1.statusCode == 200) {
-                    try {
-                      final step3ResultM1 = json.decode(step3ResponseM1.body);
-                      _appendLog("步驟 4 (M1) 解析結果: $step3ResultM1");
-
-                      if (step3ResultM1.containsKey('error')) {
-                        _appendLog("錯誤: ${step3ResultM1['error']['msg']}");
-                      } else {
-                        _appendLog("登入成功!");
-                        await _getDashboard();
-                      }
-                    } catch (e) {
-                      _appendLog("解析 M1 回應出錯: $e");
-
-                      // 嘗試檢查是否登入成功
-                      if (step3ResponseM1.body.toLowerCase().contains('success')) {
-                        _appendLog("檢測到 'success' 字符串，可能登入成功");
-                        await _getDashboard();
-                      }
-                    }
-                  }
-                } else {
-                  _appendLog("登入成功!");
-                  await _getDashboard();
-                }
-              } catch (e) {
-                _appendLog("解析回應出錯: $e");
-
-                // 嘗試檢查是否登入成功
-                if (step3Response.body.toLowerCase().contains('success')) {
-                  _appendLog("檢測到 'success' 字符串，可能登入成功");
-                  await _getDashboard();
-                }
-              }
-            } else {
-              _appendLog("步驟 4 失敗: ${step3Response.body}");
-            }
-          } catch (e) {
-            _appendLog("生成證明時出錯: $e");
-          }
-        } else {
-          _appendLog("錯誤: 服務器沒有返回必要的 's' 和 'B' 值");
-        }
-      } else {
-        _appendLog("步驟 2 失敗: ${step2Response.body}");
+    final data = {
+      'function': 'authenticate',
+      'data': {
+        'CSRFtoken': _csrfToken,
       }
-    } catch (e) {
-      _appendLog("SRP 登入流程錯誤: $e");
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+    };
+
+    (data['data'] as Map<String, dynamic>)[paramName] = proof;
+
+    _logAdd("Sending proof with $paramName parameter to $postUrl");
+    _logAdd("Data: ${json.encode(data)}");
+
+    final response = await _client!.post(
+      Uri.parse(postUrl),
+      headers: headers,
+      body: json.encode(data),
+    );
+
+    _logAdd("Status: ${response.statusCode}");
+
+    if (response.statusCode == 200) {
+      try {
+        final responseData = json.decode(response.body);
+        _logAdd("Response data: $responseData");
+
+        // 檢查錯誤信息
+        if (responseData.containsKey('error')) {
+          final errorMsg = responseData['error']['msg'] ?? 'Unknown error';
+          _logAdd("Error: $errorMsg");
+          return false;
+        }
+
+        return true;
+      } catch (e) {
+        _logAdd("Failed to parse response: $e");
+        _logAdd("Response text: ${response.body}");
+
+        // 如果JSON解析失敗但狀態碼是200，可能仍然成功
+        if (response.body.toLowerCase().contains('success')) {
+          return true;
+        }
+        return false;
+      }
+    } else {
+      _logAdd("Request failed with status code: ${response.statusCode}");
+      return false;
     }
   }
 
-  // 獲取儀表板頁面 (驗證登入是否成功)
-  Future<void> _getDashboard() async {
+  // 獲取儀表板頁面
+  Future<bool> _getDashboard(String baseUrl) async {
+    final dashboardUrl = "$baseUrl/dashboard.html?csrftoken=$_csrfToken";
+
+    _logAdd("Getting dashboard from $dashboardUrl");
+
     try {
-      final ipAddress = _ipController.text;
-      final url = Uri.parse('http://$ipAddress/dashboard.html?csrftoken=$_csrfToken');
-
-      _appendLog("獲取儀表板頁面: $url");
-
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': 'sessionID=$_sessionId',
-        },
-      ).timeout(const Duration(seconds: 10));
-
-      _appendLog("儀表板回應: 狀態碼 ${response.statusCode}");
+      final response = await _client!.get(Uri.parse(dashboardUrl));
 
       if (response.statusCode == 200) {
-        _appendLog("成功加載儀表板!");
-
-        // 保存儀表板的前 200 個字符作為預覽
+        _logAdd("Dashboard loaded successfully");
+        // 保存一部分dashboard內容以驗證成功
         final preview = response.body.length > 200
             ? response.body.substring(0, 200) + "..."
             : response.body;
-
-        _appendLog("儀表板預覽: $preview");
+        _logAdd("Dashboard preview: $preview");
+        return true;
       } else {
-        _appendLog("加載儀表板失敗: ${response.statusCode}");
+        _logAdd("Failed to load dashboard: ${response.statusCode}");
+        return false;
       }
     } catch (e) {
-      _appendLog("加載儀表板錯誤: $e");
+      _logAdd("Error loading dashboard: $e");
+      return false;
     }
   }
 
-  // 清除日誌
-  void _clearLog() {
-    setState(() {
-      _logOutput = "日誌已清除...";
-    });
+  // 生成隨機 BigInt
+  BigInt _generateRandomBigInt(int bytes) {
+    final random = Random.secure();
+    final randomBytes = List<int>.generate(bytes, (_) => random.nextInt(256));
+    return BigInt.parse(
+        randomBytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join(''),
+        radix: 16
+    );
   }
 
-  // 保存日誌到文件
-  Future<void> _saveLogToFile() async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/srp_login_log.txt');
-      await file.writeAsString(_logOutput);
-
-      setState(() {
-        _logOutput += "\n日誌已保存到 ${file.path}";
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('日誌已保存到: ${file.path}')),
-      );
-    } catch (e) {
-      setState(() {
-        _logOutput += "\n保存日誌失敗: $e";
-      });
+  // 十六進制字符串轉換為位元組數組
+  Uint8List _hexToBytes(String hex) {
+    // 確保長度為偶數
+    if (hex.length % 2 != 0) {
+      hex = '0$hex';
     }
+
+    // 轉換為小寫
+    hex = hex.toLowerCase();
+
+    final result = Uint8List(hex.length ~/ 2);
+    for (var i = 0; i < hex.length; i += 2) {
+      final value = int.parse(hex.substring(i, i + 2), radix: 16);
+      result[i ~/ 2] = value;
+    }
+    return result;
+  }
+
+  // 位元組數組轉換為十六進制字符串
+  String _bytesToHex(Uint8List bytes) {
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join('');
+  }
+
+  // 計算 SRP 證明 (實現Python srp.User.process_challenge的主要功能)
+  Uint8List _computeSrpProof({
+    required String username,
+    required String password,
+    required Uint8List salt,
+    required Uint8List serverPublic,
+    required Uint8List clientPublic,
+    required BigInt privateKey
+  }) {
+    // 計算 u = H(A | B)
+    final clientPublicHex = _bytesToHex(clientPublic);
+    final serverPublicHex = _bytesToHex(serverPublic);
+
+    final u = BigInt.parse(
+        sha1.convert(utf8.encode(clientPublicHex + serverPublicHex)).toString(),
+        radix: 16
+    );
+
+    // 計算 x = H(s | H(I | ":" | P))
+    final identityHash = sha1.convert(utf8.encode('$username:$password')).toString();
+    final saltHex = _bytesToHex(salt);
+
+    final x = BigInt.parse(
+        sha1.convert(utf8.encode(saltHex + identityHash)).toString(),
+        radix: 16
+    );
+
+    // 計算 v = g^x % N
+    final v = g.modPow(x, N);
+
+    // 計算 S = (B - k * v) ^ (a + u * x) % N
+    final B = BigInt.parse(_bytesToHex(serverPublic), radix: 16);
+    final kv = (k * v) % N;
+
+    late BigInt S;
+    if (B > kv) {
+      S = (B - kv).modPow(privateKey + u * x, N);
+    } else {
+      S = (B + N - kv).modPow(privateKey + u * x, N);
+    }
+
+    // 計算 K = H(S)
+    final K = Uint8List.fromList(
+        sha1.convert(utf8.encode(S.toRadixString(16))).bytes
+    );
+
+    // 計算 M = H(A | B | K)
+    final M = sha1.convert(utf8.encode(
+        clientPublicHex + serverPublicHex + _bytesToHex(K)
+    )).bytes;
+
+    _logAdd("Process challenge result: ${M.toString()}");
+    _logAdd("Type: ${M.runtimeType}");
+
+    return Uint8List.fromList(M);
   }
 
   @override
@@ -443,138 +449,61 @@ class _SrpLoginTestPageState extends State<SrpLoginTestPage> {
       appBar: AppBar(
         title: const Text('SRP 路由器登入測試'),
         backgroundColor: Colors.blue,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveLogToFile,
-            tooltip: '保存日誌',
-          ),
-          IconButton(
-            icon: const Icon(Icons.cleaning_services),
-            onPressed: _clearLog,
-            tooltip: '清除日誌',
-          ),
-        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // IP 地址輸入
-            TextField(
-              controller: _ipController,
-              decoration: const InputDecoration(
-                labelText: '路由器 IP 地址',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.router),
-              ),
-              keyboardType: TextInputType.text,
-            ),
-            const SizedBox(height: 16),
-
-            // 用戶名輸入
-            TextField(
-              controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: '用戶名',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 密碼輸入
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(
-                labelText: '密碼 (留空使用默認值)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock),
-                helperText: '如果不確定，請留空使用默認值',
-              ),
-              obscureText: true,
-            ),
-            const SizedBox(height: 24),
-
-            // 操作按鈕
-            Row(
+      body: Column(
+        children: [
+          // 狀態顯示
+          Container(
+            padding: const EdgeInsets.all(20),
+            width: double.infinity,
+            color: _loginSuccess ? Colors.green[100] : Colors.blue[50],
+            child: Column(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _getCsrfToken,
-                    icon: const Icon(Icons.token),
-                    label: const Text('1. 獲取 CSRF 令牌'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
+                Icon(
+                  _loginSuccess ? Icons.check_circle : Icons.info,
+                  size: 50,
+                  color: _loginSuccess ? Colors.green : Colors.blue,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: (_isLoading || _csrfToken.isEmpty) ? null : _performSrpLogin,
-                    icon: const Icon(Icons.login),
-                    label: const Text('2. SRP 登入'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
+                const SizedBox(height: 10),
+                Text(
+                  _statusMessage,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _loginSuccess ? Colors.green[800] : Colors.black,
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+          ),
 
-            // 自動運行按鈕
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : () async {
-                await _getCsrfToken();
-                if (_csrfToken.isNotEmpty) {
-                  await _performSrpLogin();
-                }
-              },
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('自動執行全部步驟'),
+          // 登入按鈕
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _performLogin,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.blue,
                 padding: const EdgeInsets.symmetric(vertical: 12),
+                minimumSize: const Size(double.infinity, 50),
               ),
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('執行 SRP 登入測試', style: TextStyle(fontSize: 18)),
             ),
-            const SizedBox(height: 24),
+          ),
 
-            // 日誌輸出
-            const Text(
-              '操作日誌:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              height: 300,
-              padding: const EdgeInsets.all(10),
+          // 日誌輸出
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(5),
               ),
-              child: _isLoading
-                  ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(color: Colors.white),
-                    SizedBox(height: 16),
-                    Text(
-                      '處理中...',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ),
-              )
-                  : SingleChildScrollView(
+              child: SingleChildScrollView(
                 controller: _scrollController,
                 child: Text(
                   _logOutput,
@@ -586,56 +515,8 @@ class _SrpLoginTestPageState extends State<SrpLoginTestPage> {
                 ),
               ),
             ),
-
-            // CSRF 令牌顯示
-            if (_csrfToken.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.token, color: Colors.blue),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'CSRF 令牌:',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _csrfToken,
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.copy, size: 20),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: _csrfToken));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('CSRF 令牌已複製到剪貼板')),
-                        );
-                      },
-                      tooltip: '複製',
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
