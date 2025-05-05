@@ -8,12 +8,14 @@ version: 1.0.0+1
 
 # 指定 Dart SDK 版本要求
 environment:
-  sdk: ^3.7.2
+  sdk: ^3.6.0
 
 # 指定專案所需的相依套件
 dependencies:
   flutter:
     sdk: flutter
+  srp:
+    path: ../srp
   # 網路連接狀態管理套件（升級版本以解決相依性衝突）
   connectivity_plus: ^6.1.4
   # iOS 風格圖示
