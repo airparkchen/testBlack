@@ -13,6 +13,7 @@
 - **一致的API整合**：統一的設備、雲端和第三方API連接方法
 - **標準化的初始化和運行時流程**：設備設置和管理的通用模式
 - **統一的設計風格**：簡潔灰色調，方形元素設計
+- **完整的安全機制**：包含初始密碼計算和API身份驗證
 
 ## 目前實現功能
 
@@ -25,6 +26,7 @@
 - **多設備型號配置**：通過JSON文件支援不同設備型號
 - **安全機制**：支援初始密碼計算和API身份驗證
 - **流程進度顯示**：支援設定完成時的進度顯示
+- **SRP安全登入**：實現安全遠程密碼認證協議
 
 ## 專案結構
 
@@ -35,8 +37,11 @@ lib/
 ├── main.dart                            # 應用程式入口點
 ├── shared/
     ├── api/
-    │   └── wifi_api_service.dart        # Wi-Fi API服務封裝
+    │   ├── wifi_api_service.dart        # Wi-Fi API服務封裝
+    │   └── srp_login_service.dart       # SRP登入服務
     ├── config/
+    │   ├── api/
+    │   │   └── wifi.json                # API端點配置
     │   └── flows/
     │       └── initialization/
     │           └── wifi.json            # Wi-Fi 初始化流程配置
@@ -116,6 +121,7 @@ lib/
 
 - **初始密碼計算**：基於設備序號、登入鹽值和SSID計算初始密碼
 - **JWT身份驗證**：支援基於JWT的API訪問授權
+- **SRP安全登入**：實現零知識證明的安全登入協議
 - **通訊加密**：使用標準加密方式保護數據傳輸
 - **密碼複雜度校驗**：確保用戶設置的密碼符合安全要求
 
@@ -199,6 +205,8 @@ await WifiApiService.loginWithInitialPassword();
 - [UI 組件使用指南](./docs/02-ui-components-guide.md)
 - [Wi-Fi 設定流程實作指南](./docs/03-wifi-setting-flow-guide.md)
 - [UI 佈局風格指南](./docs/04-ui-components-design-guide.md)
+- [API 整合指南](./docs/05-api-integration-guide.md)
+- [安全機制實現指南](./docs/06-security-implementation-guide.md)
 
 ## 許可證
 
