@@ -1,6 +1,20 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
+/// 裝置連接資訊類別
+class DeviceConnection {
+  /// 裝置ID
+  final String deviceId;
+
+  /// 連接的子裝置數量
+  final int connectedDevicesCount;
+
+  DeviceConnection({
+    required this.deviceId,
+    required this.connectedDevicesCount,
+  });
+}
+
 /// 網絡拓撲圖元件
 ///
 /// 顯示網絡設備之間的連接關係，包括有線和無線連接
@@ -11,6 +25,12 @@ class NetworkTopologyComponent extends StatefulWidget {
 
   /// 連接到網關的裝置列表
   final List<NetworkDevice> devices;
+
+  /// 裝置連接資訊列表 (記錄每個裝置連接的子設備數量)
+  final List<DeviceConnection>? deviceConnections;
+
+  /// 連接到網關的總設備數量 (用於主機數字顯示，如果不提供則使用devices列表長度)
+  final int? totalConnectedDevices;
 
   /// 是否顯示互聯網圖標
   final bool showInternet;
@@ -28,6 +48,8 @@ class NetworkTopologyComponent extends StatefulWidget {
     Key? key,
     required this.gatewayName,
     required this.devices,
+    this.deviceConnections,
+    this.totalConnectedDevices,
     this.showInternet = true,
     this.width = double.infinity,
     this.height = 400,
@@ -57,10 +79,10 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   static const double kTwoDevicesVerticalPosition = 0.85; // 兩個設備共用的垂直位置 (比例，0.85 = 85%)
 
   // 佈局常量 - 設備右側列位置 (3-4個設備時)
-  static const double kRightColumnHorizontalPosition = 0.75;  // 右側列水平位置 (比例，0.85 = 85%)
+  static const double kRightColumnHorizontalPosition = 0.85;  // 右側列水平位置 (比例，0.85 = 85%)
 
   // 佈局常量 - 垂直排列設備位置 (3個設備時的垂直分布)
-  static const List<double> kThreeDevicesVerticalPositions = [0.1, 0.5, 0.9];  // 垂直位置列表
+  static const List<double> kThreeDevicesVerticalPositions = [0.2, 0.5, 0.8];  // 垂直位置列表
 
   // 佈局常量 - 設備間距 (4個以上設備時使用)
   static const double kVerticalSpacing = 0.2;  // 垂直間距 (比例，0.2 = 20%)
@@ -75,7 +97,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   static const double kWiredLineWidth = 2.0;    // 有線連接線寬度
   static const double kWirelessLineWidth = 2.0; // 無線連接線寬度
   static const double kDashLength = 5.0;        // 虛線長度
-  static const double kGapLength = 5.0;         // 虛線間隔長度
+  static const double kGapLength = 4.0;         // 虛線間隔長度
 
   // 佈局常量 - 標籤偏移
   static const double kLabelOffsetX = 15.0;     // 標籤水平偏移
@@ -95,6 +117,8 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
         painter: TopologyPainter(
           gatewayName: widget.gatewayName,
           devices: widget.devices,
+          deviceConnections: widget.deviceConnections,
+          totalConnectedDevices: widget.totalConnectedDevices ?? widget.devices.length,
           showInternet: widget.showInternet,
           layoutConstants: LayoutConstants(
             internetHorizontalPosition: kInternetHorizontalPosition,
@@ -229,6 +253,20 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
       );
     }
   }
+
+  // 獲取裝置的連接數量
+  int _getDeviceConnectionCount(String deviceId) {
+    if (widget.deviceConnections == null) return 0;
+
+    try {
+      final connection = widget.deviceConnections!.firstWhere(
+              (conn) => conn.deviceId == deviceId
+      );
+      return connection.connectedDevicesCount;
+    } catch (e) {
+      return 0; // 如果找不到連接信息，返回0
+    }
+  }
 }
 
 /// 拓撲圖布局常量集合
@@ -290,12 +328,16 @@ class LayoutConstants {
 class TopologyPainter extends CustomPainter {
   final String gatewayName;
   final List<NetworkDevice> devices;
+  final List<DeviceConnection>? deviceConnections;
+  final int totalConnectedDevices;
   final bool showInternet;
   final LayoutConstants layoutConstants;
 
   TopologyPainter({
     required this.gatewayName,
     required this.devices,
+    this.deviceConnections,
+    required this.totalConnectedDevices,
     required this.showInternet,
     required this.layoutConstants,
   });
@@ -316,23 +358,40 @@ class TopologyPainter extends CustomPainter {
       );
       _drawInternetIcon(canvas, internetPosition);
 
-      // 繪製互聯網到網關的連線
-      _drawConnection(canvas, internetPosition, center, ConnectionType.wired);
+      // 繪製互聯網到網關的連線 (從圓周到圓周)
+      _drawConnectionBetweenCircles(
+          canvas,
+          internetPosition,
+          layoutConstants.internetRadius,
+          center,
+          layoutConstants.gatewayRadius,
+          ConnectionType.wired
+      );
     }
 
     // 繪製中央網關
-    _drawGateway(canvas, center, gatewayName);
+    _drawGateway(canvas, center, gatewayName, totalConnectedDevices);
 
     // 繪製設備和連接線
     for (var device in devices) {
       // 計算設備位置
       final devicePosition = _calculateDevicePosition(device, size);
 
-      // 繪製設備與網關之間的連接線
-      _drawConnection(canvas, center, devicePosition, device.connectionType);
+      // 獲取設備連接數量
+      final connectionCount = _getDeviceConnectionCount(device.id);
+
+      // 繪製設備與網關之間的連接線 (從圓周到圓周)
+      _drawConnectionBetweenCircles(
+          canvas,
+          center,
+          layoutConstants.gatewayRadius,
+          devicePosition,
+          layoutConstants.deviceRadius,
+          device.connectionType
+      );
 
       // 繪製設備圖標
-      _drawDevice(canvas, devicePosition, device);
+      _drawDevice(canvas, devicePosition, device, connectionCount);
     }
   }
 
@@ -375,7 +434,7 @@ class TopologyPainter extends CustomPainter {
   }
 
   // 繪製網關圖標
-  void _drawGateway(Canvas canvas, Offset position, String name) {
+  void _drawGateway(Canvas canvas, Offset position, String name, int connectionCount) {
     final paint = Paint()
       ..color = Colors.black
       ..style = PaintingStyle.fill;
@@ -383,8 +442,8 @@ class TopologyPainter extends CustomPainter {
     // 繪製網關圓形
     canvas.drawCircle(position, layoutConstants.gatewayRadius, paint);
 
-    // 添加數字標籤
-    _drawLabel(canvas, position, "4", Colors.white);
+    // 添加數字標籤，顯示連接的設備數量
+    _drawLabel(canvas, position, connectionCount.toString(), Colors.white);
 
     // 添加網關名稱標籤
     final textPainter = TextPainter(
@@ -413,7 +472,7 @@ class TopologyPainter extends CustomPainter {
   }
 
   // 繪製設備圖標
-  void _drawDevice(Canvas canvas, Offset position, NetworkDevice device) {
+  void _drawDevice(Canvas canvas, Offset position, NetworkDevice device, int connectionCount) {
     final paint = Paint()
       ..color = Colors.black
       ..style = PaintingStyle.fill;
@@ -421,15 +480,10 @@ class TopologyPainter extends CustomPainter {
     // 繪製設備圓形
     canvas.drawCircle(position, layoutConstants.deviceRadius, paint);
 
-    // 添加數字標籤 - 根據設備類型選擇標籤
-    String label = "2"; // 默認值
-    if (device.connectionType == ConnectionType.wired) {
-      label = "4"; // 有線設備用數字4標記
-    }
+    // 添加數字標籤 - 顯示連接的子設備數量
+    _drawLabel(canvas, position, connectionCount.toString(), Colors.white);
 
-    _drawLabel(canvas, position, label, Colors.white);
-
-    // 可以添加設備名稱標籤
+    // 添加設備名稱標籤
     final textPainter = TextPainter(
       text: TextSpan(
         text: device.name,
@@ -455,8 +509,38 @@ class TopologyPainter extends CustomPainter {
     );
   }
 
-  // 繪製連接線
-  void _drawConnection(Canvas canvas, Offset start, Offset end, ConnectionType type) {
+  // 繪製兩個圓形之間的連接線 (從圓周到圓周，而非圓心到圓心)
+  void _drawConnectionBetweenCircles(
+      Canvas canvas,
+      Offset start,
+      double startRadius,
+      Offset end,
+      double endRadius,
+      ConnectionType type
+      ) {
+    // 計算兩點之間的方向向量
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final distance = math.sqrt(dx * dx + dy * dy);
+
+    // 確保距離不為零
+    if (distance < 0.001) return;
+
+    // 計算單位向量
+    final unitX = dx / distance;
+    final unitY = dy / distance;
+
+    // 計算起點圓周上的點
+    final startX = start.dx + unitX * startRadius;
+    final startY = start.dy + unitY * startRadius;
+
+    // 計算終點圓周上的點
+    final endX = end.dx - unitX * endRadius;
+    final endY = end.dy - unitY * endRadius;
+
+    final adjustedStart = Offset(startX, startY);
+    final adjustedEnd = Offset(endX, endY);
+
     final lineWidth = type == ConnectionType.wired
         ? layoutConstants.wiredLineWidth
         : layoutConstants.wirelessLineWidth;
@@ -467,10 +551,10 @@ class TopologyPainter extends CustomPainter {
 
     if (type == ConnectionType.wired) {
       // 有線連接使用實線
-      canvas.drawLine(start, end, paint);
+      canvas.drawLine(adjustedStart, adjustedEnd, paint);
     } else {
       // 無線連接使用虛線
-      _drawDashedLine(canvas, start, end, paint);
+      _drawDashedLine(canvas, adjustedStart, adjustedEnd, paint);
     }
   }
 
@@ -602,10 +686,25 @@ class TopologyPainter extends CustomPainter {
     }
   }
 
+  // 獲取裝置的連接數量
+  int _getDeviceConnectionCount(String deviceId) {
+    if (deviceConnections == null) return 0;
+
+    try {
+      final connection = deviceConnections!.firstWhere(
+              (conn) => conn.deviceId == deviceId
+      );
+      return connection.connectedDevicesCount;
+    } catch (e) {
+      return 0; // 如果找不到連接信息，返回0
+    }
+  }
+
   @override
   bool shouldRepaint(TopologyPainter oldDelegate) {
     return oldDelegate.gatewayName != gatewayName ||
         oldDelegate.devices != devices ||
+        oldDelegate.totalConnectedDevices != totalConnectedDevices ||
         oldDelegate.showInternet != showInternet;
   }
 }
