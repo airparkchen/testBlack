@@ -8,7 +8,6 @@ import 'package:whitebox/shared/ui/pages/test/TestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/TestPasswordPage.dart';
 import 'package:whitebox/shared/ui/pages/test/SrpLoginTestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/SrpLoginModifiedTestPage.dart';
-import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/pages/test/NetworkTopoView.dart';
 
 void main() {
@@ -27,7 +26,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFD9D9D9),
         fontFamily: 'Segoe UI', // 設定全局字體為 Segoe UI
       ),
-      home: const NetworkTopoView(),
+      home: const SrpLoginTestPage(),
     );
   }
 }

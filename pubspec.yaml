@@ -15,7 +15,7 @@ dependencies:
   flutter:
     sdk: flutter
   srp:
-    path: ../srp
+    path: ./srp
   # 網路連接狀態管理套件（升級版本以解決相依性衝突）
   connectivity_plus: ^6.1.4
   # iOS 風格圖示
