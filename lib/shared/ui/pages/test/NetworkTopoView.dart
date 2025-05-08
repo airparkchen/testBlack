@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
+import 'package:whitebox/shared/ui/pages/test/DeviceDetailPage.dart'; // 引入設備詳情頁
 
 /// 網絡拓撲視圖頁面
 ///
@@ -21,10 +22,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   int _selectedBottomTab = 1; // 預設為中間的連線選項
 
   // 控制裝置數量的控制器
-  final TextEditingController _deviceCountController = TextEditingController(text: '3');
+  final TextEditingController _deviceCountController = TextEditingController(text: '4');
 
   // 當前裝置數量
-  int _deviceCount = 3;
+  int _deviceCount = 4;
 
   @override
   void initState() {
@@ -234,17 +235,43 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
 
     // 根據裝置數量生成設備
     for (int i = 0; i < _deviceCount; i++) {
-      // 隨機決定連接類型
-      final isWired = i % 3 == 0; // 每3個設備中的第1個設為有線連接
+      String name = '';
+      String deviceType = '';
+
+      // 創建與圖片相符的設備
+      switch (i) {
+        case 0:
+          name = 'TV';
+          deviceType = 'OWA813V_6G';
+          break;
+        case 1:
+          name = 'Xbox';
+          deviceType = 'Connected via Ethernet';
+          break;
+        case 2:
+          name = 'Iphone';
+          deviceType = 'OWA813V_6G';
+          break;
+        case 3:
+          name = 'Laptop';
+          deviceType = 'OWA813V_5G';
+          break;
+        default:
+          name = '設備 ${i + 1}';
+          deviceType = 'OWA813V_6G';
+      }
+
+      // 決定連接類型
+      final isWired = (name == 'Xbox');
 
       final device = NetworkDevice(
-        name: '設備 ${i + 1}',
+        name: name,
         id: 'device-${i + 1}',
-        mac: '00:11:22:33:44:${55 + i}',
-        ip: '192.168.1.${100 + i}',
+        mac: '48:21:0B:4A:47:9B', // 使用與圖片匹配的MAC地址
+        ip: '192.168.1.164',      // 使用與圖片匹配的IP地址
         connectionType: isWired ? ConnectionType.wired : ConnectionType.wireless,
         additionalInfo: {
-          'type': isWired ? 'computer' : 'mobile',
+          'type': deviceType,
           'status': 'online',
         },
       );
@@ -265,14 +292,44 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
       color: Colors.white,
       child: Center(
         child: NetworkTopologyComponent(
-          gatewayName: '主路由器',
+          gatewayName: 'Controller',
           devices: dummyDevices,
           deviceConnections: deviceConnections,
           totalConnectedDevices: 4, // 主機上的數字顯示
           height: 400,
           onDeviceSelected: (device) {
-            // 處理設備選擇
-            _showDeviceInfo(device);
+            // 獲取設備連接的子設備數量
+            int connectionCount = 2; // 預設值
+            bool isGateway = false;
+
+            // 判斷是否為網關設備
+            if (device.id == 'gateway') {
+              isGateway = true;
+              connectionCount = 4;
+            } else {
+              // 尋找該設備的連接數量
+              try {
+                final connection = deviceConnections.firstWhere(
+                        (conn) => conn.deviceId == device.id
+                );
+                connectionCount = connection.connectedDevicesCount;
+              } catch (e) {
+                // 如果找不到連接信息，使用預設值
+                connectionCount = 2;
+              }
+            }
+
+            // 使用新的設備詳情頁面
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DeviceDetailPage(
+                  device: device,
+                  connectedDevicesCount: connectionCount,
+                  isGateway: isGateway,
+                ),
+              ),
+            );
           },
         ),
       ),
@@ -284,9 +341,9 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
     // 使用與拓撲視圖相同的邏輯創建測試數據
     List<NetworkDevice> dummyDevices = [
       NetworkDevice(
-        name: '主路由器',
+        name: 'Controller',
         id: 'router-001',
-        mac: 'AA:BB:CC:DD:EE:FF',
+        mac: '48:21:0B:4A:46:CF',
         ip: '192.168.1.1',
         connectionType: ConnectionType.wired,
         additionalInfo: {
@@ -299,17 +356,44 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
 
     // 添加設備
     for (int i = 0; i < _deviceCount; i++) {
-      final isWired = i % 3 == 0;
+      String name = '';
+      String deviceType = '';
+
+      // 創建與圖片相符的設備
+      switch (i) {
+        case 0:
+          name = 'TV';
+          deviceType = 'OWA813V_6G';
+          break;
+        case 1:
+          name = 'Xbox';
+          deviceType = 'Connected via Ethernet';
+          break;
+        case 2:
+          name = 'Iphone';
+          deviceType = 'OWA813V_6G';
+          break;
+        case 3:
+          name = 'Laptop';
+          deviceType = 'OWA813V_5G';
+          break;
+        default:
+          name = '設備 ${i + 1}';
+          deviceType = 'OWA813V_6G';
+      }
+
+      // 決定連接類型
+      final isWired = (name == 'Xbox');
 
       dummyDevices.add(
         NetworkDevice(
-          name: '設備 ${i + 1}',
+          name: name,
           id: 'device-${i + 1}',
-          mac: '00:11:22:33:44:${55 + i}',
-          ip: '192.168.1.${100 + i}',
+          mac: '48:21:0B:4A:47:9B',
+          ip: '192.168.1.164',
           connectionType: isWired ? ConnectionType.wired : ConnectionType.wireless,
           additionalInfo: {
-            'type': isWired ? 'computer' : 'mobile',
+            'type': deviceType,
             'status': 'online',
           },
         ),
@@ -327,7 +411,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
           leading: CircleAvatar(
             backgroundColor: Colors.black,
             child: Text(
-              device.additionalInfo['type']?.substring(0, 1).toUpperCase() ?? 'D',
+              index == 0 ? '4' : '2',
               style: TextStyle(color: Colors.white),
             ),
           ),
@@ -344,35 +428,21 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
                 ? Colors.green
                 : Colors.blue,
           ),
-          onTap: () => _showDeviceInfo(device),
+          onTap: () {
+            // 點擊列表項時導航到設備詳情頁
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DeviceDetailPage(
+                  device: device,
+                  connectedDevicesCount: index == 0 ? 4 : 2,
+                  isGateway: index == 0,
+                ),
+              ),
+            );
+          },
         );
       },
-    );
-  }
-
-  // 顯示設備信息
-  void _showDeviceInfo(NetworkDevice device) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(device.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('ID: ${device.id}'),
-            Text('MAC: ${device.mac}'),
-            Text('IP: ${device.ip}'),
-            Text('連接類型: ${device.connectionType == ConnectionType.wired ? '有線' : '無線'}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('關閉'),
-          ),
-        ],
-      ),
     );
   }
 

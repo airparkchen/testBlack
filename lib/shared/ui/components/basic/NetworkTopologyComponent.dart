@@ -97,7 +97,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   static const double kWiredLineWidth = 2.0;    // 有線連接線寬度
   static const double kWirelessLineWidth = 2.0; // 無線連接線寬度
   static const double kDashLength = 5.0;        // 虛線長度
-  static const double kGapLength = 4.0;         // 虛線間隔長度
+  static const double kGapLength = 5.0;         // 虛線間隔長度
 
   // 佈局常量 - 標籤偏移
   static const double kLabelOffsetX = 15.0;     // 標籤水平偏移
@@ -162,8 +162,6 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
 
   // 處理點擊事件
   void _handleTap(Offset position) {
-    if (widget.onDeviceSelected == null) return;
-
     // 檢查是否點擊了設備
     for (var device in widget.devices) {
       // 計算設備圓心位置
@@ -174,7 +172,10 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
 
       // 如果距離小於設備圖標半徑，則認為點擊了該設備
       if (distance <= kDeviceRadius) {
-        widget.onDeviceSelected!(device);
+        // 如果有設備選中回調，觸發回調
+        if (widget.onDeviceSelected != null) {
+          widget.onDeviceSelected!(device);
+        }
         return;
       }
     }
@@ -184,8 +185,24 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     final gatewayDistance = (position - gatewayPosition).distance;
 
     if (gatewayDistance <= kGatewayRadius) {
-      // 如果點擊了網關，可以在這裡添加處理邏輯
-      print('點擊了網關: ${widget.gatewayName}');
+      // 如果有設備選中回調，觸發回調，指明這是網關
+      if (widget.onDeviceSelected != null) {
+        // 創建一個表示網關的虛擬設備
+        final gatewayDevice = NetworkDevice(
+          name: widget.gatewayName,
+          id: 'gateway',
+          mac: '48:21:0B:4A:46:CF', // 預設 MAC
+          ip: '192.168.1.1',        // 預設 IP
+          connectionType: ConnectionType.wired,
+          additionalInfo: {
+            'type': 'gateway',
+            'status': 'online',
+          },
+        );
+
+        // 傳遞網關設備
+        widget.onDeviceSelected!(gatewayDevice);
+      }
     }
   }
 
@@ -358,7 +375,7 @@ class TopologyPainter extends CustomPainter {
       );
       _drawInternetIcon(canvas, internetPosition);
 
-      // 繪製互聯網到網關的連線 (從圓周到圓周)
+      // 繪製互聯網到網關的連線
       _drawConnectionBetweenCircles(
           canvas,
           internetPosition,
@@ -380,7 +397,7 @@ class TopologyPainter extends CustomPainter {
       // 獲取設備連接數量
       final connectionCount = _getDeviceConnectionCount(device.id);
 
-      // 繪製設備與網關之間的連接線 (從圓周到圓周)
+      // 繪製設備與網關之間的連接線
       _drawConnectionBetweenCircles(
           canvas,
           center,
