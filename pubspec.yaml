@@ -14,6 +14,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.19.0 #need 0.19.0 for multi-language
+  shared_preferences: ^2.0.15
   srp:
     path: ./srp
   # 網路連接狀態管理套件（升級版本以解決相依性衝突）
@@ -40,7 +44,7 @@ dependencies:
   convert: ^3.1.1
   # 十六進制處理
   hex: ^0.2.0
-  # 狀態管理
+  # 狀態管理 / 語言狀態
   provider: ^6.0.5
   # 側邊欄抽屜
   flutter_slider_drawer: ^2.1.3
@@ -89,6 +93,7 @@ dev_dependencies:
 
 # Flutter 特定配置
 flutter:
+  generate: true
   # 啟用 Material Design 圖示
   uses-material-design: true
 
@@ -120,3 +125,11 @@ flutter:
           style: italic
         - asset: fonts/seguisli.ttf       # 半細斜體
           style: italic
+
+# 語言切換
+flutter_intl:
+  enabled: true
+  class_name: AppLocalizations
+  main_locale: en
+  arb_dir: lib/shared/config/language
+  output_dir: lib/generated

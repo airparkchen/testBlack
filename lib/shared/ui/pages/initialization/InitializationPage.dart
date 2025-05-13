@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 import 'package:whitebox/shared/ui/pages/initialization/QrCodeScannerPage.dart';
 import 'package:whitebox/shared/ui/components/basic/WifiScannerComponent.dart';
-import 'package:whitebox/shared/ui/pages/initialization/WifiSettingFlowPage.dart'; // 引入 WifiSettingFlowPage
+import 'package:whitebox/shared/ui/pages/initialization/WifiSettingFlowPage.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+// 等I10n生成完成後再啟用
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:whitebox/shared/ui/components/basic/LanguageSwitcherComponent.dart';
 
 class InitializationPage extends StatefulWidget {
   const InitializationPage({super.key});
@@ -70,8 +74,23 @@ class _InitializationPageState extends State<InitializationPage> {
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
 
+    // 當I10n生成好後可以啟用這行
+    final appLocalizations = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        // 當I10n生成好後可以啟用這行
+        title: Text(appLocalizations.appTitle),
+        // title: const Text('Wi-Fi 5G IOT APP'),
+        actions: [
+          // 添加語言切換元件
+          const Padding(
+            padding: EdgeInsets.only(right: 16.0),
+            child: LanguageSwitcherComponent(),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,7 +118,9 @@ class _InitializationPageState extends State<InitializationPage> {
             Padding(
               padding: const EdgeInsets.only(left: 20, top: 10, bottom: 10),
               child: _buildActionButton(
-                label: 'QRcode',
+                // 當I10n生成好後可以啟用這行
+                // label: appLocalizations.qrcode,
+                label: appLocalizations.qrcode,
                 onPressed: _openQrCodeScanner,
               ),
             ),
@@ -108,7 +129,9 @@ class _InitializationPageState extends State<InitializationPage> {
             Padding(
               padding: const EdgeInsets.only(left: 20, top: 10, bottom: 10),
               child: _buildActionButton(
-                label: '手動',
+                // 當I10n生成好後可以啟用這行
+                // label: appLocalizations.manual,
+                label: appLocalizations.manual,
                 onPressed: _openManualAdd,
               ),
             ),
@@ -138,9 +161,11 @@ class _InitializationPageState extends State<InitializationPage> {
                       side: BorderSide(color: Colors.grey.shade400),
                     ),
                   ),
-                  child: const Text(
-                    'Search Devices',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
+                  child: Text(
+                    // 當I10n生成好後可以啟用這行
+                    appLocalizations.searchDevices,
+                    // 'Search Devices',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
                   ),
                 ),
               ),
