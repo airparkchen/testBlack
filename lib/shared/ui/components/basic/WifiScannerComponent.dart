@@ -187,7 +187,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
     if (discoveredDevices.isEmpty) {
       return const Center(
         child: Text(
-          '未發現裝置\n請重新掃描',
+          'No device found\nPlease scan again',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 16),
         ),

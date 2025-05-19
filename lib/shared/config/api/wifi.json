@@ -3,135 +3,55 @@
   "apiVersion": "/api/v1",
   "timeoutSeconds": 10,
   "endpoints": {
-    "configStart": {
-      "path": "$apiVersion/config/start",
-      "method": "post",
-      "description": "開始設定流程"
-    },
-    "configFinish": {
-      "path": "$apiVersion/config/finish",
-      "method": "post",
-      "description": "完成設定流程"
-    },
     "systemInfo": {
       "path": "$apiVersion/system/info",
       "method": "get",
       "description": "獲取系統資訊"
     },
-    "systemLog": {
-      "path": "$apiVersion/system/log",
+    "systemMeshTopology": {
+      "path": "$apiVersion/system/mesh_topology",
       "method": "get",
-      "description": "獲取系統日誌"
+      "description": "獲取網格拓撲資訊"
     },
-    "systemFirmware": {
-      "path": "$apiVersion/system/firmware",
+    "wizardStart": {
+      "path": "$apiVersion/wizard/start",
       "method": "post",
-      "description": "更新系統韌體"
-    },
-    "systemReboot": {
-      "path": "$apiVersion/system/reboot",
-      "method": "post",
-      "description": "重啟系統"
-    },
-    "wan5g": {
-      "path": "$apiVersion/network/wan_5g",
-      "method": "get",
-      "description": "獲取5G廣域網路設定"
-    },
-    "wanEth": {
-      "path": "$apiVersion/network/wan_eth",
-      "method": "get",
-      "description": "獲取以太網廣域網路設定"
-    },
-    "lan": {
-      "path": "$apiVersion/network/lan",
-      "method": "get",
-      "description": "獲取區域網路設定"
-    },
-    "networkReserved": {
-      "path": "$apiVersion/network/reserved",
-      "method": "get",
-      "description": "獲取保留IP設定"
-    },
-    "ipv6": {
-      "path": "$apiVersion/network/ipv6",
-      "method": "get",
-      "description": "獲取IPv6設定"
-    },
-    "networkStatus": {
-      "path": "$apiVersion/network/status",
-      "method": "get",
-      "description": "獲取網絡狀態"
-    },
-    "wirelessBasic": {
-      "path": "$apiVersion/wireless/basic",
-      "method": "get",
-      "description": "獲取無線基本設定"
-    },
-    "wirelessAdvanced": {
-      "path": "$apiVersion/wireless/advanced",
-      "method": "get",
-      "description": "獲取無線進階設定"
-    },
-    "wirelessMesh": {
-      "path": "$apiVersion/wireless/mesh",
-      "method": "get",
-      "description": "獲取無線網格設定"
-    },
-    "wirelessWps": {
-      "path": "$apiVersion/wireless/wps",
-      "method": "get",
-      "description": "獲取無線WPS設定"
-    },
-    "wirelessMlo": {
-      "path": "$apiVersion/wireless/mlo",
-      "method": "get",
-      "description": "獲取無線MLO設定"
-    },
-    "userAccount": {
-      "path": "$apiVersion/user/account",
-      "method": "get",
-      "description": "獲取使用者帳戶資訊"
-    },
-    "userLogin": {
-      "path": "$apiVersion/user/login",
-      "method": "post",
-      "description": "使用者登入"
-    },
-    "scheduleList": {
-      "path": "$apiVersion/schedule/list",
-      "method": "get",
-      "description": "獲取排程列表"
-    },
-    "diagnosticPing": {
-      "path": "$apiVersion/diagnostic/ping",
-      "method": "get",
-      "description": "獲取ping測試資訊"
-    },
-    "diagnosticTraceroute": {
-      "path": "$apiVersion/diagnostic/traceroute",
-      "method": "get",
-      "description": "獲取路由追蹤資訊"
-    },
-    "wizardChangePassword": {
-      "path": "$apiVersion/wizard/change_password",
-      "method": "put",
-      "description": "變更設定精靈密碼"
-    },
-    "wizardWanEth": {
-      "path": "$apiVersion/wizard/wan_eth",
-      "method": "get",
-      "description": "獲取設定精靈以太網廣域網路設定"
-    },
-    "wizardWifi": {
-      "path": "$apiVersion/wizard/wifi",
-      "method": "get",
-      "description": "獲取設定精靈WiFi設定"
+      "description": "開始設定精靈配置"
     },
     "wizardFinish": {
       "path": "$apiVersion/wizard/finish",
       "method": "post",
-      "description": "完成設定精靈"
+      "description": "完成設定精靈配置並應用設定"
+    },
+    "wanEthGet": {
+      "path": "$apiVersion/network/wan_eth",
+      "method": "get",
+      "description": "獲取以太網廣域網路設定"
+    },
+    "wanEthUpdate": {
+      "path": "$apiVersion/network/wan_eth",
+      "method": "put",
+      "description": "更新以太網廣域網路設定"
+    },
+    "wirelessBasicGet": {
+      "path": "$apiVersion/wireless/basic",
+      "method": "get",
+      "description": "獲取無線基本設定"
+    },
+    "wirelessBasicUpdate": {
+      "path": "$apiVersion/wireless/basic",
+      "method": "put",
+      "description": "更新無線基本設定"
+    },
+    "userChangePassword": {
+      "path": "$apiVersion/user/change_password",
+      "method": "put",
+      "description": "使用SRP方法更改用戶密碼"
+    },
+    "userLogin": {
+      "path": "$apiVersion/user/login",
+      "method": "post",
+      "description": "使用者SRP驗證登入"
     }
   }
 }

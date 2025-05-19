@@ -1,8 +1,9 @@
-import 'dart:convert';
+// lib/shared/ui/pages/test/TestPage.dart
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
+import 'dart:convert';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
-// 需要額外導入網絡信息套件
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 
@@ -14,835 +15,1171 @@ class TestPage extends StatefulWidget {
 }
 
 class _TestPageState extends State<TestPage> {
-  // 用於儲存 API 回傳的結果
-  Map<String, dynamic> _apiResult = {};
+  // 日誌和狀態
+  List<String> logs = [];
+  bool isLoading = false;
+  String statusMessage = "請選擇測試操作";
 
-  // 用於顯示加載狀態
-  bool _isLoading = false;
-  bool _isCalculatingPassword = false;
-  bool _isLogingIn = false;
+  // 輸入控制器
+  final TextEditingController _usernameController = TextEditingController(text: 'admin');
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _ssidController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
-  // 用於顯示錯誤資訊
-  String? _errorMessage;
+  // API 端點列表
+  Map<String, dynamic> apiConfig = {};
+  List<String> endpoints = [];
+  String? selectedEndpoint;
+  String? selectedMethod;
 
-  // 儲存原始回應
-  String _rawResponse = '';
+  // 會話信息
+  String? jwtToken;
+  String? sessionId;
+  String? csrfToken;
+  bool isAuthenticated = false;
 
-  // 儲存計算出的密碼和使用的SSID
-  String _calculatedPassword = '';
-  String _usedSSID = '';
-  String _defaultUser = '';
+  @override
+  void initState() {
+    super.initState();
+    // 載入可用的 API 端點
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadApiEndpoints();
+      _getCurrentWifiSSID();
+    });
+  }
 
-  // 用於存儲登入結果
-  Map<String, dynamic> _loginResult = {};
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _ssidController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
-  // 使用新的 API 服務測試 getSystemInfo
-  Future<void> _testSystemInfoApi() async {
+  // 添加日誌
+  void _addLog(String message) {
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _rawResponse = '';
-      _apiResult = {};
+      logs.add(message);
     });
 
+    // 確保日誌滾動到底部
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
+    print(message);
+  }
+
+  // 更新狀態消息
+  void _updateStatus(String message) {
+    setState(() {
+      statusMessage = message;
+    });
+  }
+
+  // 獲取當前連接的 WiFi SSID - 簡化版
+  Future<void> _getCurrentWifiSSID() async {
     try {
-      // 使用動態方法調用
-      final systemInfoEndpoint = WifiApiService.getEndpoint('systemInfo');
-      final url = Uri.parse('${WifiApiService.baseUrl}$systemInfoEndpoint');
-      print('請求 URL: $url');
+      _addLog("嘗試獲取當前連接的 WiFi SSID...");
 
-      final response = await http.get(
-        url,
-        headers: WifiApiService.getHeaders(),
-      ).timeout(Duration(seconds: WifiApiService.timeoutSeconds));
+      // 使用 NetworkInfo 獲取 SSID
+      final info = NetworkInfo();
+      String? ssid = await info.getWifiName();
 
-      // 保存原始回應內容
-      _rawResponse = response.body;
-      print('原始回應內容：$_rawResponse');
-      print('狀態碼：${response.statusCode}');
-      print('回應標頭：${response.headers}');
+      // 清理 SSID 字符串 (移除引號等)
+      if (ssid != null && ssid.isNotEmpty) {
+        // 移除 SSID 字符串中的引號（如果有）
+        ssid = ssid.replaceAll('"', '');
 
-      // 嘗試解析 JSON - 處理特殊格式
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          // 如果回應包含多行，嘗試找到 JSON 部分
-          String jsonString = _rawResponse;
+        // 檢查這是否看起來像 MAC 地址 (六組冒號分隔的十六進制數)
+        bool isMacAddress = RegExp(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$').hasMatch(ssid);
 
-          // 查找 JSON 可能的起始位置（從最後一行尋找 JSON 開頭 '{'）
-          final lines = _rawResponse.split('\n');
-          for (int i = 0; i < lines.length; i++) {
-            final line = lines[i].trim();
-            if (line.startsWith('{') && line.contains('}')) {
-              jsonString = line;
-              break;
-            } else if (line.startsWith('{')) {
-              // 找到了 JSON 開頭，組合剩餘行
-              jsonString = lines.sublist(i).join('\n');
-              break;
-            }
-          }
-
-          final jsonResult = json.decode(jsonString);
-
-          setState(() {
-            _apiResult = jsonResult;
-            _isLoading = false;
-            // 保存默認用戶名
-            if (jsonResult.containsKey('default_user')) {
-              _defaultUser = jsonResult['default_user'];
-            }
-          });
-
-          print('解析後的 JSON 結果：$jsonResult');
-        } catch (jsonError) {
-          setState(() {
-            _errorMessage = '無法解析 JSON: $jsonError\n原始回應內容保留在下方';
-            _isLoading = false;
-          });
-
-          print('JSON 解析錯誤：$jsonError');
+        if (isMacAddress) {
+          _addLog("獲取到的是 MAC 地址而非 SSID，將使用預設 SSID");
+          ssid = "DefaultSSID"; // 使用預設值代替 MAC 地址
+        } else {
+          _addLog("成功獲取 SSID: $ssid");
         }
       } else {
-        setState(() {
-          _errorMessage = '請求失敗: 狀態碼 ${response.statusCode}';
-          _isLoading = false;
-        });
+        _addLog("無法獲取 SSID，使用預設值");
+        ssid = "DefaultSSID"; // 使用預設值
       }
-    } catch (e) {
-      // 處理錯誤情況
+
+      // 設置 SSID 到輸入框
       setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
+        _ssidController.text = ssid!;
       });
 
-      print('HTTP 請求錯誤：$e');
-    }
-  }
-
-  // 使用新的 API 服務直接獲取系統信息
-  Future<void> _testSystemInfoApiDirect() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _apiResult = {};
-    });
-
-    try {
-      // 使用新的動態調用方式
-      final result = await WifiApiService.call('getSystemInfo');
-
+    } catch (e) {
+      _addLog("獲取 SSID 時出錯: $e");
+      // 確保始終有一個預設值
       setState(() {
-        _apiResult = result;
-        _isLoading = false;
-        // 保存默認用戶名
-        if (result.containsKey('default_user')) {
-          _defaultUser = result['default_user'];
+        if (_ssidController.text.isEmpty) {
+          _ssidController.text = "DefaultSSID";
         }
       });
-
-      print('API調用成功，結果：$result');
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-
-      print('API調用錯誤：$e');
     }
   }
 
-  // 計算初始密碼的方法
-  Future<void> _calculateInitialPassword() async {
-    setState(() {
-      _isCalculatingPassword = true;
-      _errorMessage = null;
-      _calculatedPassword = '';
-      _usedSSID = '';
-    });
-
-    try {
-      // 先獲取系統資訊，以便獲取必要的參數
-      if (_apiResult.isEmpty) {
-        // 如果還沒有獲取系統資訊，使用新的 API 方式獲取
-        final systemInfo = await WifiApiService.call('getSystemInfo');
-        setState(() {
-          _apiResult = systemInfo;
-          // 保存默認用戶名
-          if (systemInfo.containsKey('default_user')) {
-            _defaultUser = systemInfo['default_user'];
-          }
-        });
-      }
-
-      // 從API結果中提取所需數據
-      String serialNumber = _apiResult['serial_number'] ?? '';
-      String loginSalt = _apiResult['login_salt'] ?? '';
-
-      // 獲取當前連接的SSID
-      String? currentSSID = await WifiApiService.getCurrentSSID();
-      String modelName = _apiResult['model_name'] ?? '';
-
-      // 優先使用當前連接的SSID，如果獲取失敗則使用設備型號作為替代
-      String ssid = currentSSID ?? modelName;
-
-      // 儲存使用的SSID以便顯示
-      _usedSSID = ssid;
-
-      // 如果缺少必要資訊，則報錯
-      if (serialNumber.isEmpty || loginSalt.isEmpty) {
-        throw Exception('無法獲取序號或登入鹽值，請先獲取系統資訊');
-      }
-
-      // 計算初始密碼
-      final password = await WifiApiService.calculateInitialPassword(
-        providedSSID: ssid,
-        serialNumber: serialNumber,
-        loginSalt: loginSalt,
-      );
-
-      setState(() {
-        _calculatedPassword = password;
-        _isCalculatingPassword = false;
-      });
-
-      print('計算得到的初始密碼: $password (使用SSID: $ssid)');
-    } catch (e) {
-      setState(() {
-        _errorMessage = '計算密碼錯誤: $e';
-        _isCalculatingPassword = false;
-      });
-
-      print('計算密碼錯誤: $e');
-    }
-  }
-
-  // 使用計算出的密碼嘗試登入
-  Future<void> _testLogin() async {
-    // 檢查是否已經有密碼和用戶名
-    if (_calculatedPassword.isEmpty) {
-      setState(() {
-        _errorMessage = '請先計算初始密碼';
-      });
-      return;
-    }
-
-    if (_defaultUser.isEmpty) {
-      setState(() {
-        _defaultUser = 'admin'; // 預設使用admin作為用戶名
-      });
-    }
-
-    setState(() {
-      _isLogingIn = true;
-      _errorMessage = null;
-      _loginResult = {};
-    });
-
-    try {
-      // 準備登入參數
-      final loginData = {
-        'method': 'basic',
-        'user': _defaultUser,
-        'password': _calculatedPassword,
-      };
-
-      print('嘗試使用以下資訊登入：');
-      print('用戶名: $_defaultUser');
-      print('密碼: $_calculatedPassword');
-
-      // 調用登入API
-      final result = await WifiApiService.call('postUserLogin', loginData);
-
-      setState(() {
-        _loginResult = result;
-        _isLogingIn = false;
-      });
-
-      // 如果登入成功且返回了token，儲存到API服務中
-      if (result.containsKey('jwt')) {
-        WifiApiService.setJwtToken(result['jwt']);
-        _showSuccessDialog('登入成功！已獲取JWT令牌。');
-      } else {
-        _showSuccessDialog('API請求已完成，但未獲取到JWT令牌。請檢查返回的資訊。');
-      }
-
-      print('登入API調用成功，結果：$result');
-    } catch (e) {
-      setState(() {
-        _errorMessage = '登入失敗: $e';
-        _isLogingIn = false;
-      });
-
-      print('登入錯誤：$e');
-    }
-  }
-
-  // 顯示成功對話框
-  void _showSuccessDialog(String message) {
+// 手動設置 SSID
+  void _setCustomSSID() {
+    // 顯示輸入對話框
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('成功'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('確定'),
+      builder: (context) {
+        String customSSID = _ssidController.text;
+        return AlertDialog(
+          title: const Text('設置自定義 SSID'),
+          content: TextField(
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'SSID',
+              hintText: '請輸入 WiFi 名稱',
+            ),
+            onChanged: (value) {
+              customSSID = value;
+            },
+            controller: TextEditingController(text: _ssidController.text),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _ssidController.text = customSSID;
+                });
+                _addLog("已設置自定義 SSID: $customSSID");
+                Navigator.pop(context);
+              },
+              child: const Text('確定'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 載入 API 端點 - 修復版
+  Future<void> _loadApiEndpoints() async {
+    setState(() {
+      isLoading = true;
+      _updateStatus("載入 API 端點中...");
+    });
+
+    try {
+      // 清空日誌以開始新的測試
+      _clearLogs();
+      _addLog("開始載入 API 配置...");
+
+      // 嘗試從 JSON 檔案讀取端點配置
+      final jsonString = await rootBundle.loadString('lib/shared/config/api/wifi.json');
+      _addLog("成功讀取 JSON 配置文件");
+
+      // 嘗試解析 JSON
+      final config = json.decode(jsonString);
+      _addLog("成功解析 JSON 數據");
+
+      // 確保配置中包含 endpoints
+      if (!config.containsKey('endpoints')) {
+        throw Exception("配置中缺少 'endpoints' 字段");
+      }
+
+      // 提取端點名稱和完整配置
+      final endpointsMap = config['endpoints'] as Map<String, dynamic>;
+      _addLog("找到 ${endpointsMap.length} 個 API 端點");
+
+      // 更新 WifiApiService 的配置
+      if (config.containsKey('baseUrl')) {
+        WifiApiService.baseUrl = config['baseUrl'];
+        _addLog("設置 baseUrl: ${config['baseUrl']}");
+      }
+
+      // 更新狀態
+      setState(() {
+        apiConfig = config;
+        endpoints = endpointsMap.keys.toList();
+        isLoading = false;
+        _updateStatus("已載入 ${endpoints.length} 個 API 端點");
+
+        // 如果有端點，自動選擇第一個
+        if (endpoints.isNotEmpty) {
+          selectedEndpoint = endpoints.first;
+          selectedMethod = endpointsMap[selectedEndpoint]['method'] ?? 'get';
+        }
+      });
+
+      // 打印端點詳情
+      _addLog("可用的 API 端點:");
+      for (var endpoint in endpoints) {
+        var method = endpointsMap[endpoint]['method'] ?? 'get';
+        var path = endpointsMap[endpoint]['path'] ?? '';
+        var desc = endpointsMap[endpoint]['description'] ?? '';
+
+        _addLog("- $endpoint: [$method] $path ($desc)");
+      }
+    } catch (e) {
+      _addLog("載入 API 端點錯誤: $e");
+      setState(() {
+        isLoading = false;
+        _updateStatus("載入 API 端點失敗");
+      });
+    }
+  }
+
+// API 測試區域 UI - 修復版
+  Widget _buildApiTestSection() {
+    return Card(
+      elevation: 3,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 標題和載入按鈕
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'API 測試',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: '重新載入 API 配置',
+                  onPressed: isLoading ? null : _loadApiEndpoints,
+                ),
+              ],
+            ),
+
+            // 顯示當前 API 端點數量
+            Text(
+              '已載入 ${endpoints.length} 個端點',
+              style: TextStyle(
+                color: endpoints.isEmpty ? Colors.red : Colors.green,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 端點選擇下拉框
+            endpoints.isEmpty
+                ? Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.red),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error, color: Colors.red),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      '未載入任何 API 端點，請點擊重新載入',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: isLoading ? null : _loadApiEndpoints,
+                    child: const Text('載入'),
+                  ),
+                ],
+              ),
+            )
+                : DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: '選擇 API 端點',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.api),
+              ),
+              value: selectedEndpoint,
+              items: endpoints.map((endpoint) {
+                // 從配置中獲取方法和描述信息
+                String method = '';
+                String description = '';
+                if (apiConfig.containsKey('endpoints')) {
+                  final endpointsMap = apiConfig['endpoints'] as Map<String, dynamic>;
+                  if (endpointsMap.containsKey(endpoint) && endpointsMap[endpoint] is Map<String, dynamic>) {
+                    method = endpointsMap[endpoint]['method'] ?? '';
+                    description = endpointsMap[endpoint]['description'] ?? '';
+                  }
+                }
+
+                // 顯示方法和描述
+                String displayText = endpoint;
+                if (method.isNotEmpty) {
+                  displayText = '[$method] $displayText';
+                }
+                if (description.isNotEmpty) {
+                  displayText = '$displayText - $description';
+                }
+
+                return DropdownMenuItem<String>(
+                  value: endpoint,
+                  child: Text(displayText, overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedEndpoint = value;
+                  // 更新選中的方法
+                  if (value != null && apiConfig.containsKey('endpoints')) {
+                    final endpointsMap = apiConfig['endpoints'] as Map<String, dynamic>;
+                    if (endpointsMap.containsKey(value)) {
+                      selectedMethod = endpointsMap[value]['method'] ?? 'get';
+                    }
+                  }
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 顯示選中的 API 詳情（如果有選中的端點）
+            if (selectedEndpoint != null && apiConfig.containsKey('endpoints'))
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('選中的 API: $selectedEndpoint',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(
+                        '方法: ${apiConfig['endpoints'][selectedEndpoint]['method'] ?? 'get'}'),
+                    Text(
+                        '路徑: ${apiConfig['endpoints'][selectedEndpoint]['path'] ?? ''}'),
+                    if (apiConfig['endpoints'][selectedEndpoint]
+                        .containsKey('description'))
+                      Text(
+                          '描述: ${apiConfig['endpoints'][selectedEndpoint]['description']}'),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+
+            // 執行按鈕
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: (isLoading || selectedEndpoint == null || endpoints.isEmpty)
+                    ? null
+                    : _callSelectedApi,
+                icon: const Icon(Icons.send),
+                label: const Text('執行 API 請求'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // 顯示所有可用的API方法
-  void _showAvailableMethods() {
-    final methods = WifiApiService.getAllMethodNames();
+  // 獲取系統資訊
+  Future<void> _getSystemInfo() async {
     setState(() {
-      _apiResult = {'可用API方法': methods};
-    });
-  }
-
-  // 一鍵自動化處理：獲取系統信息 -> 計算密碼 -> 登入
-  Future<void> _autoLoginProcess() async {
-    setState(() {
-      _errorMessage = null;
-      _isLoading = true;
+      isLoading = true;
+      _updateStatus("獲取系統資訊中...");
     });
 
     try {
-      // 步驟1：獲取系統信息
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('步驟1: 獲取系統信息...'))
-      );
-      final systemInfo = await WifiApiService.call('getSystemInfo');
+      final systemInfo = await WifiApiService.getSystemInfo();
+      _addLog("系統資訊: ${json.encode(systemInfo)}");
+
       setState(() {
-        _apiResult = systemInfo;
-        if (systemInfo.containsKey('default_user')) {
-          _defaultUser = systemInfo['default_user'];
-        } else {
-          _defaultUser = 'admin';
-        }
+        isLoading = false;
+        _updateStatus("成功獲取系統資訊");
       });
+    } catch (e) {
+      _addLog("獲取系統資訊錯誤: $e");
+      setState(() {
+        isLoading = false;
+        _updateStatus("獲取系統資訊失敗");
+      });
+    }
+  }
 
-      // 步驟2：計算初始密碼
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('步驟2: 計算初始密碼...'))
-      );
+  // 計算初始密碼
+  Future<void> _calculatePassword() async {
+    if (_ssidController.text.isEmpty) {
+      _addLog("錯誤: SSID 不能為空");
+      _updateStatus("SSID 不能為空");
+      return;
+    }
 
-      String serialNumber = systemInfo['serial_number'] ?? '';
-      String loginSalt = systemInfo['login_salt'] ?? '';
+    setState(() {
+      isLoading = true;
+      _updateStatus("計算初始密碼中...");
+    });
 
-      // 獲取當前連接的SSID
-      String? currentSSID = await WifiApiService.getCurrentSSID();
-      String modelName = systemInfo['model_name'] ?? '';
-      String ssid = currentSSID ?? modelName;
-
-      _usedSSID = ssid;
-
-      if (serialNumber.isEmpty || loginSalt.isEmpty) {
-        throw Exception('無法獲取序號或登入鹽值');
-      }
-
+    try {
       final password = await WifiApiService.calculateInitialPassword(
-        providedSSID: ssid,
-        serialNumber: serialNumber,
-        loginSalt: loginSalt,
+        providedSSID: _ssidController.text,
       );
 
+      _addLog("計算的初始密碼: $password");
       setState(() {
-        _calculatedPassword = password;
+        _passwordController.text = password;
+        isLoading = false;
+        _updateStatus("成功計算初始密碼");
       });
+    } catch (e) {
+      _addLog("計算初始密碼錯誤: $e");
+      setState(() {
+        isLoading = false;
+        _updateStatus("計算初始密碼失敗");
+      });
+    }
+  }
 
-      // 步驟3：嘗試登入
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('步驟3: 嘗試登入...'))
-      );
+  // 使用初始密碼登入
+  Future<void> _loginWithPassword() async {
+    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+      _addLog("錯誤: 用戶名或密碼不能為空");
+      _updateStatus("用戶名或密碼不能為空");
+      return;
+    }
 
-      final loginData = {
-        'method': 'basic',
-        'user': _defaultUser,
-        'password': password,
+    setState(() {
+      isLoading = true;
+      _updateStatus("嘗試使用密碼登入中...");
+    });
+
+    try {
+      // 構建登入數據
+      Map<String, dynamic> loginData = {
+        'user': _usernameController.text,
+        'password': _passwordController.text,
       };
 
-      final loginResult = await WifiApiService.call('postUserLogin', loginData);
+      // 發送登入請求
+      final response = await WifiApiService.call('postUserLogin', loginData);
+      _addLog("登入響應: ${json.encode(response)}");
 
-      setState(() {
-        _loginResult = loginResult;
-        _isLoading = false;
-      });
-
-      if (loginResult.containsKey('jwt')) {
-        WifiApiService.setJwtToken(loginResult['jwt']);
-        _showSuccessDialog('自動登入成功！已獲取JWT令牌。');
+      // 檢查登入結果
+      if (response.containsKey('token') || response.containsKey('jwt')) {
+        String token = response.containsKey('token') ? response['token'] : response['jwt'];
+        setState(() {
+          jwtToken = token;
+          isAuthenticated = true;
+          _updateStatus("登入成功！獲取到 JWT 令牌");
+        });
+        _addLog("JWT 令牌: $token");
+        WifiApiService.setJwtToken(token);
+      } else if (response.containsKey('status') && response['status'] == 'success') {
+        setState(() {
+          isAuthenticated = true;
+          _updateStatus("登入成功！未獲取到 JWT 令牌");
+        });
       } else {
-        _showSuccessDialog('API請求已完成，但未獲取到JWT令牌。請檢查返回的資訊。');
+        _addLog("登入失敗: ${json.encode(response)}");
+        _updateStatus("登入失敗");
+      }
+    } catch (e) {
+      _addLog("登入錯誤: $e");
+      _updateStatus("登入請求錯誤");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loginWithSRP() async {
+    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+      _addLog("錯誤: 用戶名或密碼不能為空");
+      _updateStatus("用戶名或密碼不能為空");
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      _updateStatus("嘗試使用 SRP 方法登入中...");
+    });
+
+    try {
+      // 使用 SRP 登入
+      final result = await WifiApiService.loginWithSRP(
+          _usernameController.text,
+          _passwordController.text
+      );
+
+      _addLog("SRP 登入結果: ${result.message}");
+
+      if (result.success) {  // 現在使用 success 而非 returnStatus
+        setState(() {
+          sessionId = result.sessionId;
+          csrfToken = result.csrfToken;
+          jwtToken = result.jwtToken;
+          isAuthenticated = true;
+          _updateStatus("SRP 登入成功");
+        });
+
+        _addLog("會話 ID: $sessionId");
+        _addLog("CSRF 令牌: $csrfToken");
+
+        if (jwtToken != null && jwtToken!.isNotEmpty) {
+          _addLog("JWT 令牌: $jwtToken");
+          WifiApiService.setJwtToken(jwtToken!);
+        }
+      } else {
+        _updateStatus("SRP 登入失敗");
+      }
+    } catch (e) {
+      _addLog("SRP 登入錯誤: $e");
+      _updateStatus("SRP 登入請求錯誤");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // 執行首次登入流程
+  Future<void> _performFirstLogin() async {
+    setState(() {
+      isLoading = true;
+      _updateStatus("執行首次登入流程中...");
+    });
+
+    try {
+      final ssid = _ssidController.text.isNotEmpty ? _ssidController.text : null;
+
+      FirstLoginResult result = await WifiApiService.performFirstLogin(
+        providedSSID: ssid,
+        username: _usernameController.text.isNotEmpty ? _usernameController.text : 'admin',
+      );
+
+      _addLog("首次登入結果: ${result.message}");
+
+      if (result.success) {
+        setState(() {
+          jwtToken = result.jwtToken;
+          isAuthenticated = true;
+          _updateStatus("首次登入成功");
+        });
+
+        if (result.calculatedPassword != null) {
+          setState(() {
+            _passwordController.text = result.calculatedPassword!;
+          });
+          _addLog("計算的密碼: ${result.calculatedPassword}");
+        }
+
+        if (result.jwtToken != null && result.jwtToken!.isNotEmpty) {
+          _addLog("JWT 令牌: ${result.jwtToken}");
+        }
+      } else {
+        _updateStatus("首次登入失敗");
+      }
+    } catch (e) {
+      _addLog("首次登入錯誤: $e");
+      _updateStatus("首次登入請求錯誤");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // 構建適當的 API 函數名稱
+  String _buildApiMethodName(String endpoint, String method) {
+    // 例如: 將 "wanEthGet" 轉換為 "getWanEth"
+    String methodName = '';
+
+    if (endpoint.endsWith('Get')) {
+      // 處理 wanEthGet -> getWanEth
+      String baseName = endpoint.substring(0, endpoint.length - 3);
+      methodName = 'get${_capitalizeFirstLetter(baseName)}';
+    } else if (endpoint.endsWith('Update')) {
+      // 處理 wanEthUpdate -> updateWanEth
+      String baseName = endpoint.substring(0, endpoint.length - 6);
+      methodName = 'update${_capitalizeFirstLetter(baseName)}';
+    } else {
+      // 使用標準格式: get/post/update + Endpoint
+      String prefix = method.toLowerCase() == 'get' ? 'get' :
+      method.toLowerCase() == 'post' ? 'post' :
+      method.toLowerCase() == 'put' ? 'update' :
+      method.toLowerCase() == 'delete' ? 'delete' : 'get';
+
+      methodName = '$prefix${_capitalizeFirstLetter(endpoint)}';
+    }
+
+    return methodName;
+  }
+
+  // 首字母大寫
+  String _capitalizeFirstLetter(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
+  }
+
+  // 執行 API 請求 - 最終版
+  Future<void> _callSelectedApi() async {
+    if (selectedEndpoint == null) {
+      _addLog("錯誤: 未選擇 API 端點");
+      _updateStatus("請選擇一個 API 端點");
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      _updateStatus("呼叫 API: $selectedEndpoint");
+    });
+
+    try {
+      // 從配置中獲取 API 方法
+      final endpointsMap = apiConfig['endpoints'] as Map<String, dynamic>;
+      final endpointConfig = endpointsMap[selectedEndpoint];
+      String method = endpointConfig['method'] ?? 'get';
+      String path = endpointConfig['path'] ?? '';
+      String description = endpointConfig['description'] ?? '';
+
+      // 去除路徑中的變量替換
+      path = path.replaceAll('\$apiVersion', apiConfig['apiVersion'] ?? '/api/v1');
+
+      _addLog("準備呼叫 API - 端點: $selectedEndpoint");
+      _addLog("HTTP方法: $method, 路徑: $path");
+      _addLog("描述: $description");
+
+      // 根據端點名稱和方法確定對應的 WifiApiService 方法名
+      String? methodName;
+
+      // 直接映射表 - 基於 wifi.json 中的定義
+      Map<String, String> mappings = {
+        'systemInfo': 'getSystemInfo',
+        'systemMeshTopology': 'getSystemMeshTopology',
+        'wizardStart': 'postWizardStart',
+        'wizardFinish': 'postWizardFinish',
+        'wanEthGet': 'getWanEth',
+        'wanEthUpdate': 'updateWanEth',
+        'wirelessBasicGet': 'getWirelessBasic',
+        'wirelessBasicUpdate': 'updateWirelessBasic',
+        'userChangePassword': 'updateUserChangePassword',
+        'userLogin': 'postUserLogin'
+      };
+
+      // 從映射表中獲取方法名
+      methodName = mappings[selectedEndpoint];
+
+      // 如果找不到映射，則使用通用規則
+      if (methodName == null) {
+        String prefix = method.toLowerCase() == 'get' ? 'get' :
+        method.toLowerCase() == 'post' ? 'post' :
+        method.toLowerCase() == 'put' ? 'update' :
+        method.toLowerCase() == 'delete' ? 'delete' : 'get';
+
+        methodName = '$prefix${_capitalizeFirstLetter(selectedEndpoint!)}';
       }
 
-    } catch (e) {
-      setState(() {
-        _errorMessage = '自動登入失敗: $e';
-        _isLoading = false;
-      });
+      _addLog("使用 WifiApiService 方法名: $methodName");
 
-      print('自動登入過程錯誤：$e');
+      // 準備調用參數
+      Map<String, dynamic>? params;
+      if (method.toLowerCase() == 'post' || method.toLowerCase() == 'put') {
+        // 打開對話框讓用戶輸入 JSON 參數
+        params = await _promptForJsonParams();
+        if (params == null) {
+          _addLog("用戶取消了操作");
+          setState(() {
+            isLoading = false;
+            _updateStatus("API 呼叫已取消");
+          });
+          return;
+        }
+      }
+
+      // 呼叫 API
+      _addLog("開始執行 API 呼叫...");
+
+      final response = params != null
+          ? await WifiApiService.call(methodName, params)
+          : await WifiApiService.call(methodName);
+
+      _addLog("API 呼叫成功");
+      _addLog("響應內容: ${json.encode(response)}");
+
+      setState(() {
+        isLoading = false;
+        _updateStatus("API 呼叫成功");
+      });
+    } catch (e) {
+      _addLog("API 呼叫錯誤: $e");
+      setState(() {
+        isLoading = false;
+        _updateStatus("API 呼叫失敗");
+      });
     }
+  }
+
+// 提示用戶輸入 JSON 參數
+  Future<Map<String, dynamic>?> _promptForJsonParams() async {
+    String jsonStr = '{}';
+    bool isValidJson = true;
+    String errorMessage = '';
+
+    return await showDialog<Map<String, dynamic>?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('輸入 API 參數 (JSON 格式)'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: '{ "key": "value" }',
+                      errorText: isValidJson ? null : errorMessage,
+                      border: const OutlineInputBorder(),
+                    ),
+                    maxLines: 5,
+                    onChanged: (value) {
+                      jsonStr = value;
+                      try {
+                        if (value.trim().isNotEmpty) {
+                          json.decode(value);
+                        }
+                        setState(() {
+                          isValidJson = true;
+                          errorMessage = '';
+                        });
+                      } catch (e) {
+                        setState(() {
+                          isValidJson = false;
+                          errorMessage = '無效的 JSON 格式';
+                        });
+                      }
+                    },
+                  ),
+                  if (!isValidJson)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        errorMessage,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(null);
+                  },
+                  child: const Text('取消'),
+                ),
+                TextButton(
+                  onPressed: isValidJson
+                      ? () {
+                    try {
+                      Map<String, dynamic> params = jsonStr.trim().isEmpty
+                          ? {}
+                          : json.decode(jsonStr);
+                      Navigator.of(context).pop(params);
+                    } catch (e) {
+                      setState(() {
+                        isValidJson = false;
+                        errorMessage = '無效的 JSON 格式: $e';
+                      });
+                    }
+                  }
+                      : null,
+                  child: const Text('確定'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 清除日誌
+  void _clearLogs() {
+    setState(() {
+      logs = [];
+    });
+    _addLog("日誌已清除");
+  }
+
+  // 登出
+  void _logout() {
+    setState(() {
+      jwtToken = null;
+      sessionId = null;
+      csrfToken = null;
+      isAuthenticated = false;
+      _updateStatus("已登出");
+    });
+    WifiApiService.setJwtToken('');
+    _addLog("已清除身份驗證信息");
   }
 
   @override
   Widget build(BuildContext context) {
-    // 獲取最新 API 端點
-    final systemInfoEndpoint = WifiApiService.getEndpoint('systemInfo');
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('API 測試頁面'),
-        backgroundColor: Colors.grey[300],
+        title: const Text('WiFi API 測試平台'),
+        backgroundColor: Colors.blue,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: isLoading ? null : _loadApiEndpoints,
+            tooltip: '重新載入端點',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _clearLogs,
+            tooltip: '清除日誌',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 一鍵自動化按鈕
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading || _isCalculatingPassword || _isLogingIn ? null : _autoLoginProcess,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50), // 綠色按鈕
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    side: BorderSide(color: Colors.green.shade600),
-                  ),
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                    : const Text(
-                  '一鍵自動登入 (系統信息 -> 計算密碼 -> 登入)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-            const Text('單步驟測試：', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-
-            // 測試按鈕 (直接HTTP呼叫)
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _testSystemInfoApi,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDDDDDD),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    side: BorderSide(color: Colors.grey.shade400),
-                  ),
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text(
-                  '1. 測試 HTTP 直接呼叫 API',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 測試按鈕 (使用動態方法)
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _testSystemInfoApiDirect,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDDDDDD),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    side: BorderSide(color: Colors.grey.shade400),
-                  ),
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text(
-                  '1. 使用動態方法呼叫 API',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 計算密碼按鈕
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: (_isCalculatingPassword || _isLoading) ? null : _calculateInitialPassword,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDDDDDD),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    side: BorderSide(color: Colors.grey.shade400),
-                  ),
-                  disabledBackgroundColor: Colors.grey[200],
-                ),
-                child: _isCalculatingPassword
-                    ? const CircularProgressIndicator()
-                    : const Text(
-                  '2. 計算初始密碼',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 登入按鈕
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: (_isLogingIn || _calculatedPassword.isEmpty) ? null : _testLogin,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDDDDDD),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    side: BorderSide(color: Colors.grey.shade400),
-                  ),
-                  disabledBackgroundColor: Colors.grey[200],
-                ),
-                child: _isLogingIn
-                    ? const CircularProgressIndicator()
-                    : const Text(
-                  '3. 使用初始密碼登入',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 顯示可用方法按鈕
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _showAvailableMethods,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDDDDDD),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0),
-                    side: BorderSide(color: Colors.grey.shade400),
-                  ),
-                ),
-                child: const Text(
-                  '顯示所有可用 API 方法',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // API URL 顯示
-            Text(
-              '請求 URL: ${WifiApiService.baseUrl}$systemInfoEndpoint',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 顯示登入資訊
-            if (_loginResult.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '登入結果：',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[100],
-                      border: Border.all(color: Colors.blue[400]!),
-                    ),
-                    width: double.infinity,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ..._loginResult.entries.map((entry) {
-                          if (entry.key == 'jwt') {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'JWT Token:',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SelectableText(
-                                  '${entry.value}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ],
-                            );
-                          } else {
-                            return Text(
-                              '${entry.key}: ${entry.value}',
-                              style: const TextStyle(fontSize: 16),
-                            );
-                          }
-                        }).toList(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-            const SizedBox(height: 20),
-
-            // 顯示計算出的密碼
-            if (_calculatedPassword.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '計算得到的初始密碼：',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.green[100],
-                      border: Border.all(color: Colors.green[400]!),
-                    ),
-                    width: double.infinity,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SelectableText(
-                          _calculatedPassword,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold,
-                          ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 狀態卡片
+              Card(
+                elevation: 3,
+                color: isAuthenticated ? Colors.green[100] : Colors.blue[50],
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Icon(
+                        isAuthenticated ? Icons.verified_user : Icons.info,
+                        size: 40,
+                        color: isAuthenticated ? Colors.green : Colors.blue,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        statusMessage,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isAuthenticated ? Colors.green[800] : Colors.black,
                         ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (isAuthenticated) ...[
                         const SizedBox(height: 8),
                         Text(
-                          '使用設備序號: ${_apiResult['serial_number'] ?? '未知'}',
-                          style: const TextStyle(fontSize: 14),
+                          '已登入',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.green[800],
+                          ),
                         ),
-                        Text(
-                          '使用SSID: $_usedSSID',
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        if (_defaultUser.isNotEmpty) Text(
-                          '默認用戶名: $_defaultUser',
-                          style: const TextStyle(fontSize: 14),
+                        ElevatedButton(
+                          onPressed: _logout,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('登出'),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
-
-            const SizedBox(height: 20),
-
-            // 顯示 API 回傳結果的標題
-            const Text(
-              'API 回傳結果：',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // 如果有錯誤，顯示錯誤訊息
-            if (_errorMessage != null)
-              Container(
-                padding: const EdgeInsets.all(10),
-                color: Colors.red[100],
-                width: double.infinity,
-                child: Text(
-                  '錯誤：$_errorMessage',
-                  style: const TextStyle(color: Colors.red),
                 ),
               ),
+              const SizedBox(height: 16),
 
-            // 顯示 API 結果
-            if (_apiResult.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  border: Border.all(color: Colors.grey[400]!),
-                ),
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 遍歷 API 回傳的結果顯示在畫面上
-                    ..._apiResult.entries.map((entry) {
-                      // 如果值是陣列，特別處理顯示
-                      if (entry.value is List) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${entry.key}:',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 5),
-                            ...List.generate((entry.value as List).length, (index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(left: 20.0, bottom: 5.0),
-                                child: Text(
-                                  '${index + 1}. ${(entry.value as List)[index]}',
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              );
-                            }),
-                          ],
-                        );
-                      } else if (entry.value is Map) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${entry.key}:',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 5),
-                            ...(entry.value as Map).entries.map((subEntry) {
-                              return Padding(
-                                padding: const EdgeInsets.only(left: 20.0, bottom: 5.0),
-                                child: Text(
-                                  '${subEntry.key}: ${subEntry.value}',
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              );
-                            }),
-                          ],
-                        );
-                      } else {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Text(
-                            '${entry.key}: ${entry.value}',
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        );
-                      }
-                    }).toList(),
-                  ],
-                ),
-              ),
-
-            // 如果 API 尚未呼叫或是空結果，顯示提示資訊
-            if (_apiResult.isEmpty && _errorMessage == null && !_isLoading && _rawResponse.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(10),
-                color: Colors.grey[200],
-                width: double.infinity,
-                child: const Text(
-                  '尚未取得任何結果，請點擊上方按鈕測試 API',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-
-            // 顯示原始回應內容
-            if (_rawResponse.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 30),
-                  const Text(
-                    '原始回應內容：',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      border: Border.all(color: Colors.grey[800]!),
-                    ),
-                    width: double.infinity,
-                    child: Text(
-                      _rawResponse,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontFamily: 'monospace',
-                        color: Colors.green,
+              // 認證區域
+              Card(
+                elevation: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '登入測試',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _usernameController,
+                        decoration: const InputDecoration(
+                          labelText: '用戶名',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _passwordController,
+                        decoration: InputDecoration(
+                          labelText: '密碼',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.copy),
+                            tooltip: '複製密碼',
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: _passwordController.text));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('密碼已複製到剪貼板')),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _ssidController,
+                        decoration: InputDecoration(
+                          labelText: 'SSID (用於密碼計算)',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.wifi),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.refresh),
+                                tooltip: '獲取當前 WiFi SSID',
+                                onPressed: _getCurrentWifiSSID,
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                tooltip: '手動設置 SSID',
+                                onPressed: _setCustomSSID,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: isLoading ? null : _calculatePassword,
+                              icon: const Icon(Icons.calculate),
+                              label: const Text('計算密碼'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: isLoading ? null : _getSystemInfo,
+                              icon: const Icon(Icons.info),
+                              label: const Text('獲取系統資訊'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: isLoading ? null : _loginWithPassword,
+                              icon: const Icon(Icons.login),
+                              label: const Text('標準登入'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: isLoading ? null : _loginWithSRP,
+                              icon: const Icon(Icons.security),
+                              label: const Text('SRP 登入'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: isLoading ? null : _performFirstLogin,
+                          icon: const Icon(Icons.vpn_key),
+                          label: const Text('執行首次登入流程'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[800],
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
+              const SizedBox(height: 16),
 
-            // 格式化顯示 JSON
-            if (_apiResult.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 30),
-                  const Text(
-                    '解析後的 JSON 資料：',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+              // API 測試區域
+              Card(
+                elevation: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'API 測試',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(
+                          labelText: '選擇 API 端點',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.api),
+                        ),
+                        value: selectedEndpoint,
+                        items: endpoints.map((endpoint) {
+                          // 從配置中獲取方法和描述信息
+                          String method = '';
+                          String description = '';
+                          if (apiConfig.containsKey('endpoints')) {
+                            final endpointsMap = apiConfig['endpoints'] as Map<String, dynamic>;
+                            if (endpointsMap.containsKey(endpoint) && endpointsMap[endpoint] is Map<String, dynamic>) {
+                              method = endpointsMap[endpoint]['method'] ?? '';
+                              description = endpointsMap[endpoint]['description'] ?? '';
+                            }
+                          }
+
+                          // 顯示方法和描述
+                          String displayText = endpoint;
+                          if (method.isNotEmpty) {
+                            displayText = '[$method] $displayText';
+                          }
+                          if (description.isNotEmpty) {
+                            displayText = '$displayText - $description';
+                          }
+
+                          return DropdownMenuItem<String>(
+                            value: endpoint,
+                            child: Text(displayText, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedEndpoint = value;
+                            // 更新選中的方法
+                            if (value != null && apiConfig.containsKey('endpoints')) {
+                              final endpointsMap = apiConfig['endpoints'] as Map<String, dynamic>;
+                              if (endpointsMap.containsKey(value)) {
+                                selectedMethod = endpointsMap[value]['method'] ?? 'get';
+                              }
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: (isLoading || selectedEndpoint == null) ? null : _callSelectedApi,
+                          icon: const Icon(Icons.send),
+                          label: const Text('執行 API 請求'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      border: Border.all(color: Colors.grey[400]!),
-                    ),
-                    width: double.infinity,
-                    child: Text(
-                      _apiResult.toString(),
-                      style: const TextStyle(fontSize: 14, fontFamily: 'monospace'),
-                    ),
-                  ),
-                ],
+                ),
               ),
-          ],
+              const SizedBox(height: 16),
+
+              // 日誌區域
+              Card(
+                elevation: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '測試日誌',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: _clearLogs,
+                            tooltip: '清除日誌',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 300,
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            itemCount: logs.length,
+                            itemBuilder: (context, index) {
+                              return Text(
+                                logs[index],
+                                style: const TextStyle(
+                                  color: Colors.green,
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

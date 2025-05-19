@@ -24,8 +24,8 @@ class _TestPasswordPageState extends State<TestPasswordPage> {
   String apiSalt = ''; // 從API獲取的salt值
 
   // 固定參數
-  final String deviceModel = '8C16451AF919';  // 設備型號
-  final String ssid = 'EG65BE_5G';  // SSID
+  final String deviceModel = 'MICKY001';  // 設備型號
+  final String ssid = 'EG180BE-9CF1';  // SSID
 
   // 預設 Hash 數組（與規則一致）
   static const List<String> DEFAULT_HASHES = [

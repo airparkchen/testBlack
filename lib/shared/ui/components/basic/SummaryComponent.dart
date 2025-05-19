@@ -41,6 +41,9 @@ class _SummaryComponentState extends State<SummaryComponent> {
   bool _wifiPasswordVisible = false;
   bool _pppoePasswordVisible = false;
 
+  // 密碼隱藏時顯示的固定數量星號
+  final int _fixedHiddenSymbolsCount = 8;
+
   // 分隔線顏色
   final Color _dividerColor = const Color(0x1A000000); // #0000001A
 
@@ -48,14 +51,14 @@ class _SummaryComponentState extends State<SummaryComponent> {
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
 
-    // 根據可見性狀態決定如何顯示密碼
+    // 根據可見性狀態決定如何顯示密碼 - 隱藏時固定顯示8個星號
     final wifiPassword = widget.password.isNotEmpty
-        ? (_wifiPasswordVisible ? widget.password : '•' * widget.password.length)
+        ? (_wifiPasswordVisible ? widget.password : '•' * _fixedHiddenSymbolsCount)
         : '(Not Set)';
 
-    // PPPoE 密碼也使用星號顯示
+    // PPPoE 密碼也使用固定長度星號顯示
     final pppoePassword = widget.pppoePassword != null && widget.pppoePassword!.isNotEmpty
-        ? (_pppoePasswordVisible ? widget.pppoePassword! : '•' * widget.pppoePassword!.length)
+        ? (_pppoePasswordVisible ? widget.pppoePassword! : '•' * _fixedHiddenSymbolsCount)
         : '(Not Set)';
 
     return Container(

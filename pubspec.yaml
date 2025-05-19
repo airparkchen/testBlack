@@ -100,7 +100,7 @@ flutter:
   # 資源文件配置
   assets:
     - lib/shared/config/flows/initialization/wifi.json  # WiFi 初始化配置檔案
-
+    - lib/shared/config/api/wifi.json
   # 字體配置
   fonts:
     - family: Segoe UI

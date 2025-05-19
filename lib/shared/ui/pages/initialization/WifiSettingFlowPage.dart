@@ -1,3 +1,5 @@
+// lib/shared/ui/pages/initialization/WifiSettingFlowPage.dart
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,6 +14,9 @@ import 'package:whitebox/shared/ui/components/basic/FinishingWizardComponent.dar
 import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart';
 import 'package:whitebox/shared/models/StaticIpConfig.dart';
 
+// 引入需要的 API 服務類
+import 'package:whitebox/shared/api/wifi_api_service.dart';
+
 class WifiSettingFlowPage extends StatefulWidget {
   const WifiSettingFlowPage({super.key});
 
@@ -20,19 +25,30 @@ class WifiSettingFlowPage extends StatefulWidget {
 }
 
 class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
+  // 基本設定
   String currentModel = 'Micky';
   int currentStepIndex = 0;
   bool isLastStepCompleted = false;
   bool isShowingFinishingWizard = false;
+  bool isLoading = true;
+  bool isCurrentStepComplete = false;
+  bool _isUpdatingStep = false;
 
-  // 新增省略號動畫相關變數
+  // 登入相關變數
+  bool isAuthenticated = false;
+  String? jwtToken;
+  String currentSSID = '';
+  String calculatedPassword = '';
+  bool isAuthenticating = false;
+
+  // 省略號動畫
   String _ellipsis = '';
   late Timer _ellipsisTimer;
 
+  // 表單狀態
   Map<String, dynamic> stepsConfig = {};
-  bool isLoading = true;
   StaticIpConfig staticIpConfig = StaticIpConfig();
-  String userName = '';
+  String userName = 'admin'; // 預設用戶名
   String password = '';
   String confirmPassword = '';
   String connectionType = 'DHCP';
@@ -42,19 +58,17 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   String pppoeUsername = '';
   String pppoePassword = '';
 
-  bool isCurrentStepComplete = false;
-
+  // 控制器
   late PageController _pageController;
   final StepperController _stepperController = StepperController();
-  bool _isUpdatingStep = false;
 
+  // 完成精靈的步驟名稱
   final List<String> _processNames = [
-    'Process 01',
-    'Process 02',
-    'Process 03',
-    'Process 04',
-    'Process 05',
+    'Process 01', 'Process 02', 'Process 03', 'Process 04', 'Process 05',
   ];
+  Map<String, dynamic> _currentWanSettings = {};
+  Map<String, dynamic> _currentWirelessSettings = {};
+  bool _isLoadingWirelessSettings = false;
 
   @override
   void initState() {
@@ -62,45 +76,539 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _loadConfig();
     _pageController = PageController(initialPage: currentStepIndex);
     _stepperController.addListener(_onStepperControllerChanged);
-
-    // 初始化省略號動畫計時器
     _startEllipsisAnimation();
-  }
-  // 新增省略號動畫方法
-  void _startEllipsisAnimation() {
-    _ellipsisTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      setState(() {
-        switch (_ellipsis) {
-          case '':
-            _ellipsis = '.';
-            break;
-          case '.':
-            _ellipsis = '..';
-            break;
-          case '..':
-            _ellipsis = '...';
-            break;
-          case '...':
-            _ellipsis = '';
-            break;
-          default:
-            _ellipsis = '';
-        }
-      });
+
+    // 初始化時自動執行獲取 SSID 和登入流程
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAuthentication();
     });
   }
+
   @override
   void dispose() {
     _pageController.dispose();
     _stepperController.removeListener(_onStepperControllerChanged);
     _stepperController.dispose();
-
-    // 取消省略號動畫計時器
     _ellipsisTimer.cancel();
-
     super.dispose();
   }
 
+//!!!!!!流程寫死的部分/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // 在 _WifiSettingFlowPageState 類中添加這個方法
+  Future<void> _changePassword() async {
+    if (password.isEmpty) {
+      _updateStatus("錯誤: 沒有設置新密碼");
+      _updateStatus("錯誤: 沒有設置新密碼");
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      _updateStatus("正在更改密碼...");
+    });
+
+    try {
+      _updateStatus("\n===== 開始變更密碼流程 =====");
+      _updateStatus("用戶名: $userName");
+      _updateStatus("新密碼: [已隱藏]");
+
+      final result = await WifiApiService.changePasswordWithSRP(
+          username: userName,
+          newPassword: password
+      );
+
+      if (result['success']) {
+        _updateStatus("密碼變更成功!");
+        _updateStatus("密碼已成功變更");
+      } else {
+        _updateStatus("密碼變更失敗: ${result['message']}");
+        _updateStatus("密碼變更失敗");
+      }
+
+      if (result['data'] != null) {
+        _updateStatus("服務器響應: ${json.encode(result['data'])}");
+      }
+
+      _updateStatus("===== 變更密碼流程結束 =====");
+    } catch (e) {
+      _updateStatus("變更密碼過程中發生錯誤: $e");
+      _updateStatus("變更密碼失敗");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // 初始化認證流程
+  Future<void> _initializeAuthentication() async {
+    try {
+      setState(() {
+        isAuthenticating = true;
+        _updateStatus("正在初始化連接...");
+      });
+
+      // 模擬初始延遲，開始處理前的視覺效果
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      // 步驟 1: 獲取當前 SSID
+      setState(() {
+        _updateStatus("正在獲取 WiFi 資訊...");
+      });
+      final ssid = await WifiApiService.getCurrentWifiSSID();
+      setState(() {
+        currentSSID = ssid;
+        this.ssid = ssid;
+        _updateStatus("WiFi 資訊已獲取");
+      });
+
+      // 步驟間延遲
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      // 步驟 2: 計算初始密碼
+      if (currentSSID.isEmpty) {
+        print("無法計算密碼: 缺少 SSID");
+        setState(() {
+          _updateStatus("無法計算密碼: 缺少 SSID");
+        });
+        return;
+      }
+
+      setState(() {
+        _updateStatus("正在計算初始密碼...");
+      });
+      final password = await WifiApiService.calculatePasswordWithLogs(
+        providedSSID: currentSSID,
+      );
+
+      if (password.isEmpty) {
+        setState(() {
+          _updateStatus("密碼計算失敗");
+        });
+        return;
+      }
+
+      setState(() {
+        calculatedPassword = password;
+        this.password = password;
+        _updateStatus("初始密碼已計算完成");
+      });
+
+      // 步驟間延遲
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      // 步驟 3: 執行登入
+      if (calculatedPassword.isEmpty) {
+        setState(() {
+          _updateStatus("無法登入: 缺少密碼");
+        });
+        return;
+      }
+
+      setState(() {
+        _updateStatus("正在執行登入...");
+      });
+
+      final loginResult = await WifiApiService.performFullLogin(
+          userName: userName,
+          calculatedPassword: calculatedPassword
+      );
+
+      setState(() {
+        if (loginResult['success'] == true) {
+          jwtToken = loginResult['jwtToken'];
+          isAuthenticated = loginResult['isAuthenticated'] ?? false;
+          _updateStatus("登入成功");
+        } else {
+          _updateStatus("登入失敗: ${loginResult['message']}");
+        }
+      });
+
+      if (jwtToken != null && jwtToken!.isNotEmpty) {
+        WifiApiService.setJwtToken(jwtToken!);
+      }
+
+      // 最終延遲，讓用戶有時間看到最終狀態
+      await Future.delayed(const Duration(milliseconds: 200));
+
+    } catch (e) {
+      print('初始化認證過程中出錯: $e');
+      setState(() {
+        _updateStatus("初始化過程出錯: $e");
+      });
+    } finally {
+      setState(() {
+        isAuthenticating = false;
+      });
+    }
+  }
+
+  // 修改 _loadCurrentWanSettings 方法，添加 debug 輸出
+  Future<void> _loadCurrentWanSettings() async {
+
+    try {
+      setState(() {
+        _updateStatus("正在獲取網絡設置...");
+      });
+
+      // 調用API獲取當前網絡設置
+      final wanSettings = await WifiApiService.getWanEth();
+
+      String apiConnectionType = wanSettings['connection_type'] ?? 'dhcp';
+      // 轉換為UI使用的格式
+      if (apiConnectionType == 'dhcp') {
+        connectionType = 'DHCP';
+      } else if (apiConnectionType == 'static_ip') {
+        connectionType = 'Static IP';
+      } else if (apiConnectionType == 'pppoe') {
+        connectionType = 'PPPoE';
+      } else {
+        connectionType = 'DHCP'; // 預設值
+      }
+
+      // 添加詳細的 debug 輸出
+      print('獲取到的網絡設置: ${json.encode(wanSettings)}');
+
+      setState(() {
+        _currentWanSettings = wanSettings;
+        _updateStatus("網絡設置已獲取");
+
+        // 設置初始連接類型和相關數據
+        connectionType = wanSettings['connection_type'] ?? 'DHCP';
+
+        print('設置連接類型為: $connectionType');
+
+        // 如果是靜態IP，則設置相關參數
+        if (connectionType == 'static_ip') {
+          staticIpConfig.ipAddress = wanSettings['static_ip_addr'] ?? '';
+          staticIpConfig.subnetMask = wanSettings['static_ip_mask'] ?? '';
+          staticIpConfig.gateway = wanSettings['static_ip_gateway'] ?? '';
+          staticIpConfig.primaryDns = wanSettings['dns_1'] ?? '';
+          staticIpConfig.secondaryDns = wanSettings['dns_2'] ?? '';
+
+          print('靜態IP配置: IP=${staticIpConfig.ipAddress}, 子網掩碼=${staticIpConfig.subnetMask}, 網關=${staticIpConfig.gateway}, DNS1=${staticIpConfig.primaryDns}, DNS2=${staticIpConfig.secondaryDns}');
+        }
+        // 如果是PPPoE，則設置相關參數
+        else if (connectionType == 'pppoe' && wanSettings.containsKey('pppoe')) {
+          pppoeUsername = wanSettings['pppoe']['username'] ?? '';
+          pppoePassword = wanSettings['pppoe']['password'] ?? '';
+
+          print('PPPoE配置: 用戶名=$pppoeUsername, 密碼=${pppoePassword.isEmpty ? "空" : "已設置"}');
+        }
+      });
+    } catch (e) {
+      print('獲取WAN設置時出錯: $e');
+      setState(() {
+        _updateStatus("獲取網絡設置失敗: $e");
+      });
+    }
+  }
+
+  Future _loadWirelessSettings() async {
+    try {
+      setState(() {
+        _isLoadingWirelessSettings = true;
+        _updateStatus("正在獲取無線設置...");
+      });
+
+      // 調用API獲取當前無線設置
+      final wirelessSettings = await WifiApiService.getWirelessBasic();
+
+      // 添加詳細的 debug 輸出
+      print('獲取到的無線設置: ${json.encode(wirelessSettings)}');
+
+      setState(() {
+        _currentWirelessSettings = wirelessSettings;
+        _updateStatus("無線設置已獲取");
+
+        // 如果存在有效的VAP配置，使用它填充無線設置
+        if (wirelessSettings.containsKey('vaps') &&
+            wirelessSettings['vaps'] is List &&
+            wirelessSettings['vaps'].isNotEmpty) {
+
+          // 通常使用第一個VAP配置（主要配置）
+          final vap = wirelessSettings['vaps'][0];
+
+          // 設置SSID
+          if (vap.containsKey('ssid') && vap['ssid'] is String) {
+            ssid = vap['ssid'];
+            print('設置SSID為: $ssid');
+          }
+
+          // 由於只支援 WPA3，直接設置為 WPA3 Personal
+          securityOption = 'WPA3 Personal';
+          print('設置安全選項為: $securityOption');
+
+          // 設置密碼
+          if (vap.containsKey('password')) {
+            if (vap['password'] is String) {
+              ssidPassword = vap['password'];
+              print('設置WiFi密碼: ${ssidPassword.isEmpty ? "未設置" : "已設置，長度: ${ssidPassword.length}"}');
+              // 快速密碼值檢查
+              if (ssidPassword.isNotEmpty) {
+                print('密碼前4個字符: ${ssidPassword.substring(0, ssidPassword.length > 4 ? 4 : ssidPassword.length)}...');
+              }
+            } else {
+              print('警告: 密碼不是字符串類型: ${vap['password']}');
+              ssidPassword = ''; // 重置為空字符串
+            }
+          } else {
+            print('警告: VAP配置中沒有password字段');
+            ssidPassword = ''; // WPA3 需要密碼，設置為空以便提示用戶
+          }
+        }
+
+        _isLoadingWirelessSettings = false;
+      });
+    } catch (e) {
+      print('獲取無線設置時出錯: $e');
+      setState(() {
+        _updateStatus("獲取無線設置失敗: $e");
+        _isLoadingWirelessSettings = false;
+      });
+    }
+  }
+  // 添加提交網絡設置的方法
+  Future<void> _submitWanSettings() async {
+    try {
+      setState(() {
+        _updateStatus("正在更新網絡設置...");
+      });
+
+      print('即將提交的網絡設置: ${json.encode(_currentWanSettings)}');
+
+      // 調用API提交網絡設置
+      final result = await WifiApiService.updateWanEth(_currentWanSettings);
+
+      print('網絡設置更新結果: ${json.encode(result)}');
+
+      setState(() {
+        _updateStatus("網絡設置已更新");
+      });
+    } catch (e) {
+      print('提交WAN設置時出錯: $e');
+      setState(() {
+        _updateStatus("更新網絡設置失敗: $e");
+      });
+    }
+  }
+  Future<void> _submitWirelessSettings() async {
+    try {
+      setState(() {
+        _updateStatus("正在更新無線設置...");
+      });
+
+      // 準備無線設置提交數據
+      Map<String, dynamic> wirelessConfig = {};
+
+      // 保留原始結構中的其他字段
+      if (_currentWirelessSettings.containsKey('wifi_mlo')) {
+        wirelessConfig['wifi_mlo'] = _currentWirelessSettings['wifi_mlo'];
+      }
+
+      // 設置VAPs數組
+      List<Map<String, dynamic>> vaps = [];
+
+      // 如果已經有VAPs，保留其結構但更新值
+      if (_currentWirelessSettings.containsKey('vaps') &&
+          _currentWirelessSettings['vaps'] is List &&
+          _currentWirelessSettings['vaps'].isNotEmpty) {
+
+        for (int i = 0; i < _currentWirelessSettings['vaps'].length; i++) {
+          Map<String, dynamic> originalVap = Map<String, dynamic>.from(_currentWirelessSettings['vaps'][i]);
+
+          // 只更新第一個（主要的）VAP
+          if (i == 0) {
+            // 既然只支援 WPA3，固定使用 'sae' 安全類型
+            String apiSecurityType = 'sae'; // WPA3 Personal
+
+            // 更新值
+            originalVap['ssid'] = ssid;
+            originalVap['security_type'] = apiSecurityType;
+            originalVap['password'] = ssidPassword; // WPA3 需要密碼
+          }
+
+          vaps.add(originalVap);
+        }
+      }
+      // 如果沒有現有VAPs，創建新的結構
+      else {
+        Map<String, dynamic> newVap = {
+          'vap_index': 1,
+          'vap_type': 'primary',
+          'vap_enabled': 'true',
+          'security_type': 'sae', // WPA3 Personal
+          'ssid': ssid,
+          'password': ssidPassword
+        };
+
+        vaps.add(newVap);
+      }
+
+      // 設置VAPs數組到配置中
+      wirelessConfig['vaps'] = vaps;
+
+      print('即將提交的無線設置: ${json.encode(wirelessConfig)}');
+
+      // 調用API提交無線設置
+      final result = await WifiApiService.updateWirelessBasic(wirelessConfig);
+
+      print('無線設置更新結果: ${json.encode(result)}');
+
+      setState(() {
+        _updateStatus("無線設置已更新");
+      });
+    } catch (e) {
+      print('提交無線設置時出錯: $e');
+      setState(() {
+        _updateStatus("更新無線設置失敗: $e");
+      });
+    }
+  }
+
+  // 修改處理精靈完成的方法
+  void _handleWizardCompleted() async {
+    try {
+
+      // 步驟 2: 提交網絡設置
+      print('步驟 1: 正在提交網絡設置...');
+      await _submitWanSettings();
+      await Future.delayed(const Duration(seconds: 2)); // 給系統一些處理時間
+
+      // 步驟 3: 提交無線設置
+      print('步驟 2: 正在提交無線設置...');
+      await _submitWirelessSettings();
+      await Future.delayed(const Duration(seconds: 2)); // 給系統一些處理時間
+
+      if (password.isNotEmpty && confirmPassword.isNotEmpty && password == confirmPassword) {
+        print('步驟 3: 變更用戶密碼...');
+        await _changePassword();
+
+      }
+      // 步驟 4: 完成配置
+      print('步驟 4: 正在完成配置...');
+      await WifiApiService.configFinish();
+      // await Future.delayed(const Duration(seconds: 2)); // 給系統一些處理時間
+      print('配置已完成');
+
+      // 步驟 5: 應用設置變更
+      print('步驟 5: 正在應用設置變更...');
+      try {
+        await Future.delayed(const Duration(seconds: 2)); // 給設備一些應用配置的時間
+        print('設置已應用');
+      } catch (e) {
+        print('應用設置時出錯: $e');
+      }
+
+      // 導航到初始化頁面
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const InitializationPage()),
+            (route) => false,
+      );
+    } catch (e) {
+      print('設置過程中出錯: $e');
+
+      // 顯示錯誤對話框
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('設置失敗'),
+              content: Text('無法完成設置: $e'),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('確定'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+
+                    // 仍然導航到初始化頁面
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const InitializationPage()),
+                          (route) => false,
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
+  }
+  // 省略號動畫
+  void _startEllipsisAnimation() {
+    _ellipsisTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      setState(() {
+        _ellipsis = _ellipsis.length < 3 ? _ellipsis + '.' : '';
+      });
+    });
+  }
+
+  // 更新狀態消息
+  void _updateStatus(String message) {
+    print('狀態更新: $message');
+  }
+
+  // 準備用於提交的WAN設置
+  void _prepareWanSettingsForSubmission() {
+    Map<String, dynamic> wanSettings = {};
+
+    // 根據連接類型設置不同的參數
+    if (connectionType == 'DHCP') {
+      wanSettings['connection_type'] = 'dhcp';
+    } else if (connectionType == 'Static IP') {
+      wanSettings['connection_type'] = 'static_ip';
+      wanSettings['static_ip_addr'] = staticIpConfig.ipAddress;
+      wanSettings['static_ip_mask'] = staticIpConfig.subnetMask;
+      wanSettings['static_ip_gateway'] = staticIpConfig.gateway;
+      wanSettings['dns_1'] = staticIpConfig.primaryDns;
+      wanSettings['dns_2'] = staticIpConfig.secondaryDns;
+    } else if (connectionType == 'PPPoE') {
+      wanSettings['connection_type'] = 'pppoe';
+      wanSettings['pppoe'] = {
+        'username': pppoeUsername,
+        'password': pppoePassword
+      };
+    }
+
+    // 保存設置以便後續提交
+    _currentWanSettings = wanSettings;
+  }
+
+  // 在 _handleConnectionTypeChanged 方法中添加重置邏輯
+  void _handleConnectionTypeChanged(String type, bool isComplete, StaticIpConfig? config, PPPoEConfig? pppoeConfig) {
+    setState(() {
+      // 如果從特定類型切換到其他類型，重置相關字段
+      bool isTypeChanged = connectionType != type;
+      connectionType = type;
+      isCurrentStepComplete = isComplete;
+
+      if (config != null) {
+        staticIpConfig = config;
+      } else if (isTypeChanged && type != 'Static IP') {
+        // 如果不是靜態IP，重置靜態IP配置
+        staticIpConfig = StaticIpConfig();
+      }
+
+      if (pppoeConfig != null) {
+        pppoeUsername = pppoeConfig.username;
+        pppoePassword = pppoeConfig.password;
+      } else if (isTypeChanged && type != 'PPPoE') {
+        // 如果不是PPPoE，重置PPPoE配置
+        pppoeUsername = '';
+        pppoePassword = '';
+      }
+
+      // 將設置轉換為API所需格式，以便後續提交
+      _prepareWanSettingsForSubmission();
+    });
+  }
+
+//!!!!!!流程寫死的部分/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // 步驟控制器監聽
   void _onStepperControllerChanged() {
     if (_isUpdatingStep) return;
 
@@ -118,11 +626,10 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
+  // 載入配置
   Future<void> _loadConfig() async {
     try {
-      setState(() {
-        isLoading = true;
-      });
+      setState(() => isLoading = true);
 
       final String configPath = 'lib/shared/config/flows/initialization/wifi.json';
       final String jsonContent = await rootBundle.loadString(configPath);
@@ -132,9 +639,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         isLoading = false;
       });
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _syncStepperState();
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncStepperState());
     } catch (e) {
       print('載入配置出錯: $e');
       setState(() {
@@ -142,12 +647,11 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         stepsConfig = {};
       });
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showErrorDialog();
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showErrorDialog());
     }
   }
 
+  // 顯示錯誤對話框
   void _showErrorDialog() {
     showDialog(
       context: context,
@@ -158,9 +662,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           actions: <Widget>[
             TextButton(
               child: const Text('確定'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ],
         );
@@ -168,12 +670,14 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
+  // 同步 Stepper 狀態
   void _syncStepperState() {
     _isUpdatingStep = true;
     _stepperController.jumpToStep(currentStepIndex);
     _isUpdatingStep = false;
   }
 
+  // 更新當前步驟
   void _updateCurrentStep(int stepIndex) {
     if (_isUpdatingStep || stepIndex == currentStepIndex) return;
 
@@ -197,6 +701,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _isUpdatingStep = false;
   }
 
+  // 處理表單變更
   void _handleFormChanged(String user, String pwd, String confirmPwd, bool isValid) {
     setState(() {
       userName = user;
@@ -206,16 +711,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     });
   }
 
+  // 驗證表單
   bool _validateForm() {
-    List<String> detailOptions = [];
-    final steps = _getCurrentModelSteps();
-
-    if (steps.isNotEmpty && currentStepIndex < steps.length) {
-      var currentStep = steps[currentStepIndex];
-      if (currentStep.containsKey('detail')) {
-        detailOptions = List<String>.from(currentStep['detail']);
-      }
-    }
+    List<String> detailOptions = _getStepDetailOptions();
 
     if (detailOptions.isEmpty) {
       detailOptions = ['User', 'Password', 'Confirm Password'];
@@ -226,12 +724,41 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
 
     if (detailOptions.contains('Password')) {
+      // 基本長度檢查
       if (password.isEmpty || password.length < 8 || password.length > 32) {
         return false;
       }
 
-      final RegExp validChars = RegExp(r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$');
+      // 檢查是否只包含合法字元
+      final RegExp validChars = RegExp(
+          r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$'
+      );
       if (!validChars.hasMatch(password)) {
+        return false;
+      }
+
+      // 新增的密碼複雜度要求
+      // 檢查是否至少包含一個大寫字母
+      final RegExp hasUppercase = RegExp(r'[A-Z]');
+      if (!hasUppercase.hasMatch(password)) {
+        return false;
+      }
+
+      // 檢查是否至少包含一個小寫字母
+      final RegExp hasLowercase = RegExp(r'[a-z]');
+      if (!hasLowercase.hasMatch(password)) {
+        return false;
+      }
+
+      // 檢查是否至少包含一個數字
+      final RegExp hasDigit = RegExp(r'[0-9]');
+      if (!hasDigit.hasMatch(password)) {
+        return false;
+      }
+
+      // 檢查是否至少包含一個特殊字元
+      final RegExp hasSpecialChar = RegExp(r'[\x21\x23-\x2F\x3A-\x3B\x3D\x3F-\x40\x5B\x5D-\x60\x7B-\x7E]');
+      if (!hasSpecialChar.hasMatch(password)) {
         return false;
       }
     }
@@ -244,22 +771,23 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     return true;
   }
 
-  void _handleConnectionTypeChanged(String type, bool isComplete, StaticIpConfig? config, PPPoEConfig? pppoeConfig) {
-    setState(() {
-      connectionType = type;
-      isCurrentStepComplete = isComplete;
+  // 獲取當前步驟詳細選項
+  List<String> _getStepDetailOptions() {
+    List<String> detailOptions = [];
+    final steps = _getCurrentModelSteps();
 
-      if (config != null) {
-        staticIpConfig = config;
+    if (steps.isNotEmpty && currentStepIndex < steps.length) {
+      var currentStep = steps[currentStepIndex];
+      if (currentStep.containsKey('detail')) {
+        detailOptions = List<String>.from(currentStep['detail']);
       }
+    }
 
-      if (pppoeConfig != null) {
-        pppoeUsername = pppoeConfig.username;
-        pppoePassword = pppoeConfig.password;
-      }
-    });
+    return detailOptions;
   }
 
+
+  // 處理 SSID 表單變更
   void _handleSSIDFormChanged(String newSsid, String newSecurityOption, String newPassword, bool isValid) {
     setState(() {
       ssid = newSsid;
@@ -269,66 +797,18 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     });
   }
 
+  // 處理下一步操作
   void _handleNext() {
     final steps = _getCurrentModelSteps();
     if (steps.isEmpty) return;
     final currentComponents = _getCurrentStepComponents();
 
-    if (currentComponents.contains('AccountPasswordComponent')) {
-      if (!_validateForm()) {
-        List<String> detailOptions = [];
-        if (steps.isNotEmpty && currentStepIndex < steps.length) {
-          var currentStep = steps[currentStepIndex];
-          if (currentStep.containsKey('detail')) {
-            detailOptions = List<String>.from(currentStep['detail']);
-          }
-        }
-
-        if (detailOptions.isEmpty) {
-          detailOptions = ['User', 'Password', 'Confirm Password'];
-        }
-
-        String errorMessage = '';
-        if (detailOptions.contains('User') && userName.isEmpty) {
-          errorMessage = '請輸入用戶名';
-        } else if (detailOptions.contains('Password')) {
-          if (password.isEmpty) {
-            errorMessage = '請輸入密碼';
-          } else if (password.length < 8) {
-            errorMessage = '密碼必須至少8個字元';
-          } else if (password.length > 32) {
-            errorMessage = '密碼長度不能超過32個字元';
-          } else {
-            final RegExp validChars = RegExp(r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$');
-            if (!validChars.hasMatch(password)) {
-              errorMessage = '密碼包含不允許的字元';
-            }
-          }
-        }
-
-        if (errorMessage.isEmpty && detailOptions.contains('Confirm Password')) {
-          if (confirmPassword.isEmpty) {
-            errorMessage = '請輸入確認密碼';
-          } else if (confirmPassword != password) {
-            errorMessage = '兩次輸入的密碼不一致';
-          }
-        }
-
-        if (errorMessage.isEmpty) {
-          errorMessage = '請完成當前步驟的設定';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
+    // 只對非最後一步進行表單驗證
+    if (currentStepIndex < steps.length - 1) {
+      if (!_validateCurrentStep(currentComponents)) {
         return;
       }
-      setState(() {
-        isCurrentStepComplete = true;
-      });
-    }
 
-    if (currentStepIndex < steps.length - 1) {
       _isUpdatingStep = true;
       setState(() {
         currentStepIndex++;
@@ -341,14 +821,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         curve: Curves.easeInOut,
       );
       _isUpdatingStep = false;
-    } else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
-      if (currentComponents.contains('AccountPasswordComponent') && !isCurrentStepComplete) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('請完成當前步驟的設定')),
-        );
-        return;
-      }
-
+    }
+    // 最後一步（摘要頁）不需要驗證，直接進入完成精靈
+    else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
       _isUpdatingStep = true;
       setState(() {
         isLastStepCompleted = true;
@@ -362,6 +837,173 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
+  // 驗證當前步驟
+  bool _validateCurrentStep(List<String> currentComponents) {
+    // 檢查 AccountPasswordComponent
+    if (currentComponents.contains('AccountPasswordComponent')) {
+      if (!_validateForm()) {
+        List<String> detailOptions = _getStepDetailOptions();
+        if (detailOptions.isEmpty) {
+          detailOptions = ['User', 'Password', 'Confirm Password'];
+        }
+
+        String errorMessage = _getAccountPasswordError(detailOptions);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        return false;
+      }
+      setState(() {
+        isCurrentStepComplete = true;
+      });
+    }
+
+    // 檢查 ConnectionTypeComponent
+    else if (currentComponents.contains('ConnectionTypeComponent')) {
+      if (!isCurrentStepComplete) {
+        String errorMessage = _getConnectionTypeError();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        return false;
+      }
+    }
+
+    // 檢查 SetSSIDComponent
+    else if (currentComponents.contains('SetSSIDComponent')) {
+      if (!isCurrentStepComplete) {
+        String errorMessage = _getSSIDError();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // 獲取帳戶密碼錯誤訊息
+  String _getAccountPasswordError(List<String> detailOptions) {
+    if (detailOptions.contains('User') && userName.isEmpty) {
+      return 'Please enter a username';
+    } else if (detailOptions.contains('Password')) {
+      if (password.isEmpty) {
+        return 'Please enter a password';
+      } else if (password.length < 8) {
+        return 'Password must be at least 8 characters';
+      } else if (password.length > 32) {
+        return 'Password must be 32 characters or less';
+      } else {
+        // 檢查是否只包含合法字元
+        final RegExp validChars = RegExp(
+            r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$'
+        );
+        if (!validChars.hasMatch(password)) {
+          return 'Password contains invalid characters';
+        }
+
+        // 新增的密碼複雜度錯誤信息
+        // 檢查是否至少包含一個大寫字母
+        final RegExp hasUppercase = RegExp(r'[A-Z]');
+        if (!hasUppercase.hasMatch(password)) {
+          return 'Password must contain at least one uppercase letter';
+        }
+
+        // 檢查是否至少包含一個小寫字母
+        final RegExp hasLowercase = RegExp(r'[a-z]');
+        if (!hasLowercase.hasMatch(password)) {
+          return 'Password must contain at least one lowercase letter';
+        }
+
+        // 檢查是否至少包含一個數字
+        final RegExp hasDigit = RegExp(r'[0-9]');
+        if (!hasDigit.hasMatch(password)) {
+          return 'Password must contain at least one digit';
+        }
+
+        // 檢查是否至少包含一個特殊字元
+        final RegExp hasSpecialChar = RegExp(r'[\x21\x23-\x2F\x3A-\x3B\x3D\x3F-\x40\x5B\x5D-\x60\x7B-\x7E]');
+        if (!hasSpecialChar.hasMatch(password)) {
+          return 'Password must contain at least one special character';
+        }
+      }
+    }
+
+    if (detailOptions.contains('Confirm Password')) {
+      if (confirmPassword.isEmpty) {
+        return 'Please confirm your password';
+      } else if (confirmPassword != password) {
+        return 'Passwords do not match';
+      }
+    }
+
+    return 'Please complete all required fields';
+  }
+
+  // 獲取連接類型錯誤訊息
+  String _getConnectionTypeError() {
+    if (connectionType == 'Static IP') {
+      if (staticIpConfig.ipAddress.isEmpty) {
+        return 'Please enter an IP address';
+      } else if (staticIpConfig.subnetMask.isEmpty) {
+        return 'Please enter a subnet mask';
+      } else if (staticIpConfig.gateway.isEmpty) {
+        return 'Please enter a gateway address';
+      } else if (staticIpConfig.primaryDns.isEmpty) {
+        return 'Please enter a DNS server address';
+      }
+    } else if (connectionType == 'PPPoE') {
+      if (pppoeUsername.isEmpty) {
+        return 'Please enter a PPPoE username';
+      } else if (pppoePassword.isEmpty) {
+        return 'Please enter a PPPoE password';
+      }
+    }
+
+    return 'Please complete all required fields';
+  }
+
+  // 獲取 SSID 錯誤訊息
+  String _getSSIDError() {
+    // 驗證 SSID
+    if (ssid.isEmpty) {
+      return 'Please enter an SSID';
+    } else if (ssid.length > 64) {
+      return 'SSID must be 64 characters or less';
+    } else {
+      // 驗證 SSID 字符
+      final RegExp validChars = RegExp(
+          r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$'
+      );
+      if (!validChars.hasMatch(ssid)) {
+        return 'SSID contains invalid characters';
+      }
+    }
+
+    // 驗證密碼
+    if (securityOption != 'no authentication' && securityOption != 'Enhanced Open (OWE)') {
+      if (ssidPassword.isEmpty) {
+        return 'Please enter a password';
+      } else if (ssidPassword.length < 8) {
+        return 'Password must be at least 8 characters';
+      } else if (ssidPassword.length > 64) {
+        return 'Password must be 64 characters or less';
+      } else {
+        // 驗證密碼字符
+        final RegExp validChars = RegExp(
+            r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$'
+        );
+        if (!validChars.hasMatch(ssidPassword)) {
+          return 'Password contains invalid characters';
+        }
+      }
+    }
+
+    return 'Please complete all required fields';
+  }
+
+  // 處理返回操作
   void _handleBack() {
     if (currentStepIndex > 0) {
       _isUpdatingStep = true;
@@ -380,13 +1022,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
-  void _handleWizardCompleted() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const InitializationPage()),
-          (route) => false,
-    );
-  }
-
+  // 獲取當前模型步驟
   List<dynamic> _getCurrentModelSteps() {
     if (stepsConfig.isEmpty ||
         !stepsConfig.containsKey('models') ||
@@ -397,6 +1033,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     return stepsConfig['models'][currentModel]['steps'];
   }
 
+  // 獲取當前步驟組件
   List<String> _getCurrentStepComponents({int? stepIndex}) {
     final index = stepIndex ?? currentStepIndex;
     final steps = _getCurrentModelSteps();
@@ -419,6 +1056,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           : SafeArea(
         child: Column(
           children: [
+            // Stepper 區域
             Expanded(
               flex: 30,
               child: Container(
@@ -429,16 +1067,18 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                   modelType: currentModel,
                   onStepChanged: _updateCurrentStep,
                   controller: _stepperController,
-                  isLastStepCompleted: isLastStepCompleted, // 傳遞狀態
+                  isLastStepCompleted: isLastStepCompleted,
                 ),
               ),
             ),
+            // 主內容區域
             Expanded(
               flex: 108,
               child: isShowingFinishingWizard
                   ? _buildFinishingWizard()
                   : Column(
                 children: [
+                  // 步驟標題
                   Expanded(
                     flex: 12,
                     child: Container(
@@ -451,6 +1091,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                       ),
                     ),
                   ),
+                  // 步驟內容
                   Expanded(
                     flex: 95,
                     child: _buildPageView(),
@@ -458,6 +1099,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                 ],
               ),
             ),
+            // 導航按鈕
             if (!isShowingFinishingWizard)
               Expanded(
                 flex: 38,
@@ -469,10 +1111,10 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
+  // 完成精靈介面
   Widget _buildFinishingWizard() {
     return Column(
       children: [
-        // 將標題修改為「Finishing Wizard...」，並加入動態省略號
         Expanded(
           flex: 12,
           child: Container(
@@ -504,6 +1146,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
+  // 獲取當前步驟名稱
   String _getCurrentStepName() {
     final steps = _getCurrentModelSteps();
     if (steps.isNotEmpty && currentStepIndex < steps.length) {
@@ -512,6 +1155,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     return 'Step ${currentStepIndex + 1}';
   }
 
+  // 構建頁面視圖
   Widget _buildPageView() {
     final steps = _getCurrentModelSteps();
     if (steps.isEmpty) {
@@ -540,10 +1184,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
+  // 構建步驟內容
   Widget _buildStepContent(int index) {
     final componentNames = _getCurrentStepComponents(stepIndex: index);
+    final steps = _getCurrentModelSteps();
 
-    if (index == _getCurrentModelSteps().length - 1) {
+    // 如果是最後一個步驟，顯示摘要
+    if (index == steps.length - 1) {
       return SingleChildScrollView(
         child: Container(
           width: double.infinity,
@@ -564,6 +1211,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       );
     }
 
+    // 創建當前步驟的組件
     List<Widget> components = [];
     for (String componentName in componentNames) {
       Widget? component = _createComponentByName(componentName);
@@ -586,6 +1234,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       );
     }
 
+    // 沒有定義組件的步驟
     return Container(
       color: Colors.grey[200],
       width: double.infinity,
@@ -605,10 +1254,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
+  // 構建導航按鈕
   Widget _buildNavigationButtons() {
-    final steps = _getCurrentModelSteps();
-    final isLastStep = steps.isNotEmpty && currentStepIndex == steps.length - 1;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20.0),
@@ -659,16 +1306,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
+  // 根據名稱創建組件
   Widget? _createComponentByName(String componentName) {
-    List<String> detailOptions = [];
-    final steps = _getCurrentModelSteps();
-
-    if (steps.isNotEmpty && currentStepIndex < steps.length) {
-      var currentStep = steps[currentStepIndex];
-      if (currentStep.containsKey('detail')) {
-        detailOptions = List<String>.from(currentStep['detail']);
-      }
-    }
+    List<String> detailOptions = _getStepDetailOptions();
 
     switch (componentName) {
       case 'AccountPasswordComponent':
@@ -679,15 +1319,40 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           onBackPressed: _handleBack,
         );
       case 'ConnectionTypeComponent':
+      // 在創建組件前，確保已調用獲取網絡設置的方法
+        if (_currentWanSettings.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _loadCurrentWanSettings();
+          });
+        }
+
         return ConnectionTypeComponent(
           displayOptions: detailOptions.isNotEmpty ? detailOptions : const ['DHCP', 'Static IP', 'PPPoE'],
+          initialConnectionType: connectionType,
+          initialStaticIpConfig: connectionType == 'Static IP' ? staticIpConfig : null,
+          initialPppoeUsername: pppoeUsername,
+          initialPppoePassword: pppoePassword,
           onSelectionChanged: _handleConnectionTypeChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );
+    // 在 _createComponentByName 方法中
       case 'SetSSIDComponent':
+      // 添加詳細日誌
+        print('創建SetSSIDComponent，傳入SSID: $ssid, 安全選項: $securityOption, 密碼長度: ${ssidPassword.length}');
+
+        // 在創建組件前，確保已調用獲取無線設置的方法
+        if (_currentWirelessSettings.isEmpty && !_isLoadingWirelessSettings) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _loadWirelessSettings();
+          });
+        }
+
         return SetSSIDComponent(
           displayOptions: detailOptions.isNotEmpty ? detailOptions : const ['no authentication', 'Enhanced Open (OWE)', 'WPA2 Personal', 'WPA3 Personal', 'WPA2/WPA3 Personal', 'WPA2 Enterprise'],
+          initialSsid: ssid,
+          initialSecurityOption: securityOption,
+          initialPassword: ssidPassword,
           onFormChanged: _handleSSIDFormChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,

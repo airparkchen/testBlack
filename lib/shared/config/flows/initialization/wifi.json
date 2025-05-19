@@ -6,66 +6,98 @@
           "id": 1,
           "name": "Account",
           "next": 2,
-          "components": ["AccountPasswordComponent"],
-          "detail": ["Password"]
+          "components": [
+            "AccountPasswordComponent"
+          ],
+          "detail": [
+            "User",
+            "Password",
+            "Confirm Password"
+          ],
+          "apiCalls": [
+            {
+              "type": "start",
+              "methods": [
+                "systemInfo",
+                "userLogin"
+              ]
+            }
+          ]
         },
         {
           "id": 2,
           "name": "Internet",
           "next": 3,
-          "components": ["ConnectionTypeComponent"],
-          "detail": ["DHCP", "Static IP", "PPPoE"]
+          "components": [
+            "ConnectionTypeComponent"
+          ],
+          "detail": [
+            "DHCP",
+            "Static IP",
+            "PPPoE"
+          ],
+          "detailOptions": {
+            "Static IP": ["IP Address", "IP Subnet Mask", "Gateway IP Address", "Primary DNS"],
+            "PPPoE": ["User", "Password"]
+          },
+          "apiCalls": [
+            {
+              "type": "start",
+              "methods": [
+                "wanEthGet"
+              ]
+            }
+          ]
         },
         {
           "id": 3,
           "name": "Wireless",
           "next": 4,
-          "components": ["SetSSIDComponent"],
-          "detail": ["WPA2 Personal", "WPA3 Personal", "WPA2/WPA3 Personal", "WPA2 Enterprise"]
+          "components": [
+            "SetSSIDComponent"
+          ],
+          "detail": [
+            "WPA3 Personal"
+          ],
+          "detailOptions": {
+            "WPA3 Personal": ["Password"]
+          },
+          "apiCalls": [
+            {
+              "type": "start",
+              "methods": [
+                "wirelessBasicGet"
+              ]
+            }
+          ]
         },
         {
           "id": 4,
           "name": "Summary",
           "next": null,
-          "components": ["SummaryComponent"],
-          "detail": ["Model Name", "Operation Mode", "Wireless SSID", "Wireless Key"],
+          "components": [
+            "SummaryComponent"
+          ],
+          "detail": [
+            "Model Name",
+            "Operation Mode",
+            "Wireless SSID",
+            "Wireless Key"
+          ],
           "apiCalls": [
             {
               "type": "finish",
               "method": "postWizardFinish"
-            }
-          ]
-        }
-      ],
-      "type": "JSON",
-      "API": "WifiAPI"
-    },
-    "NewModel": {
-      "steps": [
-        {
-          "id": 1,
-          "name": "Account",
-          "next": 2,
-          "components": ["AccountPasswordComponent"],
-          "detail": ["User", "Password"]
-        },
-        {
-          "id": 2,
-          "name": "Internet",
-          "next": 3,
-          "components": ["ConnectionTypeComponent"],
-          "detail": ["DHCP", "Static IP"]
-        },
-        {
-          "id": 3,
-          "name": "Summary",
-          "next": null,
-          "components": ["SummaryComponent"],
-          "detail": ["Model Name", "Operation Mode"],
-          "apiCalls": [
+            },
             {
-              "type": "finish",
-              "method": "postConfigFinish"
+              "type": "end",
+              "methods": [
+                "wizardStart",
+                "userChangePassword",
+                "wanEthUpdate",
+                "wirelessBasicUpdate",
+                "wizardFinish"
+              ]
             }
           ]
         }
