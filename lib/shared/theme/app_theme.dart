@@ -1,362 +1,334 @@
+// lib/shared/theme/app_theme.dart
+
 import 'package:flutter/material.dart';
+import 'dart:ui';
 
-/// 應用程式主題設定檔
-///
-/// 此檔案定義了整個應用程式的視覺風格，包括顏色、字體、間距等
-/// 所有UI元件應使用此處定義的常量，以確保視覺一致性
-
-// 顏色系統
+/// 應用程式顏色常量
 class AppColors {
-  // 主要背景顏色
-  static const Color mainBackgroundColor = Colors.white;
+  // 主要顏色
+  static const Color primary = Color(0xFF9747FF);
+  static const Color primaryDark = Color(0xFF162140);
 
-  // 次要背景顏色 (淺灰色，用於表單區域)
-  static const Color secondaryBackgroundColor = Color(0xFFEFEFEF);
-
-  // 輸入區域背景色
-  static const Color inputBackgroundColor = Colors.white;
-
-  // 按鈕背景色
-  static const Color buttonBackgroundColor = Color(0xFFDDDDDD);
-
-  // 按鈕邊框色
-  static const Color buttonBorderColor = Color(0xFFD0D0D0);
+  // 背景顏色
+  static const Color background = Color(0xFFD9D9D9);
+  static const Color cardBackground = Color(0xFFEEEEEE);
+  static const Color backgroundOverlay = Color(0x40000000); // 背景圖上的半透明覆蓋層
 
   // 文字顏色
-  static const Color primaryTextColor = Colors.black;
-  static const Color secondaryTextColor = Colors.grey;
-  static const Color buttonTextColor = Colors.black;
-
-  // 邊框顏色
-  static const Color primaryBorderColor = Color(0xFFBDBDBD); // Colors.grey[400]
-  static const Color secondaryBorderColor = Color(0xFFE0E0E0); // Colors.grey[300]
+  static const Color textPrimary = Color(0xFF333333);
+  static const Color textSecondary = Color(0xFF666666);
+  static const Color textLight = Color(0xFFFFFFFF);
 
   // 狀態顏色
-  static const Color activeColor = Colors.black;
-  static const Color inactiveColor = Color(0xFFEEEEEE); // Colors.grey[200]
+  static const Color success = Color(0xFF4CAF50);
+  static const Color warning = Color(0xFFFFC107);
+  static const Color error = Color(0xFFF44336);
+  static const Color info = Color(0xFF2196F3);
 
-  // 錯誤顏色
-  static const Color errorColor = Colors.red;
+  // 漸層顏色組合
+  static const List<Color> purpleBlueGradient = [
+    Color(0xFF162140),
+    Color(0xFF9747FF),
+  ];
 }
 
-// 文字樣式
+/// 應用程式背景常量
+class AppBackgrounds {
+  // 背景圖片路徑
+  static const String mainBackground = 'assets/images/background.png';
+  static const String background2x = 'assets/images/background_2x.png';
+  static const String background3x = 'assets/images/background_3x.png';
+  static const String background4x = 'assets/images/background_4x.png';
+  static const String background5x = 'assets/images/background_5x.png';
+}
+
+/// 背景裝飾器類 - 用於創建各種背景效果
+class BackgroundDecorator {
+  /// 創建圖片背景
+  static BoxDecoration imageBackground({
+    required String imagePath,
+    BoxFit fit = BoxFit.cover,
+    Color? overlayColor,
+    double? opacity,
+  }) {
+    return BoxDecoration(
+      image: DecorationImage(
+        image: AssetImage(imagePath),
+        fit: fit,
+        colorFilter: overlayColor != null
+            ? ColorFilter.mode(
+          overlayColor.withOpacity(opacity ?? 0.5),
+          BlendMode.srcOver,
+        )
+            : null,
+      ),
+    );
+  }
+
+  /// 創建使用適合螢幕大小的背景圖
+  static String getResponsiveBackground(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width > 1920) return AppBackgrounds.background5x;
+    if (width > 1440) return AppBackgrounds.background4x;
+    if (width > 1080) return AppBackgrounds.background3x;
+    if (width > 720) return AppBackgrounds.background2x;
+    return AppBackgrounds.mainBackground;
+  }
+}
+
+/// 應用程式文字樣式常量
 class AppTextStyles {
-  // 字體家族常量
-  static const String fontFamily = 'Segoe UI';
-
-  // 大標題 (例如頁面標題)
-  static const TextStyle titleStyle = TextStyle(
-    fontSize: 32,
+  // 標題樣式
+  static const TextStyle heading1 = TextStyle(
+    fontSize: 28,
     fontWeight: FontWeight.bold,
-    color: AppColors.primaryTextColor,
-    fontFamily: fontFamily,
+    color: AppColors.textPrimary,
   );
 
-  // 中標題 (例如組件標題)
-  static const TextStyle subtitleStyle = TextStyle(
-    fontSize: 22,
+  static const TextStyle heading2 = TextStyle(
+    fontSize: 24,
     fontWeight: FontWeight.bold,
-    color: AppColors.primaryTextColor,
-    fontFamily: fontFamily,
+    color: AppColors.textPrimary,
   );
 
-  // 小標題 (例如輸入區標籤)
-  static const TextStyle labelStyle = TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.normal,
-    color: AppColors.primaryTextColor,
-    fontFamily: fontFamily,
+  static const TextStyle heading3 = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
   );
 
-  // 正文文字
-  static const TextStyle bodyStyle = TextStyle(
+  // 內文樣式
+  static const TextStyle bodyLarge = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.normal,
-    color: AppColors.primaryTextColor,
-    fontFamily: fontFamily,
+    color: AppColors.textPrimary,
   );
 
-  // 小型文字 (例如次要資訊)
-  static const TextStyle smallTextStyle = TextStyle(
+  static const TextStyle bodyMedium = TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.normal,
-    color: AppColors.secondaryTextColor,
-    fontFamily: fontFamily,
+    color: AppColors.textPrimary,
   );
 
-  // 微型文字 (例如MAC地址顯示)
-  static const TextStyle microTextStyle = TextStyle(
-    fontSize: 10,
-    fontWeight: FontWeight.normal,
-    color: AppColors.secondaryTextColor,
-    fontFamily: fontFamily,
-  );
-
-  // 按鈕文字
-  static const TextStyle buttonTextStyle = TextStyle(
-    fontSize: 18,
-    color: AppColors.buttonTextColor,
-    fontFamily: fontFamily,
-  );
-
-  // 錯誤提示文字
-  static const TextStyle errorTextStyle = TextStyle(
+  static const TextStyle bodySmall = TextStyle(
     fontSize: 12,
-    color: AppColors.errorColor,
-    fontFamily: fontFamily,
+    fontWeight: FontWeight.normal,
+    color: AppColors.textSecondary,
+  );
+
+  // 特殊樣式
+  static const TextStyle buttonText = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textLight,
+  );
+
+  static const TextStyle cardTitleLight = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textLight,
   );
 }
 
-// 間距系統
-class AppSpacing {
-  // 頁面佈局間距
-  static const double pagePadding = 20.0;
-  static const double topMarginRatio = 0.05; // 螢幕高度的5%
-  static const double componentSpacing = 20.0;
+/// 應用程式尺寸常量
+class AppDimensions {
+  // 間距
+  static const double spacingXS = 4.0;
+  static const double spacingS = 8.0;
+  static const double spacingM = 16.0;
+  static const double spacingL = 24.0;
+  static const double spacingXL = 32.0;
 
-  // 元素內部間距
-  static const double buttonPadding = 16.0;
-  static const double inputFieldPadding = 16.0;
-  static const double containerPadding = 25.0;
+  // 圓角
+  static const double radiusXS = 2.0;
+  static const double radiusS = 4.0;
+  static const double radiusM = 8.0;
+  static const double radiusL = 12.0;
+  static const double radiusXL = 16.0;
 
-  // 元素間間距
-  static const double smallElementSpacing = 8.0;
-  static const double mediumElementSpacing = 16.0;
-  static const double largeElementSpacing = 30.0;
-  static const double buttonSpacing = 20.0;
+  // 邊框寬度
+  static const double borderWidthThin = 0.5;
+  static const double borderWidthRegular = 1.0;
+  static const double borderWidthThick = 2.0;
+
+  // 元素高度
+  static const double buttonHeight = 48.0;
+  static const double inputHeight = 56.0;
+  static const double cardHeightSmall = 120.0;
+  static const double cardHeightMedium = 180.0;
+  static const double cardHeightLarge = 240.0;
 }
 
-// 元素尺寸
-class AppSizes {
-  // 按鈕尺寸
-  static const double standardButtonHeight = 56.0;
+/// 漸層卡片主題實現
+class WhiteBoxTheme {
+  // 預設的透明度和模糊設定
+  static const double defaultOpacity = 0.6; // 提高透明度（降低不透明度），使背景更容易看到
+  static const double defaultBlurRadius = 3.0; // 降低模糊程度，讓背景更清晰
 
-  // 輸入框尺寸
-  static const double standardInputHeight = 56.0;
+  /// 建立標準漸層卡片
+  Widget buildStandardCard({
+    required double width,
+    required double height,
+    Widget? child,
+    BorderRadius? borderRadius,
+  }) {
+    return buildCustomCard(
+      width: width,
+      height: height,
+      borderRadius: borderRadius ?? BorderRadius.circular(AppDimensions.radiusS),
+      blurRadius: defaultBlurRadius,
+      gradientColors: AppColors.purpleBlueGradient,
+      borderColor: AppColors.primary,
+      opacity: defaultOpacity,
+      child: child,
+    );
+  }
 
-  // 設備方塊尺寸
-  static const double deviceBoxSize = 80.0;
-  static const double deviceBoxSpacing = 20.0;
+  /// 建立純色按鈕卡片 - 使用主題色填充
+  Widget buildPrimaryColorCard({
+    required double width,
+    required double height,
+    Widget? child,
+    BorderRadius? borderRadius,
+  }) {
+    return buildCustomCard(
+      width: width,
+      height: height,
+      borderRadius: borderRadius ?? BorderRadius.circular(AppDimensions.radiusS),
+      blurRadius: defaultBlurRadius,
+      gradientColors: [AppColors.primary, AppColors.primary], // 使用純色填充
+      borderColor: AppColors.primary,
+      opacity: defaultOpacity,
+      child: child,
+    );
+  }
+  /// 建立簡單純色按鈕 - 沒有模糊效果和透明度
+  Widget buildSimpleColorButton({
+    required double width,
+    required double height,
+    BorderRadius? borderRadius,
+    Color backgroundColor = AppColors.primary,
+    Widget? child,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: borderRadius ?? BorderRadius.circular(AppDimensions.radiusS),
+      ),
+      child: child,
+    );
+  }
+  /// 建立自定義漸層卡片
+  Widget buildCustomCard({
+    required double width,
+    required double height,
+    BorderRadius? borderRadius,
+    double blurRadius = defaultBlurRadius,
+    List<Color> gradientColors = const [
+      Color(0xFF162140),
+      Color(0xFF9747FF),
+    ],
+    double gradientAngle = 0.75,
+    double opacity = defaultOpacity,
+    Color borderColor = const Color(0xFF9747FF),
+    double borderOpacity = 0.7,
+    double borderWidth = 1.0,
+    Widget? child,
+  }) {
+    // 計算漸層的起點和終點
+    final double endX = width + (width * 0.18 * gradientAngle.abs());
+    final double endY = height - (height * 0.26 * gradientAngle.abs());
 
-  // 步驟導航元件尺寸
-  static const double stepperCircleSize = 60.0;
-  static const double stepperLineHeight = 4.0;
+    final BorderRadius finalBorderRadius = borderRadius ?? BorderRadius.circular(AppDimensions.radiusS);
 
-  // Icon 尺寸
-  static const double smallIconSize = 18.0;
-  static const double mediumIconSize = 24.0;
-  static const double largeIconSize = 30.0;
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: finalBorderRadius,
+        // 使用Box裝飾器確保支持透明度
+        color: Colors.transparent,
+      ),
+      child: Stack(
+        children: [
+          // 背景模糊層 - 確保此層有透明效果
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: finalBorderRadius,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: blurRadius,
+                  sigmaY: blurRadius,
+                ),
+                child: Container(
+                  // 這里使用低透明度的顏色
+                  color: Colors.white.withOpacity(0.05),
+                ),
+              ),
+            ),
+          ),
+
+          // 漸層層 - 使用透明漸層
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: finalBorderRadius,
+                gradient: LinearGradient(
+                  begin: Alignment.bottomLeft,
+                  end: Alignment(endX / width, endY / height),
+                  colors: gradientColors.map((color) => color.withOpacity(opacity)).toList(),
+                ),
+                border: Border.all(
+                  color: borderColor.withOpacity(borderOpacity),
+                  width: borderWidth,
+                ),
+              ),
+            ),
+          ),
+
+          // 內容層
+          if (child != null) Positioned.fill(child: Center(child: child)),
+        ],
+      ),
+    );
+  }
 }
 
-// 按鈕樣式
-class AppButtonStyles {
-  // 標準按鈕樣式
-  static ButtonStyle standardButtonStyle = ElevatedButton.styleFrom(
-    backgroundColor: AppColors.buttonBackgroundColor,
-    foregroundColor: AppColors.buttonTextColor,
-    elevation: 0,
-    padding: const EdgeInsets.symmetric(
-      vertical: AppSpacing.buttonPadding,
-      horizontal: AppSpacing.buttonPadding,
-    ),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(0),
-      side: BorderSide(color: AppColors.primaryBorderColor),
-    ),
-    minimumSize: const Size(100, AppSizes.standardButtonHeight),
-    textStyle: const TextStyle(
-      fontFamily: AppTextStyles.fontFamily,
-      fontSize: 18,
-    ),
-  );
-
-  // 禁用按鈕樣式
-  static ButtonStyle disabledButtonStyle = ElevatedButton.styleFrom(
-    backgroundColor: AppColors.inactiveColor,
-    foregroundColor: AppColors.secondaryTextColor,
-    elevation: 0,
-    padding: const EdgeInsets.symmetric(
-      vertical: AppSpacing.buttonPadding,
-      horizontal: AppSpacing.buttonPadding,
-    ),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(0),
-      side: BorderSide(color: AppColors.secondaryBorderColor),
-    ),
-    minimumSize: const Size(100, AppSizes.standardButtonHeight),
-    textStyle: const TextStyle(
-      fontFamily: AppTextStyles.fontFamily,
-      fontSize: 18,
-    ),
-  );
-
-  // 方形按鈕樣式 (用於設備選擇)
-  static ButtonStyle squareButtonStyle = ElevatedButton.styleFrom(
-    backgroundColor: AppColors.buttonBackgroundColor,
-    foregroundColor: AppColors.buttonTextColor,
-    elevation: 0,
-    padding: EdgeInsets.zero,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(0),
-      side: BorderSide(color: AppColors.secondaryBorderColor),
-    ),
-    textStyle: const TextStyle(
-      fontFamily: AppTextStyles.fontFamily,
-      fontSize: 15,
-      fontWeight: FontWeight.bold,
-    ),
-  );
-}
-
-// 輸入框樣式
-class AppInputDecorations {
-  // 標準輸入框樣式
-  static InputDecoration standardInputDecoration = InputDecoration(
-    filled: true,
-    fillColor: AppColors.inputBackgroundColor,
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: AppSpacing.inputFieldPadding,
-      vertical: AppSpacing.inputFieldPadding,
-    ),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(2),
-      borderSide: BorderSide(color: AppColors.primaryBorderColor),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(2),
-      borderSide: BorderSide(color: AppColors.primaryBorderColor),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(2),
-      borderSide: BorderSide(color: AppColors.primaryTextColor),
-    ),
-    errorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(2),
-      borderSide: BorderSide(color: AppColors.errorColor),
-    ),
-    errorStyle: AppTextStyles.errorTextStyle,
-    hintStyle: TextStyle(
-      fontFamily: AppTextStyles.fontFamily,
-      color: Colors.grey[400],
-    ),
-  );
-
-  // 下拉選單樣式
-  static InputDecoration dropdownDecoration = InputDecoration(
-    filled: true,
-    fillColor: AppColors.inputBackgroundColor,
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: AppSpacing.inputFieldPadding,
-      vertical: AppSpacing.inputFieldPadding,
-    ),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(2),
-      borderSide: BorderSide(color: AppColors.primaryBorderColor),
-    ),
-    hintStyle: TextStyle(
-      fontFamily: AppTextStyles.fontFamily,
-      color: Colors.grey[400],
-    ),
-  );
-}
-
-// 容器樣式
-class AppContainerStyles {
-  // 標準容器裝飾
-  static BoxDecoration standardContainerDecoration = BoxDecoration(
-    color: AppColors.secondaryBackgroundColor,
-    borderRadius: BorderRadius.circular(0),
-  );
-
-  // 輸入表單容器
-  static BoxDecoration formContainerDecoration = BoxDecoration(
-    color: AppColors.secondaryBackgroundColor,
-    borderRadius: BorderRadius.circular(0),
-  );
-
-  // 設備容器裝飾
-  static BoxDecoration deviceBoxDecoration = BoxDecoration(
-    color: AppColors.buttonBackgroundColor,
-    border: Border.all(color: AppColors.secondaryBorderColor),
-  );
-}
-
-// 應用程式主題設定
+/// 應用程式主題管理類
+///
+/// 提供統一的主題管理，包含顏色、文字樣式、尺寸和各種元件主題
 class AppTheme {
-  // 獲取全局主題數據
-  static ThemeData getThemeData() {
+  // 懶漢式單例模式
+  static final AppTheme _instance = AppTheme._internal();
+
+  factory AppTheme() => _instance;
+
+  AppTheme._internal() {
+    // 初始化元件主題
+    whiteBoxTheme = WhiteBoxTheme(); // 名稱已變更
+    // 未來可以在這裡初始化更多元件主題
+  }
+
+  // 元件主題實例
+  late final WhiteBoxTheme whiteBoxTheme; // 名稱已變更
+  // 未來可以在這裡添加更多元件主題
+  // late final CustomButtonTheme customButton;
+
+  /// 獲取全局主題數據
+  ThemeData getThemeData() {
     return ThemeData(
       primarySwatch: Colors.grey,
-      scaffoldBackgroundColor: AppColors.mainBackgroundColor,
-      fontFamily: AppTextStyles.fontFamily, // 設置全局字體
-      textTheme: TextTheme(
-        // 使用新版的文字主題設定（Flutter 2.0以後）
-        displayLarge: AppTextStyles.titleStyle,
-        displayMedium: AppTextStyles.subtitleStyle,
-        bodyLarge: AppTextStyles.bodyStyle,
-        bodyMedium: AppTextStyles.smallTextStyle,
-        // 添加更多文字樣式...
-        labelLarge: AppTextStyles.labelStyle,
-        titleMedium: AppTextStyles.subtitleStyle.copyWith(fontWeight: FontWeight.w500),
-        titleSmall: AppTextStyles.labelStyle.copyWith(fontWeight: FontWeight.w500),
+      scaffoldBackgroundColor: AppColors.background,
+      fontFamily: 'Segoe UI',
+      textTheme: const TextTheme(
+        displayLarge: AppTextStyles.heading1,
+        displayMedium: AppTextStyles.heading2,
+        bodyLarge: AppTextStyles.bodyLarge,
+        bodyMedium: AppTextStyles.bodyMedium,
       ),
-      // 按鈕主題
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: AppButtonStyles.standardButtonStyle,
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          textStyle: TextStyle(fontFamily: AppTextStyles.fontFamily),
-        ),
-      ),
-      // 輸入框主題
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.inputBackgroundColor,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(2),
-        ),
-        hintStyle: TextStyle(
-          fontFamily: AppTextStyles.fontFamily,
-          color: Colors.grey[400],
-        ),
-        // 確保所有輸入文字使用 Segoe UI
-        labelStyle: TextStyle(fontFamily: AppTextStyles.fontFamily),
-        helperStyle: TextStyle(fontFamily: AppTextStyles.fontFamily),
-        errorStyle: TextStyle(fontFamily: AppTextStyles.fontFamily, color: AppColors.errorColor),
-        // 確保輸入文字使用 Segoe UI
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.inputFieldPadding,
-          vertical: AppSpacing.inputFieldPadding,
-        ),
-      ),
-      // 對話框主題
-      dialogTheme: DialogTheme(
-        titleTextStyle: TextStyle(
-          fontFamily: AppTextStyles.fontFamily,
-          fontWeight: FontWeight.bold,
-          fontSize: 18,
-          color: AppColors.primaryTextColor,
-        ),
-        contentTextStyle: TextStyle(
-          fontFamily: AppTextStyles.fontFamily,
-          fontSize: 16,
-          color: AppColors.primaryTextColor,
-        ),
-      ),
-      // 應用欄主題
-      appBarTheme: AppBarTheme(
-        titleTextStyle: TextStyle(
-          fontFamily: AppTextStyles.fontFamily,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: AppColors.primaryTextColor,
-        ),
-      ),
-      // 確保所有文字欄位都使用 Segoe UI
-      textSelectionTheme: const TextSelectionThemeData(
-        cursorColor: AppColors.primaryTextColor,
-      ),
+      // 其他主題配置...
     );
   }
 }

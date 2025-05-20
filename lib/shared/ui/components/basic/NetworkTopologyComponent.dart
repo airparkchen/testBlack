@@ -63,11 +63,15 @@ class NetworkTopologyComponent extends StatefulWidget {
 class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   // 佈局常量 - 互聯網圖標位置
   static const double kInternetHorizontalPosition = 0.5;  // 水平位置 (比例，0.5 = 50%)
-  static const double kInternetVerticalPosition = 0.15;   // 垂直位置 (比例，0.15 = 15%)
+  static const double kInternetVerticalPosition = 0.25;   // 垂直位置 (比例，0.15 = 15%)
+  static const double kInternetHorizontalPosition34 = 0.3;  // 水平位置 (比例，0.5 = 50%)
 
   // 佈局常量 - 主路由器/網關位置
   static const double kGatewayHorizontalPosition = 0.5;   // 水平位置 (比例，0.5 = 50%)
   static const double kGatewayVerticalPosition = 0.5;     // 垂直位置 (比例，0.5 = 50%)
+
+  // 佈局常量 - 當設備數量為3-4時的主路由器/網關位置
+  static const double kGatewayHorizontalPosition34 = 0.3; // 水平位置 (比例，0.3 = 30%)
 
   // 佈局常量 - 單一設備位置 (一個設備時)
   static const double kSingleDeviceHorizontalPosition = 0.5;  // 水平位置 (比例，0.5 = 50%)
@@ -79,7 +83,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   static const double kTwoDevicesVerticalPosition = 0.85; // 兩個設備共用的垂直位置 (比例，0.85 = 85%)
 
   // 佈局常量 - 設備右側列位置 (3-4個設備時)
-  static const double kRightColumnHorizontalPosition = 0.85;  // 右側列水平位置 (比例，0.85 = 85%)
+  static const double kRightColumnHorizontalPosition = 0.65;  // 右側列水平位置 (比例，0.85 = 85%)
 
   // 佈局常量 - 垂直排列設備位置 (3個設備時的垂直分布)
   static const List<double> kThreeDevicesVerticalPositions = [0.2, 0.5, 0.8];  // 垂直位置列表
@@ -125,6 +129,8 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
             internetVerticalPosition: kInternetVerticalPosition,
             gatewayHorizontalPosition: kGatewayHorizontalPosition,
             gatewayVerticalPosition: kGatewayVerticalPosition,
+            internetHorizontalPosition34: kInternetHorizontalPosition34, //
+            gatewayHorizontalPosition34: kGatewayHorizontalPosition34, // 添加3-4設備時的網關水平位置
             singleDeviceHorizontalPosition: kSingleDeviceHorizontalPosition,
             singleDeviceVerticalPosition: kSingleDeviceVerticalPosition,
             twoDevicesLeftPosition: kTwoDevicesLeftPosition,
@@ -206,18 +212,28 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     }
   }
 
-  // 計算網關位置 - 固定在畫面中央 (50% 水平, 50% 垂直)
+  // 計算網關位置 - 根據設備數量決定
   Offset _calculateGatewayPosition() {
-    return Offset(
-        widget.width * kGatewayHorizontalPosition,
-        widget.height * kGatewayVerticalPosition
-    );
+    // 當設備數量為3或4時，網關位置移到左側30%
+    if (widget.devices.length >= 3 && widget.devices.length <= 4) {
+      return Offset(
+          widget.width * kGatewayHorizontalPosition34, // 使用30%水平位置
+          widget.height * kGatewayVerticalPosition
+      );
+    } else {
+      // 其他情況下，網關位置固定在中央50%
+      return Offset(
+          widget.width * kGatewayHorizontalPosition,
+          widget.height * kGatewayVerticalPosition
+      );
+    }
   }
 
   // 計算設備位置
   Offset _calculateDevicePosition(NetworkDevice device) {
     final deviceCount = widget.devices.length;
     final index = widget.devices.indexOf(device);
+    final gatewayPosition = _calculateGatewayPosition(); // 獲取網關位置
 
     // 根據設備數量決定佈局
     if (deviceCount == 1) {
@@ -262,7 +278,6 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     }
     else {
       // 超過四個設備時的處理 (這裡簡化為圓形分布)
-      final gatewayPosition = _calculateGatewayPosition();
       final angle = 2 * math.pi * index / deviceCount;
       return Offset(
         gatewayPosition.dx + 150 * math.cos(angle),
@@ -292,6 +307,8 @@ class LayoutConstants {
   final double internetVerticalPosition;
   final double gatewayHorizontalPosition;
   final double gatewayVerticalPosition;
+  final double gatewayHorizontalPosition34; // 添加3-4設備時的網關水平位置
+  final double internetHorizontalPosition34; // 添加3-4設備時的internet logo水平位置
   final double singleDeviceHorizontalPosition;
   final double singleDeviceVerticalPosition;
   final double twoDevicesLeftPosition;
@@ -316,8 +333,10 @@ class LayoutConstants {
   const LayoutConstants({
     required this.internetHorizontalPosition,
     required this.internetVerticalPosition,
+    required this.internetHorizontalPosition34,
     required this.gatewayHorizontalPosition,
     required this.gatewayVerticalPosition,
+    required this.gatewayHorizontalPosition34, // 添加3-4設備時的網關水平位置
     required this.singleDeviceHorizontalPosition,
     required this.singleDeviceVerticalPosition,
     required this.twoDevicesLeftPosition,
@@ -361,18 +380,13 @@ class TopologyPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(
-        size.width * layoutConstants.gatewayHorizontalPosition,
-        size.height * layoutConstants.gatewayVerticalPosition
-    );
+    // 計算網關位置 - 根據設備數量決定
+    final center = _calculateGatewayPosition(size);
 
     // 繪製互聯網圖標（如果啟用）
     if (showInternet) {
-      // 互聯網圖標位置固定在頂部中央
-      final internetPosition = Offset(
-          size.width * layoutConstants.internetHorizontalPosition,
-          size.height * layoutConstants.internetVerticalPosition
-      );
+      // 互聯網圖標位置 - 根據設備數量決定
+      final internetPosition = _calculateInternetPosition(size);
       _drawInternetIcon(canvas, internetPosition);
 
       // 繪製互聯網到網關的連線
@@ -392,7 +406,7 @@ class TopologyPainter extends CustomPainter {
     // 繪製設備和連接線
     for (var device in devices) {
       // 計算設備位置
-      final devicePosition = _calculateDevicePosition(device, size);
+      final devicePosition = _calculateDevicePosition(device, size, center);
 
       // 獲取設備連接數量
       final connectionCount = _getDeviceConnectionCount(device.id);
@@ -409,6 +423,40 @@ class TopologyPainter extends CustomPainter {
 
       // 繪製設備圖標
       _drawDevice(canvas, devicePosition, device, connectionCount);
+    }
+  }
+
+  // 添加計算互聯網位置的方法
+  Offset _calculateInternetPosition(Size size) {
+    // 當設備數量為3或4時，互聯網位置也移到左側30%
+    if (devices.length >= 3 && devices.length <= 4) {
+      return Offset(
+          size.width * layoutConstants.internetHorizontalPosition34, // 使用30%水平位置
+          size.height * layoutConstants.internetVerticalPosition
+      );
+    } else {
+      // 其他情況下，互聯網位置固定在中央50%
+      return Offset(
+          size.width * layoutConstants.internetHorizontalPosition,
+          size.height * layoutConstants.internetVerticalPosition
+      );
+    }
+  }
+
+  // 計算網關位置 - 根據設備數量決定
+  Offset _calculateGatewayPosition(Size size) {
+    // 當設備數量為3或4時，網關位置移到左側30%
+    if (devices.length >= 3 && devices.length <= 4) {
+      return Offset(
+          size.width * layoutConstants.gatewayHorizontalPosition34, // 使用30%水平位置
+          size.height * layoutConstants.gatewayVerticalPosition
+      );
+    } else {
+      // 其他情況下，網關位置固定在中央50%
+      return Offset(
+          size.width * layoutConstants.gatewayHorizontalPosition,
+          size.height * layoutConstants.gatewayVerticalPosition
+      );
     }
   }
 
@@ -500,7 +548,8 @@ class TopologyPainter extends CustomPainter {
     // 添加數字標籤 - 顯示連接的子設備數量
     _drawLabel(canvas, position, connectionCount.toString(), Colors.white);
 
-    // 添加設備名稱標籤
+    // 註釋掉添加設備名稱標籤的部分，這樣就不會顯示設備名稱了
+    /*
     final textPainter = TextPainter(
       text: TextSpan(
         text: device.name,
@@ -524,6 +573,7 @@ class TopologyPainter extends CustomPainter {
         position.dy + layoutConstants.deviceRadius + 10, // 在圓形下方顯示
       ),
     );
+    */
   }
 
   // 繪製兩個圓形之間的連接線 (從圓周到圓周，而非圓心到圓心)
@@ -644,7 +694,7 @@ class TopologyPainter extends CustomPainter {
   }
 
   // 計算設備位置
-  Offset _calculateDevicePosition(NetworkDevice device, Size size) {
+  Offset _calculateDevicePosition(NetworkDevice device, Size size, Offset gatewayPosition) {
     final deviceCount = devices.length;
     final index = devices.indexOf(device);
 
@@ -691,14 +741,10 @@ class TopologyPainter extends CustomPainter {
     }
     else {
       // 超過四個設備時的處理 (這裡簡化為圓形分布)
-      final center = Offset(
-          size.width * layoutConstants.gatewayHorizontalPosition,
-          size.height * layoutConstants.gatewayVerticalPosition
-      );
       final angle = 2 * math.pi * index / deviceCount;
       return Offset(
-        center.dx + 150 * math.cos(angle),
-        center.dy + 150 * math.sin(angle),
+        gatewayPosition.dx + 150 * math.cos(angle),
+        gatewayPosition.dy + 150 * math.sin(angle),
       );
     }
   }

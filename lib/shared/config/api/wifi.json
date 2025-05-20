@@ -4,7 +4,7 @@
   "timeoutSeconds": 10,
   "endpoints": {
     "systemInfo": {
-      "path": "$apiVersion/system/info",
+      "path": "$apiVersion/system/i111",
       "method": "get",
       "description": "獲取系統資訊"
     },

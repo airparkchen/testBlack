@@ -171,39 +171,67 @@ class LoginProcess {
       // 詳細記錄響應
       print("證明請求的響應狀態碼: ${response.statusCode}");
       PrintUtil.printMap(' [STEP3] HEADER', response.headers.map((k, v) => MapEntry(k, v)));
-      if (response.body.isNotEmpty) {
-        try {
-          final jsonData = json.decode(response.body);
-          print("響應體(JSON): ${jsonEncode(jsonData)}");
-
-          // 檢查JWT令牌
-          if (jsonData.containsKey('jwt')) {
-            print("發現JWT令牌: ${jsonData['jwt']}");
-          } else if (jsonData.containsKey('token')) {
-            print("發現令牌: ${jsonData['token']}");
-          }
-        } catch (e) {
-          print("響應體(非JSON): ${response.body}");
-        }
-      }
 
       var result = preCheck(response);
 
-      try {
-        if (result.response != null && result.response!.body.isNotEmpty) {
-          var tmp = json.decode(result.response!.body);
-          if (tmp['error'] != null) {
-            print("錯誤信息: ${tmp['error']['msg']}");
-            result = LoginResult(
+      // 檢查 JWT 令牌 (從響應主體中)
+      if (result.response != null && result.response!.body.isNotEmpty) {
+        try {
+          var responseData = json.decode(result.response!.body);
+
+          // 提取 JWT 令牌
+          String? jwtToken = null;
+          if (responseData.containsKey('jwt')) {
+            jwtToken = responseData['jwt'];
+            print("從響應中獲取到 JWT 令牌");
+          } else if (responseData.containsKey('token')) {
+            jwtToken = responseData['token'];
+            print("從響應中獲取到令牌");
+          } else if (responseData.containsKey('M2')) {
+            // 如果伺服器返回 M2，可能需要用它來生成 JWT
+            String m2 = responseData['M2'];
+            print("從響應中獲取到 M2: $m2");
+
+            // 如果需要從 M2 生成 JWT，可以在這裡添加相關邏輯
+            // jwtToken = _generateJwtFromM2(m2);
+          }
+
+          // 如果找到 JWT 令牌，更新結果
+          if (jwtToken != null) {
+            return LoginResult(
                 response: result.response,
-                returnStatus: false,
-                session: emptySession,
-                msg: tmp['error']['msg'] ?? "Unknown error"
+                returnStatus: result.returnStatus,
+                session: SessionInfo(
+                    sessionId: result.session.sessionId,
+                    csrfToken: result.session.csrfToken,
+                    jwtToken: jwtToken
+                ),
+                msg: result.msg
             );
           }
+        } catch (e) {
+          print("解析響應數據時出錯: $e");
         }
-      } catch (e) {
-        print("step3 response parsing error: $e");
+      }
+
+      // 檢查 JWT 令牌 (從響應標頭中)
+      if (result.response != null && result.response!.headers.containsKey('authorization')) {
+        String authHeader = result.response!.headers['authorization']!;
+        if (authHeader.startsWith('Bearer ')) {
+          String jwtToken = authHeader.substring('Bearer '.length);
+          print("從響應標頭獲取到 JWT 令牌");
+
+          return LoginResult(
+              response: result.response,
+              returnStatus: result.returnStatus,
+              session: SessionInfo(
+                  sessionId: result.session.sessionId,
+                  csrfToken: result.session.csrfToken,
+                  jwtToken: jwtToken
+              ),
+              msg: result.msg
+          );
+        }
       }
 
       return result;
@@ -212,48 +240,9 @@ class LoginProcess {
       return LoginResult(
           response: null,
           returnStatus: false,
-          session: emptySession,
+          session: SessionInfo(sessionId: "", csrfToken: "", jwtToken: null),
           msg: "發送證明請求失敗: $e"
       );
-    }
-  }
-
-  // 使用JWT令牌測試API
-  Future<dynamic> testApiWithJwt(String jwt, String endpoint) async {
-    try {
-      final headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $jwt'
-      };
-
-      print("使用 JWT 測試 API: $endpoint");
-      print("Authorization: Bearer $jwt");
-
-      final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: headers,
-      );
-
-      print("API 測試結果: ${response.statusCode}");
-      PrintUtil.printMap(' [API測試] HEADER', response.headers.map((k, v) => MapEntry(k, v)));
-
-      if (response.statusCode == 200) {
-        try {
-          final jsonData = json.decode(response.body);
-          print("API響應體(JSON): ${jsonEncode(jsonData)}");
-          return jsonData;
-        } catch (e) {
-          print("API回應解析錯誤: $e");
-          print("API響應體(非JSON): ${response.body}");
-          return response.body;
-        }
-      } else {
-        print("API響應體: ${response.body}");
-        return {"status": "error", "code": response.statusCode, "body": response.body};
-      }
-    } catch (e) {
-      print("API 測試錯誤: $e");
-      return {"status": "error", "message": e.toString()};
     }
   }
 
@@ -350,7 +339,7 @@ class LoginProcess {
           return LoginResult(
               response: null,
               returnStatus: false,
-              session: SessionInfo(sessionId: sessionId, csrfToken: ""),
+              session: SessionInfo(sessionId: sessionId, csrfToken: "", ),
               msg: "無法獲取CSRF令牌"
           );
         }

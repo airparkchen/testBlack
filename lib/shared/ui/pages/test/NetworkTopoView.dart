@@ -8,7 +8,25 @@ import 'package:whitebox/shared/ui/pages/test/DeviceDetailPage.dart'; // 引入�
 ///
 /// 這個頁面用於顯示網絡裝置之間的拓撲關係，包括有線和無線連接
 class NetworkTopoView extends StatefulWidget {
-  const NetworkTopoView({Key? key}) : super(key: key);
+  // 是否顯示測試控制器
+  final bool showDeviceCountController;
+
+  // 預設設備數量
+  final int defaultDeviceCount;
+
+  // 設備數據源 - 提供外部傳入設備列表的可能性
+  final List<NetworkDevice>? externalDevices;
+
+  // 設備連接數據源
+  final List<DeviceConnection>? externalDeviceConnections;
+
+  const NetworkTopoView({
+    Key? key,
+    this.showDeviceCountController = true, // 預設不顯示測試控制器
+    this.defaultDeviceCount = 4, // 預設顯示4個設備
+    this.externalDevices, // 允許外部傳入設備列表
+    this.externalDeviceConnections, // 允許外部傳入連接數據
+  }) : super(key: key);
 
   @override
   State<NetworkTopoView> createState() => _NetworkTopoViewState();
@@ -21,15 +39,21 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   // 底部選項卡
   int _selectedBottomTab = 1; // 預設為中間的連線選項
 
-  // 控制裝置數量的控制器
-  final TextEditingController _deviceCountController = TextEditingController(text: '4');
+  // 控制裝置數量的控制器 測試用
+  late final TextEditingController _deviceCountController;
 
   // 當前裝置數量
-  int _deviceCount = 4;
+  late int _deviceCount;
 
   @override
   void initState() {
     super.initState();
+
+    // 初始化設備數量
+    _deviceCount = widget.defaultDeviceCount;
+
+    // 初始化控制器
+    _deviceCountController = TextEditingController(text: _deviceCount.toString());
 
     // 添加監聽器，當數量改變時更新視圖
     _deviceCountController.addListener(() {
@@ -52,17 +76,15 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('網絡拓撲'),
-        backgroundColor: AppColors.buttonBackgroundColor,
-      ),
+      appBar: null,
       body: Column(
         children: [
-          // 裝置數量控制器
-          buildDeviceCountController(),
+          // 裝置數量控制器 - 根據標誌決定是否顯示
+          if (widget.showDeviceCountController)
+            buildDeviceCountController(),
 
           // 視圖切換選項卡 (與AppBar分開)
-          SizedBox(height: 20),
+          SizedBox(height: 80),
           buildTabBar(),
 
           // 主要內容區域
@@ -163,8 +185,8 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   // 構建選項卡 (與AppBar分開)
   Widget buildTabBar() {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 20),
-      height: 50,
+      margin: EdgeInsetsDirectional.only(start: 60, end: 60, top: 10, bottom: 5), // 設置合適的左右邊距使其不是全寬
+      height: 30, // 精確高度，根據SVG設定
       child: Row(
         children: [
           // 拓撲視圖選項卡
@@ -179,9 +201,9 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: _viewMode == 'topology' ? Colors.grey[600] : Colors.grey[300],
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(4),
-                    topRight: Radius.circular(4),
+                  borderRadius: BorderRadiusDirectional.only(
+                    topStart: Radius.circular(4),
+                    topEnd: Radius.circular(4),
                   ),
                 ),
                 child: Text(
@@ -189,6 +211,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
                   style: TextStyle(
                     color: _viewMode == 'topology' ? Colors.white : Colors.black,
                     fontWeight: FontWeight.bold,
+                    fontSize: 12, // 調整字體大小
                   ),
                 ),
               ),
@@ -217,6 +240,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
                   style: TextStyle(
                     color: _viewMode == 'list' ? Colors.white : Colors.black,
                     fontWeight: FontWeight.bold,
+                    fontSize: 12, // 調整字體大小
                   ),
                 ),
               ),
@@ -227,11 +251,15 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
     );
   }
 
-  // 構建拓撲視圖
-  Widget buildTopologyView() {
-    // 創建測試數據
+  // 獲取設備數據 - 從外部數據源或生成測試數據
+  List<NetworkDevice> getDevices() {
+    // 如果提供了外部設備數據，優先使用
+    if (widget.externalDevices != null && widget.externalDevices!.isNotEmpty) {
+      return widget.externalDevices!;
+    }
+
+    // 否則生成測試數據
     List<NetworkDevice> dummyDevices = [];
-    List<DeviceConnection> deviceConnections = [];
 
     // 根據裝置數量生成設備
     for (int i = 0; i < _deviceCount; i++) {
@@ -277,15 +305,41 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
       );
 
       dummyDevices.add(device);
+    }
 
-      // 創建連接數據 (每個設備連接2個子設備)
-      deviceConnections.add(
+    return dummyDevices;
+  }
+
+  // 獲取設備連接數據 - 從外部數據源或生成測試數據
+  List<DeviceConnection> getDeviceConnections(List<NetworkDevice> devices) {
+    // 如果提供了外部連接數據，優先使用
+    if (widget.externalDeviceConnections != null && widget.externalDeviceConnections!.isNotEmpty) {
+      return widget.externalDeviceConnections!;
+    }
+
+    // 否則生成測試數據
+    List<DeviceConnection> connections = [];
+
+    // 為每個設備創建連接數據
+    for (var device in devices) {
+      connections.add(
         DeviceConnection(
-          deviceId: 'device-${i + 1}',
+          deviceId: device.id,
           connectedDevicesCount: 2, // 固定為2個連接設備
         ),
       );
     }
+
+    return connections;
+  }
+
+  // 構建拓撲視圖
+  Widget buildTopologyView() {
+    // 獲取設備數據
+    final devices = getDevices();
+
+    // 獲取設備連接數據
+    final deviceConnections = getDeviceConnections(devices);
 
     return Container(
       padding: EdgeInsets.all(16),
@@ -293,10 +347,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
       child: Center(
         child: NetworkTopologyComponent(
           gatewayName: 'Controller',
-          devices: dummyDevices,
+          devices: devices,
           deviceConnections: deviceConnections,
           totalConnectedDevices: 4, // 主機上的數字顯示
-          height: 400,
+          height: MediaQuery.of(context).size.height * 0.5,  // 調整高度為屏幕高度的50%
           onDeviceSelected: (device) {
             // 獲取設備連接的子設備數量
             int connectionCount = 2; // 預設值
@@ -338,74 +392,29 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
 
   // 構建列表視圖
   Widget buildListView() {
-    // 使用與拓撲視圖相同的邏輯創建測試數據
-    List<NetworkDevice> dummyDevices = [
-      NetworkDevice(
-        name: 'Controller',
-        id: 'router-001',
-        mac: '48:21:0B:4A:46:CF',
-        ip: '192.168.1.1',
-        connectionType: ConnectionType.wired,
-        additionalInfo: {
-          'type': 'router',
-          'status': 'online',
-          'uptime': '10天3小時',
-        },
-      ),
-    ];
+    // 獲取設備數據
+    List<NetworkDevice> devices = getDevices();
 
-    // 添加設備
-    for (int i = 0; i < _deviceCount; i++) {
-      String name = '';
-      String deviceType = '';
-
-      // 創建與圖片相符的設備
-      switch (i) {
-        case 0:
-          name = 'TV';
-          deviceType = 'OWA813V_6G';
-          break;
-        case 1:
-          name = 'Xbox';
-          deviceType = 'Connected via Ethernet';
-          break;
-        case 2:
-          name = 'Iphone';
-          deviceType = 'OWA813V_6G';
-          break;
-        case 3:
-          name = 'Laptop';
-          deviceType = 'OWA813V_5G';
-          break;
-        default:
-          name = '設備 ${i + 1}';
-          deviceType = 'OWA813V_6G';
-      }
-
-      // 決定連接類型
-      final isWired = (name == 'Xbox');
-
-      dummyDevices.add(
-        NetworkDevice(
-          name: name,
-          id: 'device-${i + 1}',
-          mac: '48:21:0B:4A:47:9B',
-          ip: '192.168.1.164',
-          connectionType: isWired ? ConnectionType.wired : ConnectionType.wireless,
-          additionalInfo: {
-            'type': deviceType,
-            'status': 'online',
-          },
-        ),
-      );
-    }
+    // 添加網關設備到列表最前方
+    devices.insert(0, NetworkDevice(
+      name: 'Controller',
+      id: 'router-001',
+      mac: '48:21:0B:4A:46:CF',
+      ip: '192.168.1.1',
+      connectionType: ConnectionType.wired,
+      additionalInfo: {
+        'type': 'router',
+        'status': 'online',
+        'uptime': '10天3小時',
+      },
+    ));
 
     return ListView.separated(
       padding: EdgeInsets.all(16),
-      itemCount: dummyDevices.length,
+      itemCount: devices.length,
       separatorBuilder: (context, index) => Divider(),
       itemBuilder: (context, index) {
-        final device = dummyDevices[index];
+        final device = devices[index];
 
         return ListTile(
           leading: CircleAvatar(
@@ -449,7 +458,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   // 構建速度區域 (Speed Area)
   Widget buildSpeedArea() {
     return Container(
-      height: 150,
+      height: 154,
       color: Color(0xFFEFEFEF),
       padding: EdgeInsets.all(16),
       child: Center(

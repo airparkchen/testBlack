@@ -77,7 +77,7 @@ class _WifiConnectionPageState extends State<WifiConnectionPage> {
     final nextButtonWidth = size.width * (150 / buttonWidthProportion);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: SingleChildScrollView(
           child: SizedBox(

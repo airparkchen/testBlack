@@ -1050,7 +1050,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
@@ -1339,7 +1339,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     // 在 _createComponentByName 方法中
       case 'SetSSIDComponent':
       // 添加詳細日誌
-        print('創建SetSSIDComponent，傳入SSID: $ssid, 安全選項: $securityOption, 密碼長度: ${ssidPassword.length}');
+      //   print('創建SetSSIDComponent，傳入SSID: $ssid, 安全選項: $securityOption, 密碼長度: ${ssidPassword.length}');
 
         // 在創建組件前，確保已調用獲取無線設置的方法
         if (_currentWirelessSettings.isEmpty && !_isLoadingWirelessSettings) {

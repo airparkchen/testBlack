@@ -89,7 +89,7 @@ class _LoginPageState extends State<LoginPage> {
     final double bottomMargin = screenHeight * _bottomMarginRatio;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
