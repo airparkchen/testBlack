@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
-import 'package:whitebox/shared/ui/pages/test/DeviceDetailPage.dart'; // 引入設備詳情頁
+import 'package:whitebox/shared/ui/pages/test/DeviceDetailPage.dart';
 
 /// 網絡拓撲視圖頁面
 ///
@@ -22,7 +22,7 @@ class NetworkTopoView extends StatefulWidget {
 
   const NetworkTopoView({
     Key? key,
-    this.showDeviceCountController = true, // 預設不顯示測試控制器
+    this.showDeviceCountController = false, // 預設不顯示測試控制器
     this.defaultDeviceCount = 4, // 預設顯示4個設備
     this.externalDevices, // 允許外部傳入設備列表
     this.externalDeviceConnections, // 允許外部傳入連接數據
@@ -39,11 +39,14 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   // 底部選項卡
   int _selectedBottomTab = 1; // 預設為中間的連線選項
 
-  // 控制裝置數量的控制器 測試用
+  // 控制裝置數量的控制器(測試用)
   late final TextEditingController _deviceCountController;
 
   // 當前裝置數量
   late int _deviceCount;
+
+  // 創建 AppTheme 實例
+  final AppTheme _appTheme = AppTheme();
 
   @override
   void initState() {
@@ -56,24 +59,84 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
     _deviceCountController = TextEditingController(text: _deviceCount.toString());
 
     // 添加監聽器，當數量改變時更新視圖
-    _deviceCountController.addListener(() {
-      final newCount = int.tryParse(_deviceCountController.text) ?? 0;
-      if (newCount != _deviceCount && newCount >= 0 && newCount <= 10) {
-        setState(() {
-          _deviceCount = newCount;
-        });
-      }
-    });
+    _deviceCountController.addListener(_handleDeviceCountChanged);
+  }
+
+  // 處理設備數量變更
+  void _handleDeviceCountChanged() {
+    final newCount = int.tryParse(_deviceCountController.text) ?? 0;
+    if (newCount != _deviceCount && newCount >= 0 && newCount <= 10) {
+      setState(() {
+        _deviceCount = newCount;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _deviceCountController.removeListener(_handleDeviceCountChanged);
     _deviceCountController.dispose();
     super.dispose();
   }
 
+  // 處理設備選擇
+  void _handleDeviceSelected(NetworkDevice device) {
+    // 獲取設備連接的子設備數量
+    int connectionCount = 2; // 預設值
+    bool isGateway = false;
+
+    // 判斷是否為網關設備
+    if (device.id == 'gateway') {
+      isGateway = true;
+      connectionCount = 4;
+    } else {
+      // 尋找該設備的連接數量
+      try {
+        if (widget.externalDeviceConnections != null) {
+          final connection = widget.externalDeviceConnections!.firstWhere(
+                  (conn) => conn.deviceId == device.id
+          );
+          connectionCount = connection.connectedDevicesCount;
+        }
+      } catch (e) {
+        // 如果找不到連接信息，使用預設值
+        connectionCount = 2;
+      }
+    }
+
+    // 導航到設備詳情頁
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DeviceDetailPage(
+          device: device,
+          connectedDevicesCount: connectionCount,
+          isGateway: isGateway,
+        ),
+      ),
+    );
+  }
+
+  // 處理視圖模式切換
+  void _handleViewModeChanged(String mode) {
+    if (mode != _viewMode) {
+      setState(() {
+        _viewMode = mode;
+      });
+    }
+  }
+
+  // 處理底部選項卡切換
+  void _handleBottomTabChanged(int index) {
+    setState(() {
+      _selectedBottomTab = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: null,
@@ -81,41 +144,41 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
         children: [
           // 裝置數量控制器 - 根據標誌決定是否顯示
           if (widget.showDeviceCountController)
-            buildDeviceCountController(),
+            _buildDeviceCountController(),
 
           // 視圖切換選項卡 (與AppBar分開)
-          SizedBox(height: 80),
-          buildTabBar(),
+          SizedBox(height: screenSize.height * 0.08),
+          _buildTabBar(),
 
           // 主要內容區域
           Expanded(
             child: _viewMode == 'topology'
-                ? buildTopologyView()
-                : buildListView(),
+                ? _buildTopologyView()
+                : _buildListView(),
           ),
 
           // 速度區域 (Speed Area)
-          buildSpeedArea(),
+          _buildSpeedArea(),
 
           // 底部導航欄
-          buildBottomNavBar(),
+          _buildBottomNavBar(),
         ],
       ),
     );
   }
 
   // 構建裝置數量控制器
-  Widget buildDeviceCountController() {
+  Widget _buildDeviceCountController() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.grey[100],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: const Color(0xFFEFEFEF),
       child: Row(
         children: [
-          Text(
+          const Text(
             '裝置數量:',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
 
           // 減少按鈕
           InkWell(
@@ -131,24 +194,26 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: const Color(0xFFD9D9D9),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Icon(Icons.remove),
+              child: const Icon(Icons.remove),
             ),
           ),
 
           // 數量輸入框
           Container(
             width: 60,
-            margin: EdgeInsets.symmetric(horizontal: 8),
+            margin: const EdgeInsets.symmetric(horizontal: 8),
             child: TextField(
               controller: _deviceCountController,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
               decoration: InputDecoration(
-                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                border: OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
@@ -171,10 +236,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: const Color(0xFFD9D9D9),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Icon(Icons.add),
+              child: const Icon(Icons.add),
             ),
           ),
         ],
@@ -182,26 +247,22 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
     );
   }
 
-  // 構建選項卡 (與AppBar分開)
-  Widget buildTabBar() {
+  // 構建選項卡
+  Widget _buildTabBar() {
     return Container(
-      margin: EdgeInsetsDirectional.only(start: 60, end: 60, top: 10, bottom: 5), // 設置合適的左右邊距使其不是全寬
-      height: 30, // 精確高度，根據SVG設定
+      margin: const EdgeInsetsDirectional.only(start: 60, end: 60, top: 10, bottom: 5),
+      height: 30,
       child: Row(
         children: [
           // 拓撲視圖選項卡
           Expanded(
             child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _viewMode = 'topology';
-                });
-              },
+              onTap: () => _handleViewModeChanged('topology'),
               child: Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _viewMode == 'topology' ? Colors.grey[600] : Colors.grey[300],
-                  borderRadius: BorderRadiusDirectional.only(
+                  color: _viewMode == 'topology' ? const Color(0xFF808080) : const Color(0xFFD9D9D9),
+                  borderRadius: const BorderRadiusDirectional.only(
                     topStart: Radius.circular(4),
                     topEnd: Radius.circular(4),
                   ),
@@ -211,7 +272,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
                   style: TextStyle(
                     color: _viewMode == 'topology' ? Colors.white : Colors.black,
                     fontWeight: FontWeight.bold,
-                    fontSize: 12, // 調整字體大小
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -221,16 +282,12 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
           // 列表視圖選項卡
           Expanded(
             child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _viewMode = 'list';
-                });
-              },
+              onTap: () => _handleViewModeChanged('list'),
               child: Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _viewMode == 'list' ? Colors.grey[600] : Colors.grey[300],
-                  borderRadius: BorderRadius.only(
+                  color: _viewMode == 'list' ? const Color(0xFF808080) : const Color(0xFFD9D9D9),
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(4),
                     topRight: Radius.circular(4),
                   ),
@@ -240,7 +297,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
                   style: TextStyle(
                     color: _viewMode == 'list' ? Colors.white : Colors.black,
                     fontWeight: FontWeight.bold,
-                    fontSize: 12, // 調整字體大小
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -252,7 +309,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   }
 
   // 獲取設備數據 - 從外部數據源或生成測試數據
-  List<NetworkDevice> getDevices() {
+  List<NetworkDevice> _getDevices() {
     // 如果提供了外部設備數據，優先使用
     if (widget.externalDevices != null && widget.externalDevices!.isNotEmpty) {
       return widget.externalDevices!;
@@ -311,7 +368,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   }
 
   // 獲取設備連接數據 - 從外部數據源或生成測試數據
-  List<DeviceConnection> getDeviceConnections(List<NetworkDevice> devices) {
+  List<DeviceConnection> _getDeviceConnections(List<NetworkDevice> devices) {
     // 如果提供了外部連接數據，優先使用
     if (widget.externalDeviceConnections != null && widget.externalDeviceConnections!.isNotEmpty) {
       return widget.externalDeviceConnections!;
@@ -334,15 +391,17 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   }
 
   // 構建拓撲視圖
-  Widget buildTopologyView() {
+  Widget _buildTopologyView() {
+    final screenSize = MediaQuery.of(context).size;
+
     // 獲取設備數據
-    final devices = getDevices();
+    final devices = _getDevices();
 
     // 獲取設備連接數據
-    final deviceConnections = getDeviceConnections(devices);
+    final deviceConnections = _getDeviceConnections(devices);
 
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       color: Colors.white,
       child: Center(
         child: NetworkTopologyComponent(
@@ -350,50 +409,17 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
           devices: devices,
           deviceConnections: deviceConnections,
           totalConnectedDevices: 4, // 主機上的數字顯示
-          height: MediaQuery.of(context).size.height * 0.5,  // 調整高度為屏幕高度的50%
-          onDeviceSelected: (device) {
-            // 獲取設備連接的子設備數量
-            int connectionCount = 2; // 預設值
-            bool isGateway = false;
-
-            // 判斷是否為網關設備
-            if (device.id == 'gateway') {
-              isGateway = true;
-              connectionCount = 4;
-            } else {
-              // 尋找該設備的連接數量
-              try {
-                final connection = deviceConnections.firstWhere(
-                        (conn) => conn.deviceId == device.id
-                );
-                connectionCount = connection.connectedDevicesCount;
-              } catch (e) {
-                // 如果找不到連接信息，使用預設值
-                connectionCount = 2;
-              }
-            }
-
-            // 使用新的設備詳情頁面
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DeviceDetailPage(
-                  device: device,
-                  connectedDevicesCount: connectionCount,
-                  isGateway: isGateway,
-                ),
-              ),
-            );
-          },
+          height: screenSize.height * 0.5,  // 調整高度為屏幕高度的50%
+          onDeviceSelected: _handleDeviceSelected,
         ),
       ),
     );
   }
 
   // 構建列表視圖
-  Widget buildListView() {
+  Widget _buildListView() {
     // 獲取設備數據
-    List<NetworkDevice> devices = getDevices();
+    List<NetworkDevice> devices = _getDevices();
 
     // 添加網關設備到列表最前方
     devices.insert(0, NetworkDevice(
@@ -410,9 +436,9 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
     ));
 
     return ListView.separated(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       itemCount: devices.length,
-      separatorBuilder: (context, index) => Divider(),
+      separatorBuilder: (context, index) => const Divider(),
       itemBuilder: (context, index) {
         final device = devices[index];
 
@@ -421,12 +447,12 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
             backgroundColor: Colors.black,
             child: Text(
               index == 0 ? '4' : '2',
-              style: TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white),
             ),
           ),
           title: Text(
             device.name,
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           subtitle: Text('${device.ip} | ${device.mac}'),
           trailing: Icon(
@@ -437,31 +463,19 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
                 ? Colors.green
                 : Colors.blue,
           ),
-          onTap: () {
-            // 點擊列表項時導航到設備詳情頁
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DeviceDetailPage(
-                  device: device,
-                  connectedDevicesCount: index == 0 ? 4 : 2,
-                  isGateway: index == 0,
-                ),
-              ),
-            );
-          },
+          onTap: () => _handleDeviceSelected(device),
         );
       },
     );
   }
 
   // 構建速度區域 (Speed Area)
-  Widget buildSpeedArea() {
+  Widget _buildSpeedArea() {
     return Container(
       height: 154,
-      color: Color(0xFFEFEFEF),
-      padding: EdgeInsets.all(16),
-      child: Center(
+      color: const Color(0xFFEFEFEF),
+      padding: const EdgeInsets.all(16),
+      child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -476,7 +490,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
   }
 
   // 構建底部導航欄
-  Widget buildBottomNavBar() {
+  Widget _buildBottomNavBar() {
     return Container(
       color: Colors.white,
       height: 80,
@@ -484,33 +498,29 @@ class _NetworkTopoViewState extends State<NetworkTopoView> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           // Dashboard
-          buildBottomNavItem(0, 'Dashboard'),
+          _buildBottomNavItem(0, 'Dashboard'),
 
           // 連線 (當前頁面)
-          buildBottomNavItem(1, '連線'),
+          _buildBottomNavItem(1, '連線'),
 
           // Setting
-          buildBottomNavItem(2, 'Setting'),
+          _buildBottomNavItem(2, 'Setting'),
         ],
       ),
     );
   }
 
   // 構建底部導航項
-  Widget buildBottomNavItem(int index, String label) {
+  Widget _buildBottomNavItem(int index, String label) {
     final isSelected = index == _selectedBottomTab;
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedBottomTab = index;
-        });
-      },
+      onTap: () => _handleBottomTabChanged(index),
       child: Container(
         width: 80,
         height: 80,
         decoration: BoxDecoration(
-          color: isSelected ? Colors.grey[300] : Colors.transparent,
+          color: isSelected ? const Color(0xFFD9D9D9) : Colors.transparent,
           border: isSelected ? Border.all(color: Colors.grey) : null,
         ),
         child: Center(
