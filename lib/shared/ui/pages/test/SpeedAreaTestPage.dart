@@ -20,6 +20,9 @@ class SpeedDataGenerator {
   // 數據點的數量
   final int dataPointCount;
 
+  // 添加一個標記，表示數據是否已經填滿到目標寬度
+  bool _isFullWidth = false;
+
   // 最小速度值
   final double minSpeed;
 
@@ -93,6 +96,7 @@ class SpeedDataGenerator {
     print('Updated speed: $newValue, Smoothed: $smoothedValue, data points: ${_speedData.length}');
   }
 
+
   // 生成下一個數據點
   double _generateNextValue(double currentValue) {
     // 生成 -3 到 3 的隨機波動 (減小波動範圍)
@@ -107,6 +111,7 @@ class SpeedDataGenerator {
 
     return newValue;
   }
+
 }
 
 class _SpeedAreaTestPageState extends State<SpeedAreaTestPage> with SingleTickerProviderStateMixin {
@@ -272,6 +277,7 @@ class _SpeedAreaTestPageState extends State<SpeedAreaTestPage> with SingleTicker
       ),
     );
   }
+
 }
 /// 速度標籤小部件
 /// 一個獨立的顯示速度值的標籤，帶有模糊背景和底部指向

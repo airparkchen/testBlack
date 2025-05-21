@@ -35,6 +35,31 @@ class NetworkTopoView extends StatefulWidget {
   State<NetworkTopoView> createState() => _NetworkTopoViewState();
 }
 
+// // 真實數據源接口
+// abstract class SpeedDataSource {
+//   List<double> get data;
+//   double get currentSpeed;
+//   double getWidthPercentage();
+//   bool isFullWidth();
+//   void update();
+// }
+// // 模擬數據源實現
+// class MockSpeedDataSource implements SpeedDataSource {
+//   // 現有的 SpeedDataGenerator 代碼...
+// }
+//
+// // 真實數據源實現
+// class RealSpeedDataSource implements SpeedDataSource {
+//   // 從網絡、文件或其他來源獲取實際數據
+//   // 實現與 SpeedDataGenerator 相同的方法
+// }
+//
+// // 使用時：
+// final SpeedDataSource dataSource = isTestMode
+//     ? MockSpeedDataSource()
+//     : RealSpeedDataSource();
+
+// 將 dataSource 傳遞給 SpeedChartWidget用來實現真實資料傳遞。
 /// 速度數據生成器
 /// 用於生成模擬的網絡速度數據
 class SpeedDataGenerator {
@@ -59,19 +84,34 @@ class SpeedDataGenerator {
   // 平滑係數 (0-1，值越大平滑效果越強)
   final double smoothingFactor;
 
+  // 波動幅度 (值越大波動越明顯)
+  final double fluctuationAmplitude;
+
+  // 當前寬度比例
+  double _currentWidthPercentage = 0.05; // 開始時只有5%的寬度
+
+  // 目標寬度比例
+  final double endAtPercent;
+
+  // 每次更新增加的寬度比例
+  final double growthRate;
+
   // 構造函數
   SpeedDataGenerator({
     this.dataPointCount = 100,  // 預設100個數據點
     this.minSpeed = 20,         // 預設最小速度 20 Mbps
-    this.maxSpeed = 150,        // 預設最大速度 150 Mbps
+    this.maxSpeed = 1000,        // 預設最大速度 150 Mbps
     double? initialSpeed,       // 初始速度值，可選
-    this.smoothingFactor = 0.8, // 預設平滑係數
+    this.smoothingFactor = 1, // 調整平滑係數，允許更多波動
+    this.endAtPercent = 0.7,    // 默認目標寬度為70%
+    this.growthRate = 0.01,     // 每次更新增加1%的寬度
+    this.fluctuationAmplitude = 15.0, // 增加波動幅度，原來是6.0
   }) {
     // 初始化數據點
     final initialValue = initialSpeed ?? 87.0;  // 默認初始值為87
 
-    // 填充數據點列表
-    for (int i = 0; i < dataPointCount; i++) {
+    // 初始只填入少量數據點
+    for (int i = 0; i < 5; i++) {
       _speedData.add(initialValue);
       _smoothedData.add(initialValue);
     }
@@ -83,23 +123,39 @@ class SpeedDataGenerator {
   // 取得當前速度值 (最新的一筆資料)
   double get currentSpeed => _smoothedData.last;
 
+  // 檢查是否已達到最大寬度
+  bool isFullWidth() {
+    return _currentWidthPercentage >= endAtPercent;
+  }
+
+  // 獲取當前寬度比例
+  double getWidthPercentage() {
+    return _currentWidthPercentage;
+  }
+
   // 更新數據（添加新的數據點，移除最舊的）
   void update() {
     // 基於最後一個值生成新的速度值
     double newValue = _generateNextValue(_speedData.last);
 
-    // 添加到原始數據
-    if (_speedData.length >= dataPointCount) {
-      _speedData.removeAt(0);
+    // 更新寬度
+    if (_currentWidthPercentage < endAtPercent) {
+      _currentWidthPercentage += growthRate;
+      if (_currentWidthPercentage > endAtPercent) {
+        _currentWidthPercentage = endAtPercent;
+      }
     }
-    _speedData.add(newValue);
 
-    // 應用平滑算法
-    if (_smoothedData.length >= dataPointCount) {
+    // 如果已達到最大寬度，移除最舊的點
+    if (_currentWidthPercentage >= endAtPercent && _speedData.length >= dataPointCount) {
+      _speedData.removeAt(0);
       _smoothedData.removeAt(0);
     }
 
-    // 使用指數移動平均 (EMA) 進行平滑處理
+    // 添加新點
+    _speedData.add(newValue);
+
+    // 計算平滑值
     double smoothedValue;
     if (_smoothedData.isNotEmpty) {
       // 新值 = 前一個平滑值 * 平滑係數 + 當前實際值 * (1 - 平滑係數)
@@ -113,11 +169,16 @@ class SpeedDataGenerator {
 
   // 生成下一個數據點
   double _generateNextValue(double currentValue) {
-    // 生成 -3 到 3 的隨機波動 (減小波動範圍)
-    final double fluctuation = (_random.nextDouble() * 6) - 3;
+    // 生成較大幅度的隨機波動
+    final double fluctuation = (_random.nextDouble() * fluctuationAmplitude * 2) - fluctuationAmplitude;
 
     // 計算新值
     double newValue = currentValue + fluctuation;
+
+    // 有時添加一個更大的跳變，使曲線更有變化
+    if (_random.nextDouble() < 0.1) { // 10%的機率產生較大變化
+      newValue += (_random.nextDouble() * 20) - 10;
+    }
 
     // 確保值在範圍內
     if (newValue < minSpeed) newValue = minSpeed;
@@ -710,9 +771,15 @@ class SpeedChartWidget extends StatelessWidget {
     final double currentSpeed = dataGenerator.currentSpeed.round().toDouble();
     final int speedValue = currentSpeed.toInt();
 
+    // 獲取當前寬度比例
+    final double currentWidthPercentage = dataGenerator.getWidthPercentage();
+
+    // 檢查是否已達到最大寬度
+    final bool isFullWidth = currentWidthPercentage >= endAtPercent;
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 取得實際寬度和高度 - 確保是有效的數值
+        // 取得實際寬度和高度
         final double actualWidth = constraints.maxWidth;
         final double actualHeight = constraints.maxHeight;
 
@@ -721,7 +788,8 @@ class SpeedChartWidget extends StatelessWidget {
           return const SizedBox(); // 返回空小部件避免錯誤
         }
 
-        final double chartEndX = actualWidth * endAtPercent;
+        // 這裡是關鍵修改：使用 currentWidthPercentage 而不是固定的 endAtPercent
+        final double chartEndX = actualWidth * currentWidthPercentage;
 
         // 計算白點的位置 - 確保與曲線終點計算一致
         final double range = dataGenerator.maxSpeed - dataGenerator.minSpeed;
@@ -744,59 +812,63 @@ class SpeedChartWidget extends StatelessWidget {
                       animationValue: animationController.value,
                       endAtPercent: endAtPercent,
                       currentSpeed: currentSpeed,
+                      currentWidthPercentage: currentWidthPercentage,
+                      isFullWidth: isFullWidth,
                     ),
                     size: Size(actualWidth, actualHeight),
                   );
                 },
               ),
             ),
+            // 白點和垂直線只有在有數據時才顯示
 
-            // 垂直線 (從底部到白點)
-            Positioned(
-              top: dotY + 8, // 白點底部
-              bottom: 0,
-              left: chartEndX - 1, // 考慮線寬
-              child: Container(
-                width: 2,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white,
-                      Color.fromRGBO(255, 255, 255, 0),
-                    ],
+            if (dataGenerator.data.isNotEmpty) ...[
+              // 垂直線 (從底部到白點)
+              Positioned(
+                top: dotY + 8, // 白點底部
+                bottom: 0,
+                left: chartEndX - 1, // 考慮線寬
+                child: Container(
+                  width: 2,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white,
+                        Color.fromRGBO(255, 255, 255, 0),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // 當前速度標記 (白色圓圈)
-            Positioned(
-              top: dotY - 8, // 修正位置，減去圓的半徑
-              left: chartEndX - 8, // 修正位置，減去圓的半徑
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+              // 當前速度標記 (白色圓圈)
+              Positioned(
+                top: dotY - 8, // 修正位置，減去圓的半徑
+                left: chartEndX - 8, // 修正位置，減去圓的半徑
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-            ),
 
-            // 速度標籤
-            Positioned(
-              top: dotY - 50, // 在白點上方，考慮標籤高度和三角形
-              left: chartEndX - 44, // 居中對齊白點
-              child: _buildSpeedLabel(speedValue),
-            ),
+              // 速度標籤
+              Positioned(
+                top: dotY - 50, // 在白點上方，考慮標籤高度和三角形
+                left: chartEndX - 44, // 居中對齊白點
+                child: _buildSpeedLabel(speedValue),
+              ),
+            ],
           ],
         );
       },
     );
   }
-
   // 構建速度標籤
   Widget _buildSpeedLabel(int speed) {
     return Stack(
@@ -873,6 +945,12 @@ class _SpeedCurvePainter extends CustomPainter {
   // 速度數據點列表
   final List<double> speedData;
 
+  // 添加一個標記，表示是否已滿寬度
+  final bool isFullWidth;
+
+  // 當前數據寬度比例
+  final double currentWidthPercentage;
+
   // 最小速度值（用於縮放）
   final double minSpeed;
 
@@ -893,14 +971,16 @@ class _SpeedCurvePainter extends CustomPainter {
     required this.minSpeed,
     required this.maxSpeed,
     required this.animationValue,
-    this.endAtPercent = 1.0,
+    this.endAtPercent = 0.7,
     required this.currentSpeed,
+    required this.isFullWidth,
+    required this.currentWidthPercentage,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 確保有數據可畫
-    if (speedData.isEmpty) return;
+    // 確保有數據可畫，並且尺寸有效
+    if (speedData.isEmpty || size.width <= 0 || size.height <= 0) return;
 
     // 計算縮放比例
     final double range = maxSpeed - minSpeed;
@@ -909,55 +989,45 @@ class _SpeedCurvePainter extends CustomPainter {
     // 創建路徑
     final path = Path();
 
-    // 計算實際結束位置
-    final double endX = size.width * endAtPercent;
-    if (endX <= 0) return; // 確保有效值
+    // 計算當前實際結束位置
+    final double currentEndX = size.width * currentWidthPercentage;
 
-    // 每個數據點之間的水平距離
-    final double stepX = endX / (speedData.length - 1);
+    // 每個數據點之間的水平距離 - 根據數據點數量和當前寬度計算
+    final double stepX = currentEndX / (speedData.length - 1);
 
-    // 初始位置 (右側開始，但不超過指定的結束位置)
-// 初始位置 (右側開始，但不超過指定的結束位置)
-    double startX = endX;
+    // 從左側開始繪製
+    double x = 0; // 起點在左側
 
-    // 計算終點的Y位置 - 直接使用當前速度
-    double normalizedValue = (currentSpeed - minSpeed) / range;
-    double startY = size.height - (normalizedValue * size.height);
-
-    // 移動到第一個點 (右側) - 這是白點的位置
-    path.moveTo(startX, startY);
-
-    // 從右到左逐點繪製曲線 - 使用更平滑的曲線
+    // 收集點
     final List<Offset> points = [];
 
-    // 首先收集所有點
-    points.add(Offset(startX, startY));
-
-    for (int i = speedData.length - 2; i >= 0; i--) {
-      // 計算X座標 (向左移動)
-      double x = startX - ((speedData.length - 1 - i) * stepX);
-
-      // 確保不超出左邊界
-      if (x < 0) break;
-
+    // 繪製所有數據點
+    for (int i = 0; i < speedData.length; i++) {
       // 計算Y座標
-      normalizedValue = (speedData[i] - minSpeed) / range;
-      double y = size.height - (normalizedValue * size.height);
+      final double normalizedValue = (speedData[i] - minSpeed) / range;
+      final double y = size.height - (normalizedValue * size.height);
 
       // 添加點
       points.add(Offset(x, y));
+
+      // 更新X座標
+      x += stepX;
     }
+
+    // 沒有足夠的點就直接返回
+    if (points.length < 2) return;
+
+    // 繪製路徑
+    path.moveTo(points[0].dx, points[0].dy);
 
     // 使用貝茲曲線平滑連接點
     if (points.length > 2) {
-      path.moveTo(points[0].dx, points[0].dy);
-
       for (int i = 0; i < points.length - 2; i++) {
         final Offset current = points[i];
         final Offset next = points[i + 1];
         final Offset nextNext = points[i + 2];
 
-        // 計算控制點 (比例為0.5，可以調整以改變曲線的平滑度)
+        // 計算控制點
         final double controlX1 = current.dx + (next.dx - current.dx) * 0.5;
         final double controlY1 = current.dy;
 
@@ -973,10 +1043,8 @@ class _SpeedCurvePainter extends CustomPainter {
       }
 
       // 連接最後兩個點
-      if (points.length >= 2) {
-        path.lineTo(points[points.length - 1].dx, points[points.length - 1].dy);
-      }
-    } else if (points.length == 2) {
+      path.lineTo(points[points.length - 1].dx, points[points.length - 1].dy);
+    } else {
       // 只有兩個點，直接連線
       path.lineTo(points[1].dx, points[1].dy);
     }
@@ -990,7 +1058,7 @@ class _SpeedCurvePainter extends CustomPainter {
           Color(0xFF00EEFF),
           Color.fromRGBO(255, 255, 255, 0.5),
         ],
-      ).createShader(Rect.fromLTWH(0, 0, endX, size.height));
+      ).createShader(Rect.fromLTWH(0, 0, currentEndX, size.height));
 
     // 創建發光效果的畫筆
     final glowPaint = Paint()
@@ -1001,7 +1069,7 @@ class _SpeedCurvePainter extends CustomPainter {
           Color(0xFF00EEFF),
           Color.fromRGBO(255, 255, 255, 0.5),
         ],
-      ).createShader(Rect.fromLTWH(0, 0, endX, size.height))
+      ).createShader(Rect.fromLTWH(0, 0, currentEndX, size.height))
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
 
     // 先繪製發光效果
