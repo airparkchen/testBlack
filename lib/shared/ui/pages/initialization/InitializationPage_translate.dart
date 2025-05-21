@@ -75,6 +75,9 @@ class _InitializationPageState extends State<InitializationPage> {
     final screenSize = MediaQuery
         .of(context)
         .size;
+    final screenWidth = screenSize.width;
+    final screenHeight = screenSize.height;
+    final wifiListHeight = screenHeight * 0.45; // 高度為螢幕高度的50%
 
     return Scaffold(
       backgroundColor: Colors.transparent, // 確保 Scaffold 是透明的
@@ -95,9 +98,8 @@ class _InitializationPageState extends State<InitializationPage> {
                 height: screenSize.height * 0.3,
                 child: WifiScannerComponent(
                   controller: _scannerController,
-                  maxDevicesToShow: 3,
-                  deviceBoxSize: 80,
-                  spacing: 20,
+                  maxDevicesToShow: 8,
+                  height: wifiListHeight,
                   onScanComplete: _handleScanComplete,
                   onDeviceSelected: _handleDeviceSelected,
                 ),

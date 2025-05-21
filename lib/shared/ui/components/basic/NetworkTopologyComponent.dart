@@ -44,6 +44,15 @@ class NetworkTopologyComponent extends StatefulWidget {
   /// 當設備被點擊時的回調
   final Function(NetworkDevice)? onDeviceSelected;
 
+  /// 路由器圖標構建器
+  final Widget Function()? routerIconBuilder;
+
+  /// 互聯網圖標構建器
+  final Widget Function()? internetIconBuilder;
+
+  /// 設備圖標構建器
+  final Widget Function(ConnectionType)? deviceIconBuilder;
+
   const NetworkTopologyComponent({
     Key? key,
     required this.gatewayName,
@@ -54,6 +63,9 @@ class NetworkTopologyComponent extends StatefulWidget {
     this.width = double.infinity,
     this.height = 400,
     this.onDeviceSelected,
+    this.routerIconBuilder,
+    this.internetIconBuilder,
+    this.deviceIconBuilder,
   }) : super(key: key);
 
   @override
@@ -369,6 +381,7 @@ class TopologyPainter extends CustomPainter {
   final bool showInternet;
   final LayoutConstants layoutConstants;
 
+
   TopologyPainter({
     required this.gatewayName,
     required this.devices,
@@ -399,7 +412,6 @@ class TopologyPainter extends CustomPainter {
           ConnectionType.wired
       );
     }
-
     // 繪製中央網關
     _drawGateway(canvas, center, gatewayName, totalConnectedDevices);
 
@@ -425,7 +437,6 @@ class TopologyPainter extends CustomPainter {
       _drawDevice(canvas, devicePosition, device, connectionCount);
     }
   }
-
   // 添加計算互聯網位置的方法
   Offset _calculateInternetPosition(Size size) {
     // 當設備數量為3或4時，互聯網位置也移到左側30%
@@ -462,118 +473,83 @@ class TopologyPainter extends CustomPainter {
 
   // 繪製互聯網圖標
   void _drawInternetIcon(Canvas canvas, Offset position) {
-    final paint = Paint()
-      ..color = Colors.grey[300]! // 使用淺灰色
+    // 繪製白色外框圓形
+    final outerCirclePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    // 繪製外圈白色圓形
+    canvas.drawCircle(position, layoutConstants.internetRadius, outerCirclePaint);
+
+    // 繪製背景半透明圓形
+    final innerCirclePaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
       ..style = PaintingStyle.fill;
 
-    // 繪製一個白色的圓形代表互聯網
-    canvas.drawCircle(position, layoutConstants.internetRadius, paint);
+    // 繪製內部半透明圓形，稍小一些
+    canvas.drawCircle(position, layoutConstants.internetRadius - 1, innerCirclePaint);
 
-    // 添加簡單的"地球"圖案
-    final borderPaint = Paint()
-      ..color = Colors.grey[600]!
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    // 繪製水平線
-    canvas.drawLine(
-        Offset(position.dx - 15, position.dy),
-        Offset(position.dx + 15, position.dy),
-        borderPaint
-    );
-
-    // 繪製垂直線
-    canvas.drawLine(
-        Offset(position.dx, position.dy - 15),
-        Offset(position.dx, position.dy + 15),
-        borderPaint
-    );
-
-    // 繪製橢圓
-    final rect = Rect.fromCenter(
+    // 繪製Internet圖標
+    final iconSize = layoutConstants.internetRadius * 1.2; // 稍大一些以便可見
+    final iconRect = Rect.fromCenter(
       center: position,
-      width: 30,
-      height: 20,
+      width: iconSize,
+      height: iconSize,
     );
-    canvas.drawOval(rect, borderPaint);
+
+    // 使用 Canvas.drawImage，但需要先在外部加載圖像
+    // 這部分將在外部處理，這裡先預留位置
   }
 
   // 繪製網關圖標
   void _drawGateway(Canvas canvas, Offset position, String name, int connectionCount) {
-    final paint = Paint()
-      ..color = Colors.black
+    // 繪製白色外框圓形
+    final outerCirclePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    // 繪製外圈白色圓形
+    canvas.drawCircle(position, layoutConstants.gatewayRadius, outerCirclePaint);
+
+    // 繪製背景半透明圓形
+    final innerCirclePaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
       ..style = PaintingStyle.fill;
 
-    // 繪製網關圓形
-    canvas.drawCircle(position, layoutConstants.gatewayRadius, paint);
+    // 繪製內部半透明圓形，稍小一些
+    canvas.drawCircle(position, layoutConstants.gatewayRadius - 1, innerCirclePaint);
 
     // 添加數字標籤，顯示連接的設備數量
     _drawLabel(canvas, position, connectionCount.toString(), Colors.white);
 
-    // 添加網關名稱標籤
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: name,
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: layoutConstants.nameFontSize,
-          fontWeight: FontWeight.bold,
-          backgroundColor: Colors.white.withOpacity(0.7),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-
-    textPainter.layout();
-
-    // 在網關下方顯示名稱
-    textPainter.paint(
-      canvas,
-      Offset(
-        position.dx - textPainter.width / 2,
-        position.dy + layoutConstants.gatewayRadius + 10, // 在圓形下方顯示
-      ),
-    );
+    // 網關圖標將在外部處理，這裡先預留位置
   }
 
   // 繪製設備圖標
   void _drawDevice(Canvas canvas, Offset position, NetworkDevice device, int connectionCount) {
-    final paint = Paint()
-      ..color = Colors.black
+    // 繪製白色外框圓形
+    final outerCirclePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    // 繪製外圈白色圓形
+    canvas.drawCircle(position, layoutConstants.deviceRadius, outerCirclePaint);
+
+    // 繪製背景半透明圓形
+    final innerCirclePaint = Paint()
+      ..color = Colors.purple.withOpacity(0.7) // 使用紫色背景
       ..style = PaintingStyle.fill;
 
-    // 繪製設備圓形
-    canvas.drawCircle(position, layoutConstants.deviceRadius, paint);
+    // 繪製內部半透明圓形，稍小一些
+    canvas.drawCircle(position, layoutConstants.deviceRadius - 1, innerCirclePaint);
 
     // 添加數字標籤 - 顯示連接的子設備數量
     _drawLabel(canvas, position, connectionCount.toString(), Colors.white);
 
-    // 註釋掉添加設備名稱標籤的部分，這樣就不會顯示設備名稱了
-    /*
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: device.name,
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: layoutConstants.nameFontSize,
-          fontWeight: FontWeight.bold,
-          backgroundColor: Colors.white.withOpacity(0.7),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-
-    textPainter.layout();
-
-    // 在設備下方顯示名稱
-    textPainter.paint(
-      canvas,
-      Offset(
-        position.dx - textPainter.width / 2,
-        position.dy + layoutConstants.deviceRadius + 10, // 在圓形下方顯示
-      ),
-    );
-    */
+    // 設備圖標將在外部處理，這裡先預留位置
   }
 
   // 繪製兩個圓形之間的連接線 (從圓周到圓周，而非圓心到圓心)
@@ -613,7 +589,7 @@ class TopologyPainter extends CustomPainter {
         : layoutConstants.wirelessLineWidth;
 
     final paint = Paint()
-      ..color = Colors.black
+      ..color = Colors.white // 使用白色連線
       ..strokeWidth = lineWidth;
 
     if (type == ConnectionType.wired) {
@@ -677,7 +653,7 @@ class TopologyPainter extends CustomPainter {
 
     // 添加一個小圓形作為標籤背景
     final labelPaint = Paint()
-      ..color = Colors.grey[400]!
+      ..color = Colors.purple.withOpacity(0.7) // 使用紫色背景
       ..style = PaintingStyle.fill;
 
     // 繪製標籤背景圓形
