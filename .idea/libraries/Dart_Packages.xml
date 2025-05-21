@@ -1102,7 +1102,7 @@
         <entry key="video_player_android">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/video_player_android-2.8.3/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/video_player_android-2.8.4/lib" />
             </list>
           </value>
         </entry>
@@ -1194,28 +1194,28 @@
         <entry key="webview_flutter">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter-4.11.0/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter-4.12.0/lib" />
             </list>
           </value>
         </entry>
         <entry key="webview_flutter_android">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_android-4.4.2/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_android-4.7.0/lib" />
             </list>
           </value>
         </entry>
         <entry key="webview_flutter_platform_interface">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_platform_interface-2.11.0/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_platform_interface-2.13.0/lib" />
             </list>
           </value>
         </entry>
         <entry key="webview_flutter_wkwebview">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_wkwebview-3.20.0/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_wkwebview-3.22.0/lib" />
             </list>
           </value>
         </entry>
@@ -1426,7 +1426,7 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/uuid-4.5.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/vector_math-2.1.4/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/video_player-2.9.5/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/video_player_android-2.8.3/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/video_player_android-2.8.4/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/video_player_avfoundation-2.7.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/video_player_platform_interface-6.3.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/video_player_web-2.3.5/lib" />
@@ -1440,10 +1440,10 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/web_socket_channel-3.0.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webdriver-3.0.4/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webkit_inspection_protocol-1.2.1/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter-4.11.0/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_android-4.4.2/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_platform_interface-2.11.0/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_wkwebview-3.20.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter-4.12.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_android-4.7.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_platform_interface-2.13.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/webview_flutter_wkwebview-3.22.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/wifi_scan-0.4.1+2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/win32-5.10.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/xdg_directories-1.1.0/lib" />

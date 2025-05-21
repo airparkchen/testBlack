@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:whitebox/shared/theme/app_theme.dart';
 
 class SetSSIDComponent extends StatefulWidget {
   final Function(String, String, String, bool)? onFormChanged;
@@ -30,7 +31,7 @@ class SetSSIDComponent extends StatefulWidget {
 class _SetSSIDComponentState extends State<SetSSIDComponent> {
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
+  final AppTheme _appTheme = AppTheme();
   String _selectedSecurityOption = ''; // Initial empty value, will be set to first option
   bool _passwordVisible = false;
   bool _showPasswordField = true;
@@ -225,209 +226,299 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     final screenSize = MediaQuery.of(context).size;
     final String? errorMessage = _getErrorMessage();
 
-    return Container(
+    // 使用 buildStandardCard 替代原始的 Container
+    return _appTheme.whiteBoxTheme.buildStandardCard(
       width: screenSize.width * 0.9,
-      // 不設置固定高度，使用 SingleChildScrollView 處理超出部分
-      color: const Color(0xFFEFEFEF),
-      padding: const EdgeInsets.all(25.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Set SSID',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 30),
-          Text(
-            'SSID',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.normal,
-              color: _isSsidError ? Colors.red : Colors.black,
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: TextFormField(
-              controller: _ssidController,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFFEFEFEF),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  borderSide: BorderSide(
-                    color: _isSsidError ? Colors.red : Colors.grey.shade400,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                  borderSide: BorderSide(
-                    color: _isSsidError ? Colors.red : Colors.grey.shade400,
-                  ),
-                ),
-              ),
-              style: TextStyle(
-                fontSize: 16,
-                color: _isSsidError ? Colors.red : Colors.black,
-              ),
-            ),
-          ),
-          if (_isSsidError)
-            Padding(
-              padding: const EdgeInsets.only(top: 4.0),
-              child: Text(
-                _ssidErrorText,
-                style: const TextStyle(
-                  color: Colors.red,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          const SizedBox(height: 30),
-          const Text(
-            'Security Option',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.normal,
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFEFEF),
-                borderRadius: BorderRadius.circular(2),
-              ),
-              child: DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: const Color(0xFFEFEFEF),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                style: const TextStyle(fontSize: 16, color: Colors.black),
-                value: _selectedSecurityOption,
-                icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
-                iconSize: 24,
-                elevation: 16,
-                dropdownColor: const Color(0xFFEFEFEF),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _selectedSecurityOption = newValue;
-                    });
-                    _updatePasswordVisibility();
-                    if (_showPasswordField) {
-                      _validatePassword();
-                    }
-                    _notifyFormChanged();
-                  }
-                },
-                items: widget.displayOptions.map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-          if (_showPasswordField) ...[
-            const SizedBox(height: 30),
-            Text(
-              'Password',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.normal,
-                color: _isPasswordError ? Colors.red : Colors.black,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: TextFormField(
-                controller: _passwordController,
-                obscureText: !_passwordVisible,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: const Color(0xFFEFEFEF),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(2),
-                    borderSide: BorderSide(
-                      color: _isPasswordError ? Colors.red : Colors.grey.shade400,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(2),
-                    borderSide: BorderSide(
-                      color: _isPasswordError ? Colors.red : Colors.grey.shade400,
-                    ),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _passwordVisible ? Icons.visibility : Icons.visibility_off,
-                      color: _isPasswordError ? Colors.red : Colors.grey,
-                      size: 20,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _passwordVisible = !_passwordVisible;
-                      });
-                    },
-                  ),
-                ),
+      height: _showPasswordField
+          ? screenSize.height * 0.5  // 顯示密碼欄位時，增加高度
+          : screenSize.height * 0.35, // 基本高度
+      child: Padding(
+        padding: const EdgeInsets.all(25.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Set SSID',
                 style: TextStyle(
-                  fontSize: 16,
-                  color: _isPasswordError ? Colors.red : Colors.black,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-            ),
-            if (_isPasswordError)
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: Text(
-                  _passwordErrorText,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-          ],
+              const SizedBox(height: 20),
 
-          // Display form error message if validation fails
-          if (errorMessage != null && !_validateForm()) ...[
-            const SizedBox(height: 20),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              color: Colors.red[50],
-              child: Text(
-                errorMessage,
-                style: const TextStyle(
-                  color: Colors.red,
-                  fontSize: 14,
+              // SSID 輸入欄位
+              _buildLabelAndField(
+                label: 'SSID',
+                isError: _isSsidError,
+                child: _buildTextField(
+                  controller: _ssidController,
+                  isError: _isSsidError,
+                ),
+                errorText: _isSsidError ? _ssidErrorText : null,
+              ),
+
+              const SizedBox(height: 20),
+
+              // 安全選項下拉選單
+              _buildLabelAndField(
+                label: 'Security Option',
+                isError: false,
+                child: _buildSecurityOptionDropdown(),
+              ),
+
+              // 如果需要顯示密碼欄位
+              if (_showPasswordField) ...[
+                const SizedBox(height: 20),
+
+                // 密碼輸入欄位
+                _buildLabelAndField(
+                  label: 'Password',
+                  isError: _isPasswordError,
+                  child: _buildPasswordField(
+                    controller: _passwordController,
+                    isVisible: _passwordVisible,
+                    isError: _isPasswordError,
+                  ),
+                  errorText: _isPasswordError ? _passwordErrorText : null,
+                ),
+              ],
+
+              // 顯示表單錯誤訊息
+              if (errorMessage != null && !_validateForm()) ...[
+                const SizedBox(height: 20),
+                _buildErrorContainer(errorMessage),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+// ========== 以下為輔助方法 ==========
+
+// 構建標籤和輸入字段
+  Widget _buildLabelAndField({
+    required String label,
+    required bool isError,
+    required Widget child,
+    String? errorText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.normal,
+            color: isError ? const Color(0xFFFF00E5) : Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        child,
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text(
+              errorText,
+              style: const TextStyle(
+                color: Color(0xFFFF00E5),
+                fontSize: 12,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+// 構建基本文本輸入框
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required bool isError,
+    bool obscureText = false,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: AppDimensions.inputHeight,
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: Colors.black.withOpacity(0.4),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(2),
+            borderSide: BorderSide(
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(2),
+            borderSide: BorderSide(
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(2),
+            borderSide: BorderSide(
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+            ),
+          ),
+        ),
+        style: TextStyle(
+          fontSize: 16,
+          color: isError ? const Color(0xFFFF00E5) : Colors.white,
+        ),
+      ),
+    );
+  }
+
+// 構建密碼輸入框
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required bool isVisible,
+    required bool isError,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: AppDimensions.inputHeight,
+      child: Stack(
+        children: [
+          TextFormField(
+            controller: controller,
+            obscureText: !isVisible,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.black.withOpacity(0.4),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(2),
+                borderSide: BorderSide(
+                  color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(2),
+                borderSide: BorderSide(
+                  color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(2),
+                borderSide: BorderSide(
+                  color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
                 ),
               ),
             ),
-          ],
+            style: TextStyle(
+              fontSize: 16,
+              color: isError ? const Color(0xFFFF00E5) : Colors.white,
+            ),
+          ),
+          Positioned(
+            right: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: IconButton(
+                icon: Icon(
+                  isVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  color: isError ? const Color(0xFFFF00E5) : Colors.white,
+                  size: 25,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _passwordVisible = !_passwordVisible;
+                  });
+                },
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+// 構建安全選項下拉選單
+  Widget _buildSecurityOptionDropdown() {
+    return SizedBox(
+      width: double.infinity,
+      height: AppDimensions.inputHeight,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(2),
+        ),
+        child: DropdownButtonFormField<String>(
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.black.withOpacity(0.4),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(2),
+              borderSide: BorderSide(
+                color: AppColors.primary.withOpacity(0.7),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(2),
+              borderSide: BorderSide(
+                color: AppColors.primary.withOpacity(0.7),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(2),
+              borderSide: BorderSide(
+                color: AppColors.primary.withOpacity(0.7),
+              ),
+            ),
+          ),
+          style: const TextStyle(fontSize: 16, color: Colors.white),
+          value: _selectedSecurityOption,
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+          iconSize: 24,
+          elevation: 16,
+          dropdownColor: Colors.black.withOpacity(0.8),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() {
+                _selectedSecurityOption = newValue;
+              });
+              _updatePasswordVisibility();
+              if (_showPasswordField) {
+                _validatePassword();
+              }
+              _notifyFormChanged();
+            }
+          },
+          items: widget.displayOptions.map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+// 構建錯誤容器
+  Widget _buildErrorContainer(String errorText) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      color: const Color(0xFFFF00E5).withOpacity(0.1),
+      child: Text(
+        errorText,
+        style: const TextStyle(
+          color: Color(0xFFFF00E5),
+          fontSize: 14,
+        ),
       ),
     );
   }

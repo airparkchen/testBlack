@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wifi_scan/wifi_scan.dart';
+import 'package:whitebox/shared/theme/app_theme.dart';
 
 // WiFi掃描元件回調函數類型
 typedef OnWifiScanComplete = void Function(List<WiFiAccessPoint> devices, String? error);
@@ -40,19 +41,17 @@ class WifiScannerComponent extends StatefulWidget {
   final OnWifiScanComplete? onScanComplete; // 掃描完成回調
   final OnDeviceSelected? onDeviceSelected; // 裝置選擇回調
   final bool autoScan; // 是否自動開始掃描
-  final double deviceBoxSize; // 裝置方框大小
-  final double spacing; // 間距
   final WifiScannerController? controller; // 控制器
+  final double height; // 控制卡片高度
 
   const WifiScannerComponent({
     Key? key,
-    this.maxDevicesToShow = 3,
+    this.maxDevicesToShow = 10,
     this.onScanComplete,
     this.onDeviceSelected,
     this.autoScan = true,
-    this.deviceBoxSize = 80,
-    this.spacing = 20,
     this.controller,
+    this.height = 400, // 預設高度較小
   }) : super(key: key);
 
   @override
@@ -63,6 +62,9 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
   List<WiFiAccessPoint> discoveredDevices = [];
   bool isScanning = false;
   String? errorMessage;
+
+  // 添加 AppTheme 實例
+  final AppTheme _appTheme = AppTheme();
 
   @override
   void initState() {
@@ -89,7 +91,6 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
     super.dispose();
   }
 
-  // 開始掃描 WiFi 裝置
   Future<void> startScan() async {
     // 避免重複掃描
     if (isScanning) return;
@@ -125,11 +126,21 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
       // 獲取掃描結果
       final results = await WiFiScan.instance.getScannedResults();
 
+      // 使用 Set 來過濾重複的 SSID
+      final seenSsids = <String>{};
+      final uniqueResults = <WiFiAccessPoint>[];
+
+      for (var result in results) {
+        if (result.ssid.isNotEmpty && seenSsids.add(result.ssid)) {
+          uniqueResults.add(result);
+        }
+      }
+
       // 按信號強度排序結果
-      results.sort((a, b) => b.level.compareTo(a.level));
+      uniqueResults.sort((a, b) => b.level.compareTo(a.level));
 
       // 僅保留前 N 個結果
-      final limitedResults = results.take(widget.maxDevicesToShow).toList();
+      final limitedResults = uniqueResults.take(widget.maxDevicesToShow).toList();
 
       setState(() {
         discoveredDevices = limitedResults;
@@ -156,8 +167,26 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
+    // 使用傳入的高度參數
+    double cardHeight = widget.height;
+
+    // 使用主題的 buildStandardCard 方法
+    return _appTheme.whiteBoxTheme.buildStandardCard(
+      width: screenSize.width * 0.9,
+      height: cardHeight,
+      child: _buildContent(),
+    );
+  }
+
+  Widget _buildContent() {
     if (isScanning) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Colors.white, // 使用白色以配合主題
+        ),
+      );
     }
 
     if (errorMessage != null) {
@@ -168,14 +197,14 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
             Text(
               errorMessage!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: Colors.red),
+              style: const TextStyle(fontSize: 14, color: Color(0xFFFF00E5)),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: startScan,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDDDDDD),
-                foregroundColor: Colors.black,
+                backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
+                foregroundColor: Colors.white,
               ),
               child: const Text('重試'),
             ),
@@ -189,38 +218,46 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         child: Text(
           'No device found\nPlease scan again',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 16),
+          style: TextStyle(fontSize: 16, color: Colors.white),
         ),
       );
     }
 
-    // 建立水平裝置列表，從左開始排列
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.only(left: widget.spacing),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: discoveredDevices.map((device) {
-          return Padding(
-            padding: EdgeInsets.only(right: widget.spacing),
-            child: _buildDeviceBox(device),
-          );
-        }).toList(),
+    // 使用 ListView 建立垂直列表
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0), // 僅水平方向添加填充
+      child: ListView.separated(
+        padding: EdgeInsets.zero, // 移除默認填充
+        itemCount: discoveredDevices.length,
+        separatorBuilder: (context, index) => Divider(
+          height: 1,
+          color: Colors.white.withOpacity(0.1), // 淡白色分隔線，與設計稿一致
+        ),
+        itemBuilder: (context, index) {
+          return _buildDeviceListItem(discoveredDevices[index]);
+        },
       ),
     );
   }
 
-  // 建立裝置方塊
-  Widget _buildDeviceBox(WiFiAccessPoint device) {
-    // 格式化 MAC 地址顯示 (BSSID)
-    String formattedBSSID = device.bssid;
-    // 如果 BSSID 格式是 "AA:BB:CC:DD:EE:FF"，只顯示後四個部分
-    if (formattedBSSID.contains(':') && formattedBSSID.split(':').length >= 4) {
-      List<String> parts = formattedBSSID.split(':');
-      formattedBSSID = '${parts[parts.length - 4]}:${parts[parts.length - 3]}:${parts[parts.length - 2]}:${parts[parts.length - 1]}';
+  // 建立裝置列表項
+  Widget _buildDeviceListItem(WiFiAccessPoint device) {
+    // 判斷是否有密碼（根據安全類型）
+    bool hasPassword = device.capabilities != null && device.capabilities.isNotEmpty;
+
+    // 計算 WiFi 信號強度圖示
+    int signalStrength = device.level;
+    IconData wifiIcon;
+
+    if (signalStrength >= -65) {
+      wifiIcon = Icons.wifi; // 強信號
+    } else if (signalStrength >= -75) {
+      wifiIcon = Icons.wifi_2_bar; // 中等信號
+    } else {
+      wifiIcon = Icons.wifi_1_bar; // 弱信號
     }
 
-    return GestureDetector(
+    return InkWell(
       onTap: () {
         // 觸發裝置選擇回調
         if (widget.onDeviceSelected != null) {
@@ -228,40 +265,44 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         }
       },
       child: Container(
-        width: widget.deviceBoxSize,
-        height: widget.deviceBoxSize,
-        decoration: BoxDecoration(
-          color: const Color(0xFFDDDDDD),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        height: 52, // 根據設計稿指定高度
+        child: Row(
           children: [
-            // 先顯示 "OLD" 文字，之後會替換成圖標
-            const Text(
-              'OLD',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
+            // 裝置信息
+            Expanded(
+              child: Text(
+                device.ssid.isNotEmpty ? device.ssid : '未知裝置',
+                style: const TextStyle(
+                  fontSize: 16, // 將字體調小
+                  color: Color.fromRGBO(255, 255, 255, 0.8), // 根據設計稿顏色
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(height: 6),
-            // 顯示 SSID（如果有的話）
-            Text(
-              device.ssid.isNotEmpty ? device.ssid : '未知裝置',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            // 顯示 MAC 地址
-            Text(
-              formattedBSSID,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 10, color: Colors.grey),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+
+// 顯示鎖頭圖標（如果有密碼）
+            if (hasPassword)
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: ColorFiltered(
+                  colorFilter: ColorFilter.mode(
+                    Colors.white.withOpacity(0.8),
+                    BlendMode.srcIn,
+                  ),
+                  child: Image.asset(
+                    'assets/images/icon/lock_icon.png',
+                    width: 16,
+                    height: 16,
+                  ),
+                ),
+              ),
+
+            // WiFi 信號強度圖標 - 放在右側
+            Icon(
+              wifiIcon,
+              color: Colors.white.withOpacity(0.8),
+              size: 20,
             ),
           ],
         ),

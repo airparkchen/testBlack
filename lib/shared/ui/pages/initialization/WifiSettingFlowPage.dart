@@ -17,6 +17,8 @@ import 'package:whitebox/shared/models/StaticIpConfig.dart';
 // 引入需要的 API 服務類
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 
+import '../../../theme/app_theme.dart';
+
 class WifiSettingFlowPage extends StatefulWidget {
   const WifiSettingFlowPage({super.key});
 
@@ -25,6 +27,7 @@ class WifiSettingFlowPage extends StatefulWidget {
 }
 
 class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
+  final AppTheme _appTheme = AppTheme();
   // 基本設定
   String currentModel = 'Micky';
   int currentStepIndex = 0;
@@ -1006,6 +1009,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   // 處理返回操作
   void _handleBack() {
     if (currentStepIndex > 0) {
+      // 如果不是第一步，則回到上一步
       _isUpdatingStep = true;
       setState(() {
         currentStepIndex--;
@@ -1019,6 +1023,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         curve: Curves.easeInOut,
       );
       _isUpdatingStep = false;
+    } else {
+      // 如果是第一步，則回到上一個頁面
+      Navigator.of(context).pop();
     }
   }
 
@@ -1048,105 +1055,6 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-        child: Column(
-          children: [
-            // Stepper 區域
-            Expanded(
-              flex: 30,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: StepperComponent(
-                  configPath: 'lib/shared/config/flows/initialization/wifi.json',
-                  modelType: currentModel,
-                  onStepChanged: _updateCurrentStep,
-                  controller: _stepperController,
-                  isLastStepCompleted: isLastStepCompleted,
-                ),
-              ),
-            ),
-            // 主內容區域
-            Expanded(
-              flex: 108,
-              child: isShowingFinishingWizard
-                  ? _buildFinishingWizard()
-                  : Column(
-                children: [
-                  // 步驟標題
-                  Expanded(
-                    flex: 12,
-                    child: Container(
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      child: Text(
-                        _getCurrentStepName(),
-                        style: const TextStyle(fontSize: 36, fontWeight: FontWeight.normal),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                  // 步驟內容
-                  Expanded(
-                    flex: 95,
-                    child: _buildPageView(),
-                  ),
-                ],
-              ),
-            ),
-            // 導航按鈕
-            if (!isShowingFinishingWizard)
-              Expanded(
-                flex: 38,
-                child: _buildNavigationButtons(),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 完成精靈介面
-  Widget _buildFinishingWizard() {
-    return Column(
-      children: [
-        Expanded(
-          flex: 12,
-          child: Container(
-            width: double.infinity,
-            alignment: Alignment.center,
-            child: Text(
-              'Finishing Wizard$_ellipsis',
-              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.normal),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-        Expanded(
-          flex: 95,
-          child: Center(
-            child: SingleChildScrollView(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-                child: FinishingWizardComponent(
-                  processNames: _processNames,
-                  totalDurationSeconds: 10,
-                  onCompleted: _handleWizardCompleted,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 獲取當前步驟名稱
   String _getCurrentStepName() {
     final steps = _getCurrentModelSteps();
     if (steps.isNotEmpty && currentStepIndex < steps.length) {
@@ -1155,158 +1063,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     return 'Step ${currentStepIndex + 1}';
   }
 
-  // 構建頁面視圖
-  Widget _buildPageView() {
-    final steps = _getCurrentModelSteps();
-    if (steps.isEmpty) {
-      return const Center(child: Text('沒有可用的步驟'));
-    }
-
-    return PageView.builder(
-      controller: _pageController,
-      physics: const ClampingScrollPhysics(),
-      itemCount: steps.length,
-      onPageChanged: (index) {
-        if (_isUpdatingStep || index == currentStepIndex) return;
-        _isUpdatingStep = true;
-        setState(() {
-          currentStepIndex = index;
-          isCurrentStepComplete = false;
-        });
-        _stepperController.jumpToStep(index);
-        _isUpdatingStep = false;
-      },
-      itemBuilder: (context, index) {
-        return SizedBox.expand(
-          child: _buildStepContent(index),
-        );
-      },
-    );
-  }
-
-  // 構建步驟內容
-  Widget _buildStepContent(int index) {
-    final componentNames = _getCurrentStepComponents(stepIndex: index);
-    final steps = _getCurrentModelSteps();
-
-    // 如果是最後一個步驟，顯示摘要
-    if (index == steps.length - 1) {
-      return SingleChildScrollView(
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-          child: SummaryComponent(
-            username: userName,
-            connectionType: connectionType,
-            ssid: ssid,
-            securityOption: securityOption,
-            password: ssidPassword,
-            staticIpConfig: connectionType == 'Static IP' ? staticIpConfig : null,
-            pppoeUsername: connectionType == 'PPPoE' ? pppoeUsername : null,
-            pppoePassword: connectionType == 'PPPoE' ? pppoePassword : null,
-            onNextPressed: _handleNext,
-            onBackPressed: _handleBack,
-          ),
-        ),
-      );
-    }
-
-    // 創建當前步驟的組件
-    List<Widget> components = [];
-    for (String componentName in componentNames) {
-      Widget? component = _createComponentByName(componentName);
-      if (component != null) {
-        components.add(component);
-      }
-    }
-
-    if (components.isNotEmpty) {
-      return SingleChildScrollView(
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: components,
-          ),
-        ),
-      );
-    }
-
-    // 沒有定義組件的步驟
-    return Container(
-      color: Colors.grey[200],
-      width: double.infinity,
-      height: double.infinity,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Step ${index + 1} Content',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          const Text('This step has no defined components. Please use the buttons below to continue.'),
-        ],
-      ),
-    );
-  }
-
-  // 構建導航按鈕
-  Widget _buildNavigationButtons() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Container(
-              height: 56,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                border: Border.all(color: Colors.grey[400]!),
-              ),
-              child: TextButton(
-                onPressed: currentStepIndex > 0 ? _handleBack : null,
-                child: const Text(
-                  'Back',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Container(
-              height: 56,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                border: Border.all(color: Colors.grey[400]!),
-              ),
-              child: TextButton(
-                onPressed: _handleNext,
-                child: const Text(
-                  'Next',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 根據名稱創建組件
+// 根據名稱創建組件
   Widget? _createComponentByName(String componentName) {
     List<String> detailOptions = _getStepDetailOptions();
 
@@ -1336,12 +1093,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
         );
-    // 在 _createComponentByName 方法中
       case 'SetSSIDComponent':
-      // 添加詳細日誌
-      //   print('創建SetSSIDComponent，傳入SSID: $ssid, 安全選項: $securityOption, 密碼長度: ${ssidPassword.length}');
-
-        // 在創建組件前，確保已調用獲取無線設置的方法
+      // 在創建組件前，確保已調用獲取無線設置的方法
         if (_currentWirelessSettings.isEmpty && !_isLoadingWirelessSettings) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _loadWirelessSettings();
@@ -1374,5 +1127,408 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         print('不支援的組件名稱: $componentName');
         return null;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 獲取螢幕尺寸
+    final screenSize = MediaQuery.of(context).size;
+    final screenHeight = screenSize.height;
+    final screenWidth = screenSize.width;
+
+    // ===== 全域比例設定 =====
+    // 主要區域高度比例
+    final stepperAreaHeightRatio = 0.17; // Stepper區域佔總高度的17%
+    final contentAreaHeightRatio = 0.55; // 內容區域佔總高度的55%
+    final navigationAreaHeightRatio = 0.15; // 導航按鈕區域佔總高度的15%
+
+    // 內容區域內部比例
+    final titleHeightRatio = 0.07; // 標題區域佔總高度的7%
+    final contentHeightRatio = 0.45; // 內容區域佔總高度的45%
+
+    // 間距和內邊距比例
+    final horizontalPaddingRatio = 0.06; // 水平內邊距為螢幕寬度的6%
+    final verticalPaddingRatio = 0.025; // 垂直內邊距為螢幕高度的2.5%
+    final itemSpacingRatio = 0.025; // 元素間距為螢幕高度的2.5%
+    final buttonSpacingRatio = 0.05; // 按鈕間距為螢幕寬度的5%
+
+    // 字體大小比例
+    final titleFontSizeRatio = 0.042; // 標題字體大小為螢幕高度的4.2%
+    final subtitleFontSizeRatio = 0.028; // 副標題字體大小為螢幕高度的2.8%
+    final bodyTextFontSizeRatio = 0.018; // 正文字體大小為螢幕高度的1.8%
+    final buttonTextFontSizeRatio = 0.022; // 按鈕字體大小為螢幕高度的2.2%
+    final smallTextFontSizeRatio = 0.016; // 小字體大小為螢幕高度的1.6%
+
+    // 按鈕尺寸比例
+    final buttonHeightRatio = 0.07; // 按鈕高度為螢幕高度的7%
+    final buttonBorderRadiusRatio = 0.01; // 按鈕圓角為螢幕高度的1%
+
+    // ===== 計算實際尺寸 =====
+    // 主要區域高度
+    final stepperAreaHeight = screenHeight * stepperAreaHeightRatio;
+    final contentAreaHeight = screenHeight * contentAreaHeightRatio;
+    final navigationAreaHeight = screenHeight * navigationAreaHeightRatio;
+
+    // 內容區域內部高度
+    final titleHeight = screenHeight * titleHeightRatio;
+    final contentHeight = screenHeight * contentHeightRatio;
+
+    // 間距和內邊距
+    final horizontalPadding = screenWidth * horizontalPaddingRatio;
+    final verticalPadding = screenHeight * verticalPaddingRatio;
+    final itemSpacing = screenHeight * itemSpacingRatio;
+    final buttonSpacing = screenWidth * buttonSpacingRatio;
+
+    // 字體大小
+    final titleFontSize = screenHeight * titleFontSizeRatio;
+    final subtitleFontSize = screenHeight * subtitleFontSizeRatio;
+    final bodyTextFontSize = screenHeight * bodyTextFontSizeRatio;
+    final buttonTextFontSize = screenHeight * buttonTextFontSizeRatio;
+    final smallTextFontSize = screenHeight * smallTextFontSizeRatio;
+
+    // 按鈕尺寸
+    final buttonHeight = screenHeight * buttonHeightRatio;
+    final buttonBorderRadius = screenHeight * buttonBorderRadiusRatio;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+        child: Column(
+          children: [
+            // Stepper 區域 - 使用螢幕比例
+            Container(
+              height: stepperAreaHeight,
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: StepperComponent(
+                configPath: 'lib/shared/config/flows/initialization/wifi.json',
+                modelType: currentModel,
+                onStepChanged: _updateCurrentStep,
+                controller: _stepperController,
+                isLastStepCompleted: isLastStepCompleted,
+              ),
+            ),
+
+            // 主內容區域 - 使用螢幕比例
+            Container(
+              height: contentAreaHeight,
+              child: isShowingFinishingWizard
+                  ? _buildFinishingWizard(
+                titleHeight: titleHeight,
+                contentHeight: contentHeight,
+                titleFontSize: titleFontSize,
+                horizontalPadding: horizontalPadding,
+                verticalPadding: verticalPadding,
+              )
+                  : Column(
+                children: [
+                  // 步驟標題
+                  Container(
+                    height: titleHeight,
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    child: Text(
+                      _getCurrentStepName(),
+                      style: TextStyle(
+                        fontSize: titleFontSize,
+                        fontWeight: FontWeight.normal,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+
+                  // 步驟內容
+                  Expanded(
+                    child: _buildPageView(
+                      horizontalPadding: horizontalPadding,
+                      verticalPadding: verticalPadding,
+                      itemSpacing: itemSpacing,
+                      subtitleFontSize: subtitleFontSize,
+                      bodyTextFontSize: bodyTextFontSize,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // 導航按鈕區域 - 使用螢幕比例
+            if (!isShowingFinishingWizard)
+              Container(
+                height: navigationAreaHeight,
+                child: _buildNavigationButtons(
+                  buttonHeight: buttonHeight,
+                  buttonSpacing: buttonSpacing,
+                  horizontalPadding: horizontalPadding,
+                  buttonBorderRadius: buttonBorderRadius,
+                  buttonTextFontSize: buttonTextFontSize,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// 完成精靈介面 - 使用比例尺寸
+  Widget _buildFinishingWizard({
+    required double titleHeight,
+    required double contentHeight,
+    required double titleFontSize,
+    required double horizontalPadding,
+    required double verticalPadding,
+  }) {
+    return Column(
+      children: [
+        // 標題
+        Container(
+          height: titleHeight,
+          width: double.infinity,
+          alignment: Alignment.center,
+          child: Text(
+            'Finishing Wizard$_ellipsis',
+            style: TextStyle(
+              fontSize: titleFontSize,
+              fontWeight: FontWeight.normal,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        // 內容
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
+                  vertical: verticalPadding,
+                ),
+                child: FinishingWizardComponent(
+                  processNames: _processNames,
+                  totalDurationSeconds: 10,
+                  onCompleted: _handleWizardCompleted,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+// 構建頁面視圖 - 確保內容可滾動
+  Widget _buildPageView({
+    required double horizontalPadding,
+    required double verticalPadding,
+    required double itemSpacing,
+    required double subtitleFontSize,
+    required double bodyTextFontSize,
+  }) {
+    final steps = _getCurrentModelSteps();
+    if (steps.isEmpty) {
+      return Center(
+        child: Text(
+          '沒有可用的步驟',
+          style: TextStyle(
+            fontSize: bodyTextFontSize,
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+
+    return PageView.builder(
+      controller: _pageController,
+      physics: const ClampingScrollPhysics(),
+      itemCount: steps.length,
+      onPageChanged: (index) {
+        if (_isUpdatingStep || index == currentStepIndex) return;
+        _isUpdatingStep = true;
+        setState(() {
+          currentStepIndex = index;
+          isCurrentStepComplete = false;
+        });
+        _stepperController.jumpToStep(index);
+        _isUpdatingStep = false;
+      },
+      itemBuilder: (context, index) {
+        return _buildStepContent(
+          index,
+          horizontalPadding: horizontalPadding,
+          verticalPadding: verticalPadding,
+          itemSpacing: itemSpacing,
+          subtitleFontSize: subtitleFontSize,
+          bodyTextFontSize: bodyTextFontSize,
+        );
+      },
+    );
+  }
+
+// 構建步驟內容 - 確保內容可滾動
+  Widget _buildStepContent(
+      int index, {
+        required double horizontalPadding,
+        required double verticalPadding,
+        required double itemSpacing,
+        required double subtitleFontSize,
+        required double bodyTextFontSize,
+      }) {
+    final componentNames = _getCurrentStepComponents(stepIndex: index);
+    final steps = _getCurrentModelSteps();
+
+    // 內容的內邊距
+    final contentPadding = EdgeInsets.symmetric(
+      horizontal: horizontalPadding,
+      vertical: verticalPadding,
+    );
+
+    // 如果是最後一個步驟，顯示摘要
+    if (index == steps.length - 1) {
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          width: double.infinity,
+          padding: contentPadding,
+          child: SummaryComponent(
+            username: userName,
+            connectionType: connectionType,
+            ssid: ssid,
+            securityOption: securityOption,
+            password: ssidPassword,
+            staticIpConfig: connectionType == 'Static IP' ? staticIpConfig : null,
+            pppoeUsername: connectionType == 'PPPoE' ? pppoeUsername : null,
+            pppoePassword: connectionType == 'PPPoE' ? pppoePassword : null,
+            onNextPressed: _handleNext,
+            onBackPressed: _handleBack,
+          ),
+        ),
+      );
+    }
+
+    // 創建當前步驟的組件
+    List<Widget> components = [];
+    for (String componentName in componentNames) {
+      Widget? component = _createComponentByName(componentName);
+      if (component != null) {
+        components.add(component);
+      }
+    }
+
+    if (components.isNotEmpty) {
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          width: double.infinity,
+          padding: contentPadding,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: components,
+          ),
+        ),
+      );
+    }
+
+    // 沒有定義組件的步驟
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Container(
+        width: double.infinity,
+        padding: contentPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Step ${index + 1} Content',
+              style: TextStyle(
+                fontSize: subtitleFontSize,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: itemSpacing),
+            Text(
+              'This step has no defined components. Please use the buttons below to continue.',
+              style: TextStyle(
+                fontSize: bodyTextFontSize,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// Back Next 按鈕實現 - 使用比例尺寸
+  Widget _buildNavigationButtons({
+    required double buttonHeight,
+    required double buttonSpacing,
+    required double horizontalPadding,
+    required double buttonBorderRadius,
+    required double buttonTextFontSize,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(horizontalPadding),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // 返回按鈕使用新的紫色邊框樣式
+          Expanded(
+            child: GestureDetector(
+              onTap: _handleBack,
+              child: Container(
+                width: double.infinity,
+                height: buttonHeight,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(buttonBorderRadius),
+                  color: const Color(0xFF9747FF).withOpacity(0.2), // 紫色填充顏色帶透明度
+                  border: Border.all(
+                    color: const Color(0xFF9747FF), // 紫色邊框
+                    width: 1.0,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    'Back',
+                    style: TextStyle(
+                      fontSize: buttonTextFontSize,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: buttonSpacing),
+          // 下一步按鈕保持不變
+          Expanded(
+            child: GestureDetector(
+              onTap: _handleNext,
+              child: _appTheme.whiteBoxTheme.buildSimpleColorButton(
+                width: double.infinity,
+                height: buttonHeight,
+                borderRadius: BorderRadius.circular(buttonBorderRadius),
+                child: Center(
+                  child: Text(
+                    'Next',
+                    style: TextStyle(
+                      fontSize: buttonTextFontSize,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

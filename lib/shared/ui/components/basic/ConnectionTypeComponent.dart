@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:whitebox/shared/models/StaticIpConfig.dart';
+import 'package:whitebox/shared/theme/app_theme.dart';
 
 // 定義 PPPoE 配置類
 class PPPoEConfig {
@@ -49,6 +50,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   StaticIpConfig _staticIpConfig = StaticIpConfig();
   PPPoEConfig _pppoeConfig = PPPoEConfig(); // Added PPPoE configuration
 
+  final AppTheme _appTheme = AppTheme();
   // Controllers for IP-related inputs
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _subnetController = TextEditingController();
@@ -387,22 +389,18 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     final String? staticIpError = _getErrorMessage();
     final String? pppoeError = _getPppoeErrorMessage();
 
-    // 移除固定高度，改用 ConstrainedBox 限制最小高度
-    return Container(
+    // 使用 buildStandardCard 替代原始的 Container
+    return _appTheme.whiteBoxTheme.buildStandardCard(
       width: screenSize.width * 0.9, // 寬度 90%
-      color: const Color(0xFFEFEFEF),
-      padding: const EdgeInsets.all(25.0),
-      // 使用 LayoutBuilder 來獲取父容器約束
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          // 計算可用高度
-          final availableHeight = constraints.maxHeight;
-
-          return LimitedBox(
-            maxHeight: _selectedConnectionType == 'Static IP' || _selectedConnectionType == 'PPPoE'
-                ? screenSize.height * 0.75  // 靜態 IP 或 PPPoE 時，增加最大高度限制
-                : screenSize.height * 0.25,
-            child: SingleChildScrollView(
+      height: _selectedConnectionType == 'Static IP' || _selectedConnectionType == 'PPPoE'
+          ? screenSize.height * 0.75  // 靜態 IP 或 PPPoE 時，增加高度
+          : screenSize.height * 0.25,  // 基本高度
+      child: Padding(
+        padding: const EdgeInsets.all(25.0),
+        // 使用 LayoutBuilder 來獲取父容器約束
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            return SingleChildScrollView(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(), // 確保始終可滾動
               child: ConstrainedBox(
@@ -421,6 +419,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -429,201 +428,60 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.normal,
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      SizedBox(
-                        width: screenSize.width * 0.9, // 限制輸入框寬度，適應縮放
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFEFEF),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          child: DropdownButtonFormField<String>(
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: const Color(0xFFEFEFEF),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                            style: const TextStyle(fontSize: 16, color: Colors.black),
-                            value: _selectedConnectionType,
-                            icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
-                            iconSize: 24,
-                            elevation: 16,
-                            dropdownColor: const Color(0xFFEFEFEF),
-                            onChanged: (String? newValue) {
-                              if (newValue != null && newValue != _selectedConnectionType) {
-                                setState(() {
-                                  _selectedConnectionType = newValue;
-                                  _isFormComplete = (newValue != 'Static IP') && (newValue != 'PPPoE'); // 如果不是靜態 IP 或 PPPoE，則表單完成
-
-                                  // 重置所有錯誤狀態
-                                  _isIpError = false;
-                                  _isSubnetError = false;
-                                  _isGatewayError = false;
-                                  _isPrimaryDnsError = false;
-                                  _isSecondaryDnsError = false;
-                                  _isPppoeUsernameError = false;
-                                  _isPppoePasswordError = false;
-                                });
-                                _notifySelectionChanged();
-                              }
-                            },
-                            items: widget.displayOptions.map<DropdownMenuItem<String>>((String value) {
-                              return DropdownMenuItem<String>(
-                                value: value,
-                                child: Text(value),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
+                      _buildConnectionTypeDropdown(screenSize),
 
                       // 如果選擇了 Static IP，顯示額外的輸入欄位
                       if (_selectedConnectionType == 'Static IP') ...[
                         const SizedBox(height: 20),
 
                         // IP Address
-                        Text(
-                          'IP Address',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.normal,
-                            color: _isIpError ? Colors.red : Colors.black,
-                          ),
+                        _buildLabelAndField(
+                          label: 'IP Address',
+                          isError: _isIpError,
+                          child: _buildIpInputField(_ipController, '            .            .            .            ', _isIpError),
+                          errorText: _isIpError ? _ipErrorText : null,
                         ),
-                        const SizedBox(height: 8),
-                        _buildIpInputField(_ipController, '            .            .            .            ', _isIpError),
-                        if (_isIpError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              _ipErrorText,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
 
                         const SizedBox(height: 20),
 
                         // Subnet Mask
-                        Text(
-                          'IP Subnet Mask',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.normal,
-                            color: _isSubnetError ? Colors.red : Colors.black,
-                          ),
+                        _buildLabelAndField(
+                          label: 'IP Subnet Mask',
+                          isError: _isSubnetError,
+                          child: _buildIpInputField(_subnetController, '            .            .            .            ', _isSubnetError),
+                          errorText: _isSubnetError ? _subnetErrorText : null,
                         ),
-                        const SizedBox(height: 8),
-                        _buildIpInputField(_subnetController, '            .            .            .            ', _isSubnetError),
-                        if (_isSubnetError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              _subnetErrorText,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
 
                         const SizedBox(height: 20),
 
                         // Gateway
-                        Text(
-                          'Gateway IP Address',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.normal,
-                            color: _isGatewayError ? Colors.red : Colors.black,
-                          ),
+                        _buildLabelAndField(
+                          label: 'Gateway IP Address',
+                          isError: _isGatewayError,
+                          child: _buildIpInputField(_gatewayController, '            .            .            .            ', _isGatewayError),
+                          errorText: _isGatewayError ? _gatewayErrorText : null,
                         ),
-                        const SizedBox(height: 8),
-                        _buildIpInputField(_gatewayController, '            .            .            .            ', _isGatewayError),
-                        if (_isGatewayError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              _gatewayErrorText,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
 
                         const SizedBox(height: 20),
 
                         // Primary DNS
-                        Text(
-                          'Primary DNS',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.normal,
-                            color: _isPrimaryDnsError ? Colors.red : Colors.black,
-                          ),
+                        _buildLabelAndField(
+                          label: 'Primary DNS',
+                          isError: _isPrimaryDnsError,
+                          child: _buildIpInputField(_primaryDnsController, '            .            .            .            ', _isPrimaryDnsError),
+                          errorText: _isPrimaryDnsError ? _primaryDnsErrorText : null,
                         ),
-                        const SizedBox(height: 8),
-                        _buildIpInputField(_primaryDnsController, '            .            .            .            ', _isPrimaryDnsError),
-                        if (_isPrimaryDnsError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              _primaryDnsErrorText,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
 
-                        const SizedBox(height: 20),
-
-                        // Secondary DNS (Optional)
-                        // Text(
-                        //   'Secondary DNS (Optional)',
-                        //   style: TextStyle(
-                        //     fontSize: 18,
-                        //     fontWeight: FontWeight.normal,
-                        //     color: _isSecondaryDnsError ? Colors.red : Colors.black,
-                        //   ),
-                        // ),
-                        // const SizedBox(height: 8),
-                        // _buildIpInputField(_secondaryDnsController, '            .            .            .            ', _isSecondaryDnsError),
-                        // if (_isSecondaryDnsError)
-                        //   Padding(
-                        //     padding: const EdgeInsets.only(top: 4.0),
-                        //     child: Text(
-                        //       _secondaryDnsErrorText,
-                        //       style: const TextStyle(
-                        //         color: Colors.red,
-                        //         fontSize: 12,
-                        //       ),
-                        //     ),
-                        //   ),
+                        // Secondary DNS (Optional) 已被註釋掉，保持原樣
 
                         // 顯示表單錯誤訊息
                         if (staticIpError != null && !_isFormComplete) ...[
                           const SizedBox(height: 20),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(10),
-                            color: Colors.red[50],
-                            child: Text(
-                              staticIpError,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
+                          _buildErrorContainer(staticIpError),
                         ],
 
                         // 添加額外的底部空間，確保滾動到底部時看得到最後一個輸入框
@@ -635,179 +493,308 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
                         const SizedBox(height: 20),
 
                         // 用戶名
-                        Text(
-                          'User',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.normal,
-                            color: _isPppoeUsernameError ? Colors.red : Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: TextFormField(
+                        _buildLabelAndField(
+                          label: 'User',
+                          isError: _isPppoeUsernameError,
+                          child: _buildPppoeTextField(
                             controller: _pppoeUsernameController,
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: const Color(0xFFEFEFEF),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                                borderSide: BorderSide(
-                                  color: _isPppoeUsernameError ? Colors.red : Colors.grey.shade400,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                                borderSide: BorderSide(
-                                  color: _isPppoeUsernameError ? Colors.red : Colors.grey.shade400,
-                                ),
-                              ),
-                            ),
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: _isPppoeUsernameError ? Colors.red : Colors.black,
-                            ),
+                            isError: _isPppoeUsernameError,
                           ),
+                          errorText: _isPppoeUsernameError ? _pppoeUsernameErrorText : null,
                         ),
-                        if (_isPppoeUsernameError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              _pppoeUsernameErrorText,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
 
                         const SizedBox(height: 20),
 
                         // 密碼
-                        Text(
-                          'Password',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.normal,
-                            color: _isPppoePasswordError ? Colors.red : Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: TextFormField(
+                        _buildLabelAndField(
+                          label: 'Password',
+                          isError: _isPppoePasswordError,
+                          child: _buildPppoePasswordField(
                             controller: _pppoePasswordController,
-                            obscureText: !_pppoePasswordVisible,
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: const Color(0xFFEFEFEF),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                                borderSide: BorderSide(
-                                  color: _isPppoePasswordError ? Colors.red : Colors.grey.shade400,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                                borderSide: BorderSide(
-                                  color: _isPppoePasswordError ? Colors.red : Colors.grey.shade400,
-                                ),
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _pppoePasswordVisible ? Icons.visibility : Icons.visibility_off,
-                                  color: _isPppoePasswordError ? Colors.red : Colors.grey,
-                                  size: 20,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _pppoePasswordVisible = !_pppoePasswordVisible;
-                                  });
-                                },
-                              ),
-                            ),
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: _isPppoePasswordError ? Colors.red : Colors.black,
-                            ),
+                            isVisible: _pppoePasswordVisible,
+                            isError: _isPppoePasswordError,
                           ),
+                          errorText: _isPppoePasswordError ? _pppoePasswordErrorText : null,
                         ),
-                        if (_isPppoePasswordError)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              _pppoePasswordErrorText,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
 
                         // 顯示表單錯誤訊息
                         if (pppoeError != null && !_isFormComplete) ...[
                           const SizedBox(height: 20),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(10),
-                            color: Colors.red[50],
-                            child: Text(
-                              pppoeError,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
+                          _buildErrorContainer(pppoeError),
                         ],
 
                         // 添加額外的底部空間，確保滾動到底部時看得到最後一個輸入框
                         const SizedBox(height: 250),
-                      ],
+                      ]
                     ],
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
 
-  // 構建一體式 IP 輸入欄位，包含點分隔顯示
-  Widget _buildIpInputField(TextEditingController controller, String hintText, bool isError) {
+// ========== 以下為輔助方法 ==========
+
+// 構建連接類型下拉選擇框
+  Widget _buildConnectionTypeDropdown(Size screenSize) {
+    return SizedBox(
+      width: screenSize.width * 0.9,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(2),
+        ),
+        child: DropdownButtonFormField<String>(
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.black.withOpacity(0.4),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(2),
+              borderSide: BorderSide(
+                color: AppColors.primary.withOpacity(0.7),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(2),
+              borderSide: BorderSide(
+                color: AppColors.primary.withOpacity(0.7),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(2),
+              borderSide: BorderSide(
+                color: AppColors.primary.withOpacity(0.7),
+              ),
+            ),
+          ),
+          style: const TextStyle(fontSize: 16, color: Colors.white),
+          value: _selectedConnectionType,
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+          iconSize: 24,
+          elevation: 16,
+          dropdownColor: Colors.black.withOpacity(0.8),
+          onChanged: (String? newValue) {
+            if (newValue != null && newValue != _selectedConnectionType) {
+              setState(() {
+                _selectedConnectionType = newValue;
+                _isFormComplete = (newValue != 'Static IP') && (newValue != 'PPPoE');
+
+                // 重置所有錯誤狀態
+                _isIpError = false;
+                _isSubnetError = false;
+                _isGatewayError = false;
+                _isPrimaryDnsError = false;
+                _isSecondaryDnsError = false;
+                _isPppoeUsernameError = false;
+                _isPppoePasswordError = false;
+              });
+              _notifySelectionChanged();
+            }
+          },
+          items: widget.displayOptions.map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+// 構建標籤和輸入字段
+  Widget _buildLabelAndField({
+    required String label,
+    required bool isError,
+    required Widget child,
+    String? errorText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.normal,
+            color: isError ? const Color(0xFFFF00E5) : Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        child,
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text(
+              errorText,
+              style: const TextStyle(
+                color: Color(0xFFFF00E5),
+                fontSize: 12,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+// 構建錯誤容器
+  Widget _buildErrorContainer(String errorText) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      color: const Color(0xFFFF00E5).withOpacity(0.1),
+      child: Text(
+        errorText,
+        style: const TextStyle(
+          color: Color(0xFFFF00E5),
+          fontSize: 14,
+        ),
+      ),
+    );
+  }
+
+// 構建 PPPoE 文本輸入框
+  Widget _buildPppoeTextField({
+    required TextEditingController controller,
+    required bool isError,
+    bool obscureText = false,
+  }) {
     return SizedBox(
       width: double.infinity,
+      height: AppDimensions.inputHeight,
       child: TextFormField(
         controller: controller,
-        keyboardType: TextInputType.number,
+        obscureText: obscureText,
         decoration: InputDecoration(
           filled: true,
-          fillColor: const Color(0xFFEFEFEF),
+          fillColor: Colors.black.withOpacity(0.4),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(2),
+            borderSide: BorderSide(
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+            ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(2),
             borderSide: BorderSide(
-              color: isError ? Colors.red : Colors.grey.shade400,
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
             ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(2),
             borderSide: BorderSide(
-              color: isError ? Colors.red : Colors.grey.shade400,
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+            ),
+          ),
+        ),
+        style: TextStyle(
+          fontSize: 16,
+          color: isError ? const Color(0xFFFF00E5) : Colors.white,
+        ),
+      ),
+    );
+  }
+
+// 構建 PPPoE 密碼輸入框
+  Widget _buildPppoePasswordField({
+    required TextEditingController controller,
+    required bool isVisible,
+    required bool isError,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: AppDimensions.inputHeight,
+      child: Stack(
+        children: [
+          TextFormField(
+            controller: controller,
+            obscureText: !isVisible,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.black.withOpacity(0.4),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(2),
+                borderSide: BorderSide(
+                  color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(2),
+                borderSide: BorderSide(
+                  color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(2),
+                borderSide: BorderSide(
+                  color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+                ),
+              ),
+            ),
+            style: TextStyle(
+              fontSize: 16,
+              color: isError ? const Color(0xFFFF00E5) : Colors.white,
+            ),
+          ),
+          Positioned(
+            right: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: IconButton(
+                icon: Icon(
+                  isVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  color: isError ? const Color(0xFFFF00E5) : Colors.white,
+                  size: 25,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _pppoePasswordVisible = !_pppoePasswordVisible;
+                  });
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// 構建一體式 IP 輸入欄位，包含點分隔顯示
+  Widget _buildIpInputField(TextEditingController controller, String hintText, bool isError) {
+    return SizedBox(
+      width: double.infinity,
+      height: AppDimensions.inputHeight,
+      child: TextFormField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: Colors.black.withOpacity(0.4),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(2),
+            borderSide: BorderSide(
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(2),
+            borderSide: BorderSide(
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(2),
+            borderSide: BorderSide(
+              color: isError ? const Color(0xFFFF00E5) : AppColors.primary.withOpacity(0.7),
             ),
           ),
           hintText: hintText,
@@ -815,7 +802,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
         ),
         style: TextStyle(
           fontSize: 16,
-          color: isError ? Colors.red : Colors.black,
+          color: isError ? const Color(0xFFFF00E5) : Colors.white,
         ),
         inputFormatters: [
           _IpAddressInputFormatter(),

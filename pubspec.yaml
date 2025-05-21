@@ -101,6 +101,9 @@ flutter:
   assets:
     - lib/shared/config/flows/initialization/wifi.json  # WiFi 初始化配置檔案
     - lib/shared/config/api/wifi.json
+    - assets/images/
+    - assets/images/icon/
+
   # 字體配置
   fonts:
     - family: Segoe UI

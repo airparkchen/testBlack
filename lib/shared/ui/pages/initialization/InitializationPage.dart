@@ -3,7 +3,7 @@ import 'package:wifi_scan/wifi_scan.dart';
 import 'package:whitebox/shared/ui/pages/initialization/QrCodeScannerPage.dart';
 import 'package:whitebox/shared/ui/components/basic/WifiScannerComponent.dart';
 import 'package:whitebox/shared/ui/pages/initialization/WifiSettingFlowPage.dart';
-import 'package:whitebox/shared/theme/app_theme.dart'; // 引入 AppTheme
+import 'package:whitebox/shared/theme/app_theme.dart';
 
 class InitializationPage extends StatefulWidget {
   const InitializationPage({super.key});
@@ -38,9 +38,45 @@ class _InitializationPageState extends State<InitializationPage> {
     }
   }
 
+  // 建立使用圖片的功能按鈕
+  Widget _buildImageActionButton({
+    required String label,
+    required String imagePath,
+    required VoidCallback onPressed,
+    required double width,
+    required double height,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: _appTheme.whiteBoxTheme.buildStandardCard(
+        width: width, // 使用比例計算的寬度
+        height: height, // 使用比例計算的高度
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              imagePath,
+              width: height * 0.45, // 圖片寬度為按鈕高度的45%
+              height: height * 0.45, // 圖片高度為按鈕高度的45%
+              color: Colors.white,
+            ),
+            SizedBox(height: height * 0.02), // 間距為按鈕高度的2%
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: height * 0.1, // 字體大小為按鈕高度的10%
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // 處理裝置選擇
   void _handleDeviceSelected(WiFiAccessPoint device) {
-    // 現在當選擇裝置時，直接導航到 WifiSettingFlowPage
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const WifiSettingFlowPage()),
@@ -55,7 +91,6 @@ class _InitializationPageState extends State<InitializationPage> {
     );
 
     if (result != null) {
-      // 處理 QR 碼掃描結果
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('QR 碼掃描結果: $result')),
       );
@@ -72,69 +107,92 @@ class _InitializationPageState extends State<InitializationPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery
-        .of(context)
-        .size;
+    // 獲取螢幕尺寸
+    final screenSize = MediaQuery.of(context).size;
+    final screenWidth = screenSize.width;
+    final screenHeight = screenSize.height;
+
+    // 計算各元素尺寸與位置
+    final buttonWidth = screenWidth * 0.25; // 按鈕寬度為螢幕寬度的25%
+    final buttonHeight = buttonWidth; // 按鈕為正方形
+    final buttonSpacing = screenWidth * 0.08; // 按鈕間距為螢幕寬度的8%
+
+    // 頂部按鈕距離頂部的比例
+    final topButtonsTopPosition = screenHeight * 0.12; // 大約佔螢幕高度的12%
+    final topButtonsLeftPosition = screenWidth * 0.05; // 左側邊距為螢幕寬度的5%
+
+    // WiFi列表區域的位置與尺寸
+    final wifiListTopPosition = screenHeight * 0.28; // 大約佔螢幕高度的28%
+    final wifiListHeight = screenHeight * 0.45; // 高度為螢幕高度的50%
+    final wifiListWidth = screenWidth * 0.9; // 寬度為螢幕寬度的90%
+
+    // 底部搜尋按鈕的位置與尺寸
+    final searchButtonHeight = screenHeight * 0.065; // 高度為螢幕高度的6.5%
+    final searchButtonBottomPosition = screenHeight * 0.06; // 距離底部為螢幕高度的6%
+    final searchButtonHorizontalMargin = screenWidth * 0.1; // 水平邊距為螢幕寬度的10%
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // 確保 Scaffold 是透明的
+      backgroundColor: Colors.transparent,
       body: Container(
         // 設置背景圖片
         decoration: BackgroundDecorator.imageBackground(
-          imagePath: AppBackgrounds.mainBackground, // 使用您的背景圖片
+          imagePath: AppBackgrounds.mainBackground,
         ),
         child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              // 頂部留白
-              SizedBox(height: screenSize.height * 0.05),
-
-              // 裝置列表區域（顯示前三個裝置）
-              SizedBox(
-                height: screenSize.height * 0.3,
-                child: WifiScannerComponent(
-                  controller: _scannerController,
-                  maxDevicesToShow: 3,
-                  deviceBoxSize: 80,
-                  spacing: 20,
-                  onScanComplete: _handleScanComplete,
-                  onDeviceSelected: _handleDeviceSelected,
-                ),
-              ),
-
-              // 中間留白
-              const Spacer(),
-
-              // QR 碼掃描按鈕
-              Padding(
-                padding: const EdgeInsets.only(left: 20, top: 10, bottom: 10),
-                child: _buildActionButton(
-                  label: 'QRcode',
-                  onPressed: _openQrCodeScanner,
-                ),
-              ),
-
-              // 手動新增按鈕
-              Padding(
-                padding: const EdgeInsets.only(left: 20, top: 10, bottom: 10),
-                child: _buildActionButton(
-                  label: 'Manual',
-                  onPressed: _openManualAdd,
-                ),
-              ),
-
-              // 底部留白
-              const Spacer(),
-
-              // 搜尋裝置按鈕
-              Padding(
-                padding: const EdgeInsets.all(20),
+              // WiFi 裝置列表區域
+              Positioned(
+                top: wifiListTopPosition,
+                left: (screenWidth - wifiListWidth) / 2, // 居中
                 child: SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: _buildSearchButton(),
+                  width: wifiListWidth,
+                  height: wifiListHeight,
+                  child: WifiScannerComponent(
+                    controller: _scannerController,
+                    maxDevicesToShow: 8,
+                    height: wifiListHeight,
+                    onScanComplete: _handleScanComplete,
+                    onDeviceSelected: _handleDeviceSelected,
+                  ),
                 ),
+              ),
+
+              // 頂部按鈕區域
+              Positioned(
+                top: topButtonsTopPosition,
+                left: topButtonsLeftPosition,
+                child: Row(
+                  children: [
+                    // QR 碼掃描按鈕
+                    _buildImageActionButton(
+                      label: 'QRcode',
+                      imagePath: 'assets/images/icon/QRcode.png',
+                      onPressed: _openQrCodeScanner,
+                      width: buttonWidth,
+                      height: buttonHeight,
+                    ),
+
+                    SizedBox(width: buttonSpacing), // 按鈕間距
+
+                    // 手動新增按鈕
+                    _buildImageActionButton(
+                      label: 'Manual Input',
+                      imagePath: 'assets/images/icon/manual_input.png',
+                      onPressed: _openManualAdd,
+                      width: buttonWidth,
+                      height: buttonHeight,
+                    ),
+                  ],
+                ),
+              ),
+
+              // 底部搜尋按鈕
+              Positioned(
+                bottom: searchButtonBottomPosition,
+                left: searchButtonHorizontalMargin,
+                right: searchButtonHorizontalMargin,
+                child: _buildSearchButton(height: searchButtonHeight),
               ),
             ],
           ),
@@ -143,33 +201,7 @@ class _InitializationPageState extends State<InitializationPage> {
     );
   }
 
-// 建立功能按鈕 - 使用標準漸層卡片
-  Widget _buildActionButton(
-      {required String label, required VoidCallback onPressed}) {
-    return SizedBox(
-      width: 80,
-      height: 80,
-      child: GestureDetector(
-        onTap: onPressed,
-        child: _appTheme.whiteBoxTheme.buildStandardCard(
-          width: 80,
-          height: 80,
-          child: Center(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchButton() {
+  Widget _buildSearchButton({required double height}) {
     return GestureDetector(
       onTap: isScanning ? null : () {
         setState(() {
@@ -177,14 +209,24 @@ class _InitializationPageState extends State<InitializationPage> {
         });
         _scannerController.startScan();
       },
-      child: _appTheme.whiteBoxTheme.buildSimpleColorButton(
-        width: double.infinity,
-        height: 50,
-        borderRadius: BorderRadius.circular(4),
+      child: Container(
+        height: height, // 使用比例計算的高度
+        decoration: BoxDecoration(
+          color: const Color(0xFF9747FF),
+          borderRadius: BorderRadius.circular(height * 0.08), // 圓角為高度的8%
+        ),
         child: Center(
-          child: Text(
-            'Search Devices',
-            style: AppTextStyles.buttonText,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                isScanning ? 'Scanning...' : 'Search',
+                style: TextStyle(
+                  fontSize: height * 0.4, // 字體大小為按鈕高度的40%
+                  color: Colors.white,
+                ),
+              ),
+            ],
           ),
         ),
       ),

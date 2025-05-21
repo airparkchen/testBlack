@@ -116,7 +116,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     return Container(
       width: widget.width,
       height: widget.height,
-      color: Colors.white,
+      color: Colors.transparent,
       child: CustomPaint(
         painter: TopologyPainter(
           gatewayName: widget.gatewayName,

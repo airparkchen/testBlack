@@ -35,159 +35,6 @@ class NetworkTopoView extends StatefulWidget {
   State<NetworkTopoView> createState() => _NetworkTopoViewState();
 }
 
-// // 真實數據源接口
-// abstract class SpeedDataSource {
-//   List<double> get data;
-//   double get currentSpeed;
-//   double getWidthPercentage();
-//   bool isFullWidth();
-//   void update();
-// }
-// // 模擬數據源實現
-// class MockSpeedDataSource implements SpeedDataSource {
-//   // 現有的 SpeedDataGenerator 代碼...
-// }
-//
-// // 真實數據源實現
-// class RealSpeedDataSource implements SpeedDataSource {
-//   // 從網絡、文件或其他來源獲取實際數據
-//   // 實現與 SpeedDataGenerator 相同的方法
-// }
-//
-// // 使用時：
-// final SpeedDataSource dataSource = isTestMode
-//     ? MockSpeedDataSource()
-//     : RealSpeedDataSource();
-
-// 將 dataSource 傳遞給 SpeedChartWidget用來實現真實資料傳遞。
-/// 速度數據生成器
-/// 用於生成模擬的網絡速度數據
-class SpeedDataGenerator {
-  // 數據點的數量
-  final int dataPointCount;
-
-  // 最小速度值
-  final double minSpeed;
-
-  // 最大速度值
-  final double maxSpeed;
-
-  // 存儲生成的數據點
-  final List<double> _speedData = [];
-
-  // 存儲平滑後的數據點
-  final List<double> _smoothedData = [];
-
-  // 隨機數生成器
-  final math.Random _random = math.Random();
-
-  // 平滑係數 (0-1，值越大平滑效果越強)
-  final double smoothingFactor;
-
-  // 波動幅度 (值越大波動越明顯)
-  final double fluctuationAmplitude;
-
-  // 當前寬度比例
-  double _currentWidthPercentage = 0.05; // 開始時只有5%的寬度
-
-  // 目標寬度比例
-  final double endAtPercent;
-
-  // 每次更新增加的寬度比例
-  final double growthRate;
-
-  // 構造函數
-  SpeedDataGenerator({
-    this.dataPointCount = 100,  // 預設100個數據點
-    this.minSpeed = 20,         // 預設最小速度 20 Mbps
-    this.maxSpeed = 1000,        // 預設最大速度 150 Mbps
-    double? initialSpeed,       // 初始速度值，可選
-    this.smoothingFactor = 1, // 調整平滑係數，允許更多波動
-    this.endAtPercent = 0.7,    // 默認目標寬度為70%
-    this.growthRate = 0.01,     // 每次更新增加1%的寬度
-    this.fluctuationAmplitude = 15.0, // 增加波動幅度，原來是6.0
-  }) {
-    // 初始化數據點
-    final initialValue = initialSpeed ?? 87.0;  // 默認初始值為87
-
-    // 初始只填入少量數據點
-    for (int i = 0; i < 5; i++) {
-      _speedData.add(initialValue);
-      _smoothedData.add(initialValue);
-    }
-  }
-
-  // 取得當前數據點列表的副本 (平滑處理後的)
-  List<double> get data => List.from(_smoothedData);
-
-  // 取得當前速度值 (最新的一筆資料)
-  double get currentSpeed => _smoothedData.last;
-
-  // 檢查是否已達到最大寬度
-  bool isFullWidth() {
-    return _currentWidthPercentage >= endAtPercent;
-  }
-
-  // 獲取當前寬度比例
-  double getWidthPercentage() {
-    return _currentWidthPercentage;
-  }
-
-  // 更新數據（添加新的數據點，移除最舊的）
-  void update() {
-    // 基於最後一個值生成新的速度值
-    double newValue = _generateNextValue(_speedData.last);
-
-    // 更新寬度
-    if (_currentWidthPercentage < endAtPercent) {
-      _currentWidthPercentage += growthRate;
-      if (_currentWidthPercentage > endAtPercent) {
-        _currentWidthPercentage = endAtPercent;
-      }
-    }
-
-    // 如果已達到最大寬度，移除最舊的點
-    if (_currentWidthPercentage >= endAtPercent && _speedData.length >= dataPointCount) {
-      _speedData.removeAt(0);
-      _smoothedData.removeAt(0);
-    }
-
-    // 添加新點
-    _speedData.add(newValue);
-
-    // 計算平滑值
-    double smoothedValue;
-    if (_smoothedData.isNotEmpty) {
-      // 新值 = 前一個平滑值 * 平滑係數 + 當前實際值 * (1 - 平滑係數)
-      smoothedValue = _smoothedData.last * smoothingFactor + newValue * (1 - smoothingFactor);
-    } else {
-      smoothedValue = newValue;
-    }
-
-    _smoothedData.add(smoothedValue);
-  }
-
-  // 生成下一個數據點
-  double _generateNextValue(double currentValue) {
-    // 生成較大幅度的隨機波動
-    final double fluctuation = (_random.nextDouble() * fluctuationAmplitude * 2) - fluctuationAmplitude;
-
-    // 計算新值
-    double newValue = currentValue + fluctuation;
-
-    // 有時添加一個更大的跳變，使曲線更有變化
-    if (_random.nextDouble() < 0.1) { // 10%的機率產生較大變化
-      newValue += (_random.nextDouble() * 20) - 10;
-    }
-
-    // 確保值在範圍內
-    if (newValue < minSpeed) newValue = minSpeed;
-    if (newValue > maxSpeed) newValue = maxSpeed;
-
-    return newValue;
-  }
-}
-
 class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProviderStateMixin {
   // 視圖模式: 'topology' 或 'list'
   String _viewMode = 'topology';
@@ -342,31 +189,42 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     final screenSize = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: null,
-      body: Column(
-        children: [
-          // 裝置數量控制器 - 根據標誌決定是否顯示
-          if (widget.showDeviceCountController)
-            _buildDeviceCountController(),
+      backgroundColor: Colors.transparent, // 確保 Scaffold 是透明的
+      body: Container(
+        // 設置背景圖片
+        decoration: BackgroundDecorator.imageBackground(
+          imagePath: AppBackgrounds.mainBackground, // 使用預設背景圖片
+        ),
+        child: Column(
+          children: [
+            // 裝置數量控制器 - 根據標誌決定是否顯示
+            if (widget.showDeviceCountController)
+              _buildDeviceCountController(),
 
-          // 視圖切換選項卡 (與AppBar分開)
-          SizedBox(height: screenSize.height * 0.08),
-          _buildTabBar(),
+            // 視圖切換選項卡 (與AppBar分開)
+            SizedBox(height: screenSize.height * 0.08),
+            _buildTabBar(),
 
-          // 主要內容區域
-          Expanded(
-            child: _viewMode == 'topology'
-                ? _buildTopologyView()
-                : _buildListView(),
-          ),
+            // 主要內容區域
+            Expanded(
+              flex: 5,
+              child: _viewMode == 'topology'
+                  ? _buildTopologyView()
+                  : _buildListView(),
+            ),
 
-          // 速度區域 (Speed Area)
-          _buildSpeedArea(),
+            // 調整間距 - 只在拓撲視圖模式下減少間距
+            if (_viewMode == 'topology')
+              SizedBox(height: 5), // 這裡設置一個較小的間距，讓速度區域更靠近topology
 
-          // 底部導航欄
-          _buildBottomNavBar(),
-        ],
+            // 速度區域 (Speed Area) - 只在拓撲視圖模式下顯示
+            if (_viewMode == 'topology')
+              _buildSpeedArea(),
+
+            // 底部導航欄
+            _buildBottomNavBar(),
+          ],
+        ),
       ),
     );
   }
@@ -605,15 +463,16 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     final deviceConnections = _getDeviceConnections(devices);
 
     return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 0),
+      // 移除白色背景，使用透明背景
+      color: Colors.transparent,
       child: Center(
         child: NetworkTopologyComponent(
           gatewayName: 'Controller',
           devices: devices,
           deviceConnections: deviceConnections,
           totalConnectedDevices: 4, // 主機上的數字顯示
-          height: screenSize.height * 0.5,  // 調整高度為屏幕高度的50%
+          height: screenSize.height * 0.50,  // 調整高度為屏幕高度的50%
           onDeviceSelected: _handleDeviceSelected,
         ),
       ),
@@ -673,17 +532,17 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     );
   }
 
-// 構建速度區域 (Speed Area)
+  // 構建速度區域 (Speed Area)
   Widget _buildSpeedArea() {
     // 使用 MediaQuery 獲取確切的寬度，避免 double.infinity 造成的 NaN 錯誤
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+      margin: const EdgeInsets.only(left: 3, right: 3, top: 0, bottom: 20),
       child: _appTheme.whiteBoxTheme.buildStandardCard(
         // 使用實際的寬度而不是 double.infinity
-        width: screenWidth - 6, // 考慮水平邊距 3+3
-        height: 154,
+        width: screenWidth - 36, // 考慮水平邊距 3+3
+        height: 160,
         child: Stack(
           clipBehavior: Clip.none, // 允許子元素溢出
           children: [
@@ -743,6 +602,134 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
         ),
       ),
     );
+  }
+}
+
+/// 速度數據生成器
+/// 用於生成模擬的網絡速度數據
+class SpeedDataGenerator {
+  // 數據點的數量
+  final int dataPointCount;
+
+  // 最小速度值
+  final double minSpeed;
+
+  // 最大速度值
+  final double maxSpeed;
+
+  // 存儲生成的數據點
+  final List<double> _speedData = [];
+
+  // 存儲平滑後的數據點
+  final List<double> _smoothedData = [];
+
+  // 隨機數生成器
+  final math.Random _random = math.Random();
+
+  // 平滑係數 (0-1，值越大平滑效果越強)
+  final double smoothingFactor;
+
+  // 波動幅度 (值越大波動越明顯)
+  final double fluctuationAmplitude;
+
+  // 當前寬度比例
+  double _currentWidthPercentage = 0.05; // 開始時只有5%的寬度
+
+  // 目標寬度比例
+  final double endAtPercent;
+
+  // 每次更新增加的寬度比例
+  final double growthRate;
+
+  // 構造函數
+  SpeedDataGenerator({
+    this.dataPointCount = 100,  // 預設100個數據點
+    this.minSpeed = 20,         // 預設最小速度 20 Mbps
+    this.maxSpeed = 1000,        // 預設最大速度 150 Mbps
+    double? initialSpeed,       // 初始速度值，可選
+    this.smoothingFactor = 1, // 調整平滑係數，允許更多波動
+    this.endAtPercent = 0.7,    // 默認目標寬度為70%
+    this.growthRate = 0.01,     // 每次更新增加1%的寬度
+    this.fluctuationAmplitude = 15.0, // 增加波動幅度，原來是6.0
+  }) {
+    // 初始化數據點
+    final initialValue = initialSpeed ?? 87.0;  // 默認初始值為87
+
+    // 初始只填入少量數據點
+    for (int i = 0; i < 5; i++) {
+      _speedData.add(initialValue);
+      _smoothedData.add(initialValue);
+    }
+  }
+
+  // 取得當前數據點列表的副本 (平滑處理後的)
+  List<double> get data => List.from(_smoothedData);
+
+  // 取得當前速度值 (最新的一筆資料)
+  double get currentSpeed => _smoothedData.last;
+
+  // 檢查是否已達到最大寬度
+  bool isFullWidth() {
+    return _currentWidthPercentage >= endAtPercent;
+  }
+
+  // 獲取當前寬度比例
+  double getWidthPercentage() {
+    return _currentWidthPercentage;
+  }
+
+  // 更新數據（添加新的數據點，移除最舊的）
+  void update() {
+    // 基於最後一個值生成新的速度值
+    double newValue = _generateNextValue(_speedData.last);
+
+    // 更新寬度
+    if (_currentWidthPercentage < endAtPercent) {
+      _currentWidthPercentage += growthRate;
+      if (_currentWidthPercentage > endAtPercent) {
+        _currentWidthPercentage = endAtPercent;
+      }
+    }
+
+    // 如果已達到最大寬度，移除最舊的點
+    if (_currentWidthPercentage >= endAtPercent && _speedData.length >= dataPointCount) {
+      _speedData.removeAt(0);
+      _smoothedData.removeAt(0);
+    }
+
+    // 添加新點
+    _speedData.add(newValue);
+
+    // 計算平滑值
+    double smoothedValue;
+    if (_smoothedData.isNotEmpty) {
+      // 新值 = 前一個平滑值 * 平滑係數 + 當前實際值 * (1 - 平滑係數)
+      smoothedValue = _smoothedData.last * smoothingFactor + newValue * (1 - smoothingFactor);
+    } else {
+      smoothedValue = newValue;
+    }
+
+    _smoothedData.add(smoothedValue);
+  }
+
+  // 生成下一個數據點
+  double _generateNextValue(double currentValue) {
+    // 生成較大幅度的隨機波動
+    final double fluctuation = (_random.nextDouble() * fluctuationAmplitude * 2) - fluctuationAmplitude;
+
+    // 計算新值
+    double newValue = currentValue + fluctuation;
+
+    // 有時添加一個更大的跳變，使曲線更有變化
+    if (_random.nextDouble() < 0.1) { // 10%的機率產生較大變化
+      newValue += (_random.nextDouble() * 20) - 10;
+    }
+
+    // 確保值在範圍內
+    if (newValue < minSpeed) newValue = minSpeed;
+    if (newValue > maxSpeed) newValue = maxSpeed;
+
+    return newValue;
   }
 }
 
@@ -872,54 +859,54 @@ class SpeedChartWidget extends StatelessWidget {
   // 構建速度標籤
   Widget _buildSpeedLabel(int speed) {
     return Stack(
-      clipBehavior: Clip.none, // 允許子元素溢出
-      children: [
-        // 主體部分（圓角矩形）
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-            child: Container(
-              width: 88,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Center(
-                child: Text(
-                  '$speed Mb/s',
-                  style: const TextStyle(
-                    color: Color.fromRGBO(255, 255, 255, 0.8),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+        clipBehavior: Clip.none, // 允許子元素溢出
+        children: [
+    // 主體部分（圓角矩形）
+    ClipRRect(
+    borderRadius: BorderRadius.circular(4),
+    child: BackdropFilter(
+    filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+    child: Container(
+      width: 88,
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Center(
+        child: Text(
+          '$speed Mb/s',
+          style: const TextStyle(
+            color: Color.fromRGBO(255, 255, 255, 0.8),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    ),
+    ),
+    ),
+
+          // 底部三角形
+          Positioned(
+            bottom: -6, // 位於底部且稍微突出
+            left: 0,
+            right: 0,
+            child: Center(
+              child: ClipPath(
+                clipper: _TriangleClipper(),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+                  child: Container(
+                    width: 16,
+                    height: 6,
+                    color: Colors.white.withOpacity(0.1),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-
-        // 底部三角形
-        Positioned(
-          bottom: -6, // 位於底部且稍微突出
-          left: 0,
-          right: 0,
-          child: Center(
-            child: ClipPath(
-              clipper: _TriangleClipper(),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-                child: Container(
-                  width: 16,
-                  height: 6,
-                  color: Colors.white.withOpacity(0.1),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+        ],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:whitebox/shared/theme/app_theme.dart';
 
 class AccountPasswordComponent extends StatefulWidget {
   final Function(String, String, String, bool)? onFormChanged;
@@ -29,6 +30,9 @@ class AccountPasswordComponent extends StatefulWidget {
 }
 
 class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
+  // 添加 AppTheme 實例
+  final AppTheme _appTheme = AppTheme();
+
   final TextEditingController _userController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
@@ -177,6 +181,110 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
     return true;
   }
 
+  // 創建自定義密碼輸入框
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required bool isError,
+    required bool isVisible,
+    required Function(bool) onVisibilityChanged,
+    String hintText = '',
+  }) {
+    final screenSize = MediaQuery.of(context).size;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.normal,
+            color: isError ? Color(0xFFFF00E5) : Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: screenSize.width * 0.9,
+          height: AppDimensions.inputHeight,
+          child: Stack(
+            children: [
+              // 使用模糊背景輸入框，但根據錯誤狀態設置不同的邊框顏色
+              CustomTextField(
+                width: screenSize.width * 0.9,
+                controller: controller,
+                obscureText: !isVisible,
+                borderColor: isError ? Color(0xFFFF00E5) : AppColors.primary,
+                borderOpacity: 0.7,
+                backgroundColor: Colors.black,
+                backgroundOpacity: 0.4,
+                hintText: hintText,
+              ),
+
+              // 添加密碼可見性切換按鈕
+              Positioned(
+                right: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: IconButton(
+                    icon: Icon(
+                      isVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      color: isError ? Color(0xFFFF00E5) : Colors.white,
+                      size: 25,
+                    ),
+                    onPressed: () {
+                      onVisibilityChanged(!isVisible);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Your password must be at least 8 characters',
+          style: TextStyle(
+            fontSize: 12,
+            color: isError ? Color(0xFFFF00E5) : Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 創建用戶名輸入框
+  Widget _buildUserField() {
+    final screenSize = MediaQuery.of(context).size;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'User',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.normal,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // 使用模糊背景輸入框
+        CustomTextField(
+          width: screenSize.width * 0.9,
+          controller: _userController,
+          enabled: !widget.disableUsername,
+          backgroundColor: widget.disableUsername ? Colors.grey.withOpacity(0.3) : Colors.black,
+          textStyle: TextStyle(
+            color: widget.disableUsername ? Colors.grey[400] : Colors.white,
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -195,213 +303,62 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
       containerHeight += screenSize.height * 0.09;
     }
 
-    return Container(
+    // 使用 buildStandardCard 替代原有的容器
+    return _appTheme.whiteBoxTheme.buildStandardCard(
       width: screenSize.width * 0.9,
       height: containerHeight,
-      color: const Color(0xFFEFEFEF),
-      padding: const EdgeInsets.all(25.0),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Set Password',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 動態顯示 User 輸入框
-            if (widget.displayOptions.contains('User')) ...[
+      child: Padding(
+        padding: const EdgeInsets.all(25.0),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               const Text(
-                'User',
+                'Set Password',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: screenSize.width * 0.9,
-                child: TextFormField(
-                  controller: _userController,
-                  // 禁用輸入
-                  enabled: !widget.disableUsername,
-                  decoration: InputDecoration(
-                    filled: true,
-                    // 設置灰色背景色
-                    fillColor: widget.disableUsername ? Colors.grey[200] : Color(0xFFEFEFEF),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                      borderSide: const BorderSide(color: Colors.red),
-                    ),
-                    errorStyle: const TextStyle(fontSize: 12),
-                    // 對於禁用的情況，使用灰色邊框
-                    disabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                      borderSide: BorderSide(color: Colors.grey.shade400),
-                    ),
-                  ),
-                  style: TextStyle(
-                    fontSize: 16,
-                    // 禁用時使用灰色文字
-                    color: widget.disableUsername ? Colors.grey[600] : Colors.black,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
-
-            // 動態顯示 Password 輸入框
-            if (widget.displayOptions.contains('Password')) ...[
-              // 標籤顏色根據錯誤狀態變化
-              Text(
-                'Password',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.normal,
-                  color: _isPasswordError ? Colors.red : Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: screenSize.width * 0.9,
-                child: TextFormField(
-                  controller: _passwordController,
-                  obscureText: !_passwordVisible,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Color(0xFFEFEFEF),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                      borderSide: BorderSide(
-                        color: _isPasswordError ? Colors.red : Colors.grey
-                            .shade400,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                      borderSide: BorderSide(
-                        color: _isPasswordError ? Colors.red : Colors.grey
-                            .shade400,
-                      ),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _passwordVisible ? Icons.visibility : Icons
-                            .visibility_off,
-                        // 圖標顏色根據錯誤狀態變化
-                        color: _isPasswordError ? Colors.red : Colors.grey,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _passwordVisible = !_passwordVisible;
-                        });
-                      },
-                    ),
-                  ),
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: _isPasswordError ? Colors.red : Colors.black,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Your password must be at least 8 characters',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _isPasswordError ? Colors.red : Colors.black,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 20),
-            ],
 
-            // 動態顯示 Confirm Password 輸入框
-            if (widget.displayOptions.contains('Confirm Password')) ...[
-              // 標籤顏色根據錯誤狀態變化
-              Text(
-                'Confirm Password',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.normal,
-                  color: _isConfirmPasswordError ? Colors.red : Colors.black,
+              // 動態顯示 User 輸入框
+              if (widget.displayOptions.contains('User'))
+                _buildUserField(),
+
+              // 動態顯示 Password 輸入框
+              if (widget.displayOptions.contains('Password')) ...[
+                _buildPasswordField(
+                  controller: _passwordController,
+                  label: 'Password',
+                  isError: _isPasswordError,
+                  isVisible: _passwordVisible,
+                  onVisibilityChanged: (visible) {
+                    setState(() {
+                      _passwordVisible = visible;
+                    });
+                  },
                 ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: screenSize.width * 0.9,
-                child: TextFormField(
+                const SizedBox(height: 20),
+              ],
+
+              // 動態顯示 Confirm Password 輸入框
+              if (widget.displayOptions.contains('Confirm Password'))
+                _buildPasswordField(
                   controller: _confirmPasswordController,
-                  obscureText: !_confirmPasswordVisible,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Color(0xFFEFEFEF),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                      borderSide: BorderSide(
-                        color: _isConfirmPasswordError ? Colors.red : Colors
-                            .grey.shade400,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2),
-                      borderSide: BorderSide(
-                        color: _isConfirmPasswordError ? Colors.red : Colors
-                            .grey.shade400,
-                      ),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _confirmPasswordVisible ? Icons.visibility : Icons
-                            .visibility_off,
-                        // 圖標顏色根據錯誤狀態變化
-                        color: _isConfirmPasswordError ? Colors.red : Colors
-                            .grey,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _confirmPasswordVisible = !_confirmPasswordVisible;
-                        });
-                      },
-                    ),
-                  ),
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: _isConfirmPasswordError ? Colors.red : Colors.black,
-                  ),
+                  label: 'Confirm Password',
+                  isError: _isConfirmPasswordError,
+                  isVisible: _confirmPasswordVisible,
+                  onVisibilityChanged: (visible) {
+                    setState(() {
+                      _confirmPasswordVisible = visible;
+                    });
+                  },
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Your password must be at least 8 characters',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _isConfirmPasswordError ? Colors.red : Colors.black,
-                ),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

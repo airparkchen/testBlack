@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:whitebox/shared/theme/app_theme.dart';
 
 class QrCodeScannerPage extends StatefulWidget {
   const QrCodeScannerPage({super.key});
@@ -9,32 +10,36 @@ class QrCodeScannerPage extends StatefulWidget {
 }
 
 class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
-  late MobileScannerController controller;
+  final AppTheme _appTheme = AppTheme();
+  MobileScannerController? _controller;
   String qrResult = '';
   bool isScanning = true;
-  bool isFlashOn = false;
+  bool _isCameraInitFailed = false;
 
   @override
   void initState() {
     super.initState();
-    controller = MobileScannerController(
-      detectionSpeed: DetectionSpeed.normal,
-      facing: CameraFacing.back,
-      torchEnabled: false,
-    );
+    _initializeScanner();
+  }
+
+  void _initializeScanner() {
+    try {
+      _controller = MobileScannerController(
+        detectionSpeed: DetectionSpeed.normal,
+        facing: CameraFacing.back,
+      );
+    } catch (e) {
+      print('Camera initialization failed: $e');
+      setState(() {
+        _isCameraInitFailed = true;
+      });
+    }
   }
 
   @override
   void dispose() {
-    controller.dispose();
+    _controller?.dispose();
     super.dispose();
-  }
-
-  void _toggleFlash() async {
-    await controller.toggleTorch();
-    setState(() {
-      isFlashOn = !isFlashOn;
-    });
   }
 
   @override
@@ -64,8 +69,6 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
     const buttonWidthProportion = 20 + 150 + 100 + 150 + 20; // 440
     final leftButtonMargin = size.width * (20 / buttonWidthProportion);
     final backButtonWidth = size.width * (150 / buttonWidthProportion);
-    final middleButtonSpace = size.width * (100 / buttonWidthProportion);
-    final nextButtonWidth = size.width * (150 / buttonWidthProportion);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -78,21 +81,18 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
                 // 標題前的空間
                 SizedBox(height: topTextMargin),
 
-                // 標題文字 - 使用明確的高度
+                // 標題文字
                 SizedBox(
                   height: textHeight,
-                  child: const Center(
+                  child: Center(
                     child: Text(
-                      'Scan QRcode',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.normal,
-                      ),
+                      'Wi-Fi on/off Check',
+                      style: AppTextStyles.heading1,
                     ),
                   ),
                 ),
 
-                // 標題與相機之間的空間 - 使用計算得到的空間
+                // 標題與相機之間的空間
                 SizedBox(height: cameraAreaTop - topTextMargin - textHeight),
 
                 // 相機預覽容器
@@ -114,78 +114,13 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(4),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // 掃描器視圖
-                                MobileScanner(
-                                  controller: controller,
-                                  onDetect: (capture) {
-                                    final List<Barcode> barcodes = capture.barcodes;
-                                    if (barcodes.isNotEmpty && isScanning) {
-                                      // 獲取掃描結果
-                                      setState(() {
-                                        qrResult = barcodes.first.rawValue ?? '無法讀取';
-                                        isScanning = false;
-                                        controller.stop();
-                                      });
-                                    }
-                                  },
-                                ),
-
-                                // 掃描框
-                                if (isScanning)
-                                  Center(
-                                    child: Container(
-                                      width: cameraWidth * 0.6,  // 相機寬度的60%
-                                      height: cameraHeight * 0.6, // 相機高度的60%
-                                      decoration: BoxDecoration(
-                                        border: Border.all(color: Colors.white, width: 3),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-
-                                // 顯示掃描結果
-                                if (qrResult.isNotEmpty)
-                                  Positioned(
-                                    bottom: 0,
-                                    left: 0,
-                                    right: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(20),
-                                      color: Colors.black54,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Text(
-                                            '掃描結果',
-                                            style: TextStyle(
-                                                fontSize: 18,
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold
-                                            ),
-                                          ),
-                                          const SizedBox(height: 10),
-                                          Text(
-                                            qrResult,
-                                            style: const TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.white
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                            child: _buildCameraView(cameraWidth, cameraHeight),
                           ),
                         ),
                       ),
 
                       // 右邊距
-                      SizedBox(width: leftCameraMargin), // 與左邊距相同
+                      SizedBox(width: leftCameraMargin),
                     ],
                   ),
                 ),
@@ -193,78 +128,45 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
                 // 底部空間 - 用於放置按鈕
                 Expanded(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center, // 垂直居中
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // 按鈕區域 - 根據比例設置
-                      Row(
-                        children: [
-                          // 左側留白
-                          SizedBox(width: leftButtonMargin),
+                      // 按鈕區域 - 只保留Back按鈕
+                      Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            // 左側留白
+                            SizedBox(width: leftButtonMargin),
 
-                          // 返回按鈕
-                          SizedBox(
-                            width: backButtonWidth,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[300],
-                                foregroundColor: Colors.black,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(0),
-                                  side: BorderSide(color: Colors.grey[400]!),
+                            // 返回按鈕使用紫色邊框樣式
+                            SizedBox(
+                              width: backButtonWidth,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(context, qrResult.isNotEmpty ? qrResult : null);
+                                },
+                                child: Container(
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                                    color: const Color(0xFF9747FF).withOpacity(0.2),
+                                    border: Border.all(
+                                      color: const Color(0xFF9747FF),
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                        'Back',
+                                        style: AppTextStyles.buttonText
+                                    ),
+                                  ),
                                 ),
                               ),
-                              child: const Text(
-                                'Back',
-                                style: TextStyle(fontSize: 18),
-                              ),
                             ),
-                          ),
-
-                          // 中間間隔
-                          SizedBox(width: middleButtonSpace),
-
-                          // 下一步按鈕
-                          SizedBox(
-                            width: nextButtonWidth,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: qrResult.isEmpty
-                                  ? () {
-                                if (!isScanning) {
-                                  setState(() {
-                                    isScanning = true;
-                                    controller.start();
-                                  });
-                                }
-                              }
-                                  : () {
-                                // 如果有掃描結果，可以傳遞結果返回上一頁
-                                Navigator.pop(context, qrResult);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[300],
-                                foregroundColor: Colors.black,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(0),
-                                  side: BorderSide(color: Colors.grey[400]!),
-                                ),
-                              ),
-                              child: Text(
-                                qrResult.isEmpty ? 'Next' : 'Next',
-                                style: const TextStyle(fontSize: 18),
-                              ),
-                            ),
-                          ),
-
-                          // 右側留白
-                          SizedBox(width: leftButtonMargin), // 與左邊距相同
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -274,6 +176,112 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCameraView(double width, double height) {
+    // 如果相機初始化失敗，顯示錯誤信息
+    if (_isCameraInitFailed) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red, size: 48),
+            SizedBox(height: 16),
+            Text(
+              'Camera initialization failed',
+              style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Please check camera permissions',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 如果相機控制器為空，顯示加載動畫
+    if (_controller == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Initializing camera...',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 正常顯示相機和掃描結果
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // 相機視圖
+        MobileScanner(
+          controller: _controller!,
+          onDetect: (capture) {
+            final List<Barcode> barcodes = capture.barcodes;
+            if (barcodes.isNotEmpty && isScanning) {
+              setState(() {
+                qrResult = barcodes.first.rawValue ?? 'Unable to read';
+                isScanning = false;
+                _controller!.stop();
+              });
+            }
+          },
+        ),
+
+        // 掃描框
+        if (isScanning)
+          Container(
+            width: width * 0.6,
+            height: height * 0.6,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white, width: 3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+
+        // 顯示掃描結果
+        if (qrResult.isNotEmpty)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              color: Colors.black54,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Scan Result',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    qrResult,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
