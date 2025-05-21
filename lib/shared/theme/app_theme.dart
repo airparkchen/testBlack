@@ -220,6 +220,83 @@ class WhiteBoxTheme {
       child: child,
     );
   }
+  /// 建立一個帶有外邊距的漸層卡片
+  Widget buildCustomCardWithMargin({
+    required double width,
+    required double height,
+    BorderRadius? borderRadius,
+    double blurRadius = defaultBlurRadius,
+    List<Color> gradientColors = const [
+      Color(0xFF162140),
+      Color(0xFF9747FF),
+    ],
+    double gradientAngle = 0.75,
+    double opacity = defaultOpacity,
+    Color borderColor = const Color(0xFF9747FF),
+    double borderOpacity = 0.7,
+    double borderWidth = 1.0,
+    EdgeInsetsGeometry? margin,
+    Widget? child,
+  }) {
+    // 計算漸層的起點和終點
+    final double endX = width + (width * 0.18 * gradientAngle.abs());
+    final double endY = height - (height * 0.26 * gradientAngle.abs());
+
+    final BorderRadius finalBorderRadius = borderRadius ?? BorderRadius.circular(AppDimensions.radiusS);
+
+    return Container(
+      width: width,
+      height: height,
+      margin: margin,
+      decoration: BoxDecoration(
+        borderRadius: finalBorderRadius,
+        // 使用Box裝飾器確保支持透明度
+        color: Colors.transparent,
+      ),
+      child: Stack(
+        children: [
+          // 背景模糊層 - 確保此層有透明效果
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: finalBorderRadius,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: blurRadius,
+                  sigmaY: blurRadius,
+                ),
+                child: Container(
+                  // 這里使用低透明度的顏色
+                  color: Colors.white.withOpacity(0.05),
+                ),
+              ),
+            ),
+          ),
+
+          // 漸層層 - 使用透明漸層
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: finalBorderRadius,
+                gradient: LinearGradient(
+                  begin: Alignment.bottomLeft,
+                  end: Alignment(endX / width, endY / height),
+                  colors: gradientColors.map((color) => color.withOpacity(opacity)).toList(),
+                ),
+                border: Border.all(
+                  color: borderColor.withOpacity(borderOpacity),
+                  width: borderWidth,
+                ),
+              ),
+            ),
+          ),
+
+          // 內容層
+          if (child != null) Positioned.fill(child: Center(child: child)),
+        ],
+      ),
+    );
+  }
+
   /// 建立自定義漸層卡片
   Widget buildCustomCard({
     required double width,

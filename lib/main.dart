@@ -17,6 +17,7 @@ import 'package:whitebox/shared/ui/pages/test/SrpLoginModifiedTestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/theme_test_page.dart';
 import 'package:whitebox/shared/ui/pages/test/NetworkTopoView.dart';
 import 'package:whitebox/shared/theme/app_theme.dart'; // 導入主題
+import 'package:whitebox/shared/ui/pages/test/SpeedAreaTestPage.dart';
 
 // 全局背景設置，可以在應用的任何地方訪問
 class BackgroundSettings {
