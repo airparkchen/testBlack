@@ -313,58 +313,74 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     return Container(
       margin: const EdgeInsetsDirectional.only(start: 60, end: 60, top: 10, bottom: 5),
       height: 30,
-      child: Row(
-        children: [
-          // 拓撲視圖選項卡
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _handleViewModeChanged('topology'),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _viewMode == 'topology' ? const Color(0xFF808080) : const Color(0xFFD9D9D9),
-                  borderRadius: const BorderRadiusDirectional.only(
-                    topStart: Radius.circular(4),
-                    topEnd: Radius.circular(4),
-                  ),
-                ),
-                child: Text(
-                  'Topology',
-                  style: TextStyle(
-                    color: _viewMode == 'topology' ? Colors.white : Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+      child: CustomPaint(
+        painter: GradientBorderPainter(),
+        child: Container(
+          margin: const EdgeInsets.all(2), // 為邊框留出空間
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(13),
+            color: Colors.transparent,
+          ),
+          child: Row(
+            children: [
+              // Topology 選項卡
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _handleViewModeChanged('topology'),
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _viewMode == 'topology'
+                          ? const Color.fromRGBO(255, 255, 255, 0.15)
+                          : Colors.transparent,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(13),
+                        bottomLeft: Radius.circular(13),
+                      ),
+                    ),
+                    child: Text(
+                      'Topology',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: _viewMode == 'topology' ? FontWeight.bold : FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
 
-          // 列表視圖選項卡
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _handleViewModeChanged('list'),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _viewMode == 'list' ? const Color(0xFF808080) : const Color(0xFFD9D9D9),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(4),
-                    topRight: Radius.circular(4),
-                  ),
-                ),
-                child: Text(
-                  'List',
-                  style: TextStyle(
-                    color: _viewMode == 'list' ? Colors.white : Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+              // List 選項卡
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _handleViewModeChanged('list'),
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _viewMode == 'list'
+                          ? const Color.fromRGBO(255, 255, 255, 0.15)
+                          : Colors.transparent,
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(13),
+                        bottomRight: Radius.circular(13),
+                      ),
+                    ),
+                    child: Text(
+                      'List',
+                      style: TextStyle(
+                        color: _viewMode == 'list'
+                            ? const Color.fromRGBO(255, 255, 255, 0.8)
+                            : Colors.white,
+                        fontWeight: _viewMode == 'list' ? FontWeight.bold : FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -560,26 +576,199 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     );
   }
 
-  // 構建底部導航欄
+// 構建底部導航欄
   Widget _buildBottomNavBar() {
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Container(
-      color: Colors.white,
-      height: 80,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      margin: EdgeInsets.only(
+        left: screenWidth * 0.145,     // 15%-85%
+        right: screenWidth * 0.151,
+        bottom: MediaQuery.of(context).size.height * 0.05,
+      ),
+      height: 70, // 增加高度
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(35),
+      ),
+      child: CustomPaint(
+        painter: BottomNavBarPainter(),
+        child: Container(
+          margin: const EdgeInsets.all(1.5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(33.5),
+            color: Colors.transparent,
+          ),
+          child: Stack(
+            children: [
+              // 移動的圓圈背景
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                left: _getCirclePosition(),
+                top: 10, // 圓圈垂直居中
+                child: _buildAnimatedCircle(),
+              ),
+
+              // 圖標行
+              Row(
+                children: [
+                  // 左側 - 靠近左邊緣
+                  Expanded(
+                    flex: 1,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 3), // 距離左邊緣15px
+                        child: _buildBottomNavIconWithImage(0, 'assets/images/icon/dashboard.png', 35),
+                      ),
+                    ),
+                  ),
+                  // 中間連線圖標
+                  Expanded(
+                    flex: 1,
+                    child: Center(
+                      child: _buildBottomNavIconWithImage(1, 'assets/images/icon/topohome.png', 35),
+                    ),
+                  ),
+
+                  // 右側 - 靠近右邊緣
+                  Expanded(
+                    flex: 1,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 3), // 距離右邊緣15px
+                        child: _buildBottomNavIconWithImage(2, 'assets/images/icon/setting.png', 35),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+// 計算圓圈位置 - 修正 barWidth 計算
+  double _getCirclePosition() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final barWidth = screenWidth * 0.70; // 修正：bar的實際寬度 (100% - 15% * 2)
+    final circleSize = 47.0; // 要與 _buildAnimatedCircle() 中的大小一致
+
+    // Bar 的圓角半徑 (從 BottomNavBarPainter 中的設定)
+    final barRadius = 35.0; // bar height (70) / 2
+
+    // 計算圓圈與圓弧切齊時的位置
+    final edgeDistance = barRadius - (circleSize / 2); // 圓圈中心距離邊緣的距離
+
+    // 每個區域的寬度（三等分）
+    final sectionWidth = barWidth / 3;
+
+    // 計算中間位置
+    final centerOffset = (sectionWidth - circleSize) / 2;
+
+    switch (_selectedBottomTab) {
+      case 0: // Dashboard - 與左側圓弧切齊
+        return edgeDistance - 1.9; // 圓圈與左邊圓弧完美貼合
+      case 1: // 中間 - 保持居中
+        return sectionWidth + centerOffset;
+      case 2: // Setting - 與右側圓弧切齊
+        return barWidth - circleSize - edgeDistance -0.2; // 修正右側位置
+      default:
+        return sectionWidth + centerOffset; // 預設中間
+    }
+  }
+
+// 構建會移動的圓圈
+  Widget _buildAnimatedCircle() {
+    return Container(
+      width: 47,
+      height: 47,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          // Dashboard
-          _buildBottomNavItem(0, 'Dashboard'),
+          // 發光效果
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Colors.white.withOpacity(0.1),
+                  const Color(0xFF9747FF).withOpacity(0.0),  //圓圈中心顏色模糊
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.7, 1.0],
+              ),
+            ),
+          ),
 
-          // 連線 (當前頁面)
-          _buildBottomNavItem(1, '連線'),
-
-          // Setting
-          _buildBottomNavItem(2, 'Setting'),
+          // 漸變邊框圓圈
+          Container(
+            width: 47,
+            height: 47,
+            child: CustomPaint(
+              painter: GradientRingPainter(),
+            ),
+          ),
         ],
       ),
     );
   }
+
+// 構建底部導航圖標
+  Widget _buildBottomNavIconWithImage(
+      int index,
+      String imagePath,
+      double iconSize,
+      ) {
+    final isSelected = index == _selectedBottomTab;
+
+    return GestureDetector(
+      onTap: () => _handleBottomTabChanged(index),
+      child: Container(
+        width: 60,
+        height: 60,
+        child: Center(
+          child: Opacity(
+            opacity: isSelected ? 1.0 : 0.5,   //調整點擊透明/明亮程度
+            child: Image.asset(
+              imagePath,
+              width: iconSize,
+              height: iconSize,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                print('圖片載入失敗: $imagePath, 錯誤: $error');
+                return Icon(
+                  _getDefaultIcon(index),
+                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
+                  size: iconSize * 0.8,
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+// 獲取預設圖標
+  IconData _getDefaultIcon(int index) {
+    switch (index) {
+      case 0:
+        return Icons.dashboard;
+      case 1:
+        return Icons.home;
+      case 2:
+        return Icons.settings;
+      default:
+        return Icons.circle;
+    }
+  }
+
 
   // 構建底部導航項
   Widget _buildBottomNavItem(int index, String label) {
@@ -1075,4 +1264,107 @@ class _SpeedCurvePainter extends CustomPainter {
         oldDelegate.animationValue != animationValue ||
         oldDelegate.currentSpeed != currentSpeed;
   }
+}
+/// 漸變環形繪製器
+class GradientRingPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 + 2; // 調整圓圈半徑
+
+    // 創建垂直漸變（從上到下：白色到紫色）
+    final gradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Colors.white,
+        const Color(0xFF9747FF),
+      ],
+    );
+
+    // 創建邊框畫筆
+    final paint = Paint()
+      ..shader = gradient.createShader(
+        Rect.fromCircle(center: center, radius: radius),
+      )
+      ..style = PaintingStyle.stroke // 只繪製邊框
+      ..strokeWidth = 2; // 邊框厚度
+
+    // 繪製圓形邊框
+    canvas.drawCircle(center, radius + 7, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// 上方 TabBar 的漸變邊框繪製器
+class GradientBorderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gradient = const LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [
+        Colors.white,
+        Color.fromRGBO(255, 255, 255, 0.6),
+      ],
+    );
+
+    final outerRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final outerRRect = RRect.fromRectAndRadius(outerRect, const Radius.circular(15));
+
+    final innerRect = Rect.fromLTWH(2, 2, size.width - 4, size.height - 4);
+    final innerRRect = RRect.fromRectAndRadius(innerRect, const Radius.circular(13));
+
+    final path = Path()
+      ..addRRect(outerRRect)
+      ..addRRect(innerRRect);
+    path.fillType = PathFillType.evenOdd;
+
+    final paint = Paint()
+      ..shader = gradient.createShader(outerRect)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// 底部導航欄背景繪製器
+class BottomNavBarPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gradient = const LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [
+        // Colors.white,
+        Color.fromRGBO(255, 255, 255, 0.3),
+        Color.fromRGBO(255, 255, 255, 0.3),   //調整底下bar的顏色
+      ],
+    );
+
+    final outerRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final outerRRect = RRect.fromRectAndRadius(outerRect, Radius.circular(size.height / 2));
+
+    final innerRect = Rect.fromLTWH(1.5, 1.5, size.width - 3, size.height - 3);
+    final innerRRect = RRect.fromRectAndRadius(innerRect, Radius.circular((size.height - 3) / 2));
+
+    final path = Path()
+      ..addRRect(outerRRect)
+      ..addRRect(innerRRect);
+    path.fillType = PathFillType.evenOdd;
+
+    final paint = Paint()
+      ..shader = gradient.createShader(outerRect)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
