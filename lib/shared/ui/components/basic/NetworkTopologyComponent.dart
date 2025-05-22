@@ -223,27 +223,53 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
         onTap: () {
           print('互聯網圖標被點擊');
         },
-        child: Container(
-          width: kInternetRadius * 2,
-          height: kInternetRadius * 2,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            // border: Border.all(color: Colors.white, width: 2),
-          ),
-          child: Container(
-            width: kInternetRadius * 2,
-            height: kInternetRadius * 2,
-            child: Center(
+        child: Stack(
+          clipBehavior: Clip.none, // 允許文字溢出到圓圈範圍外
+          children: [
+            // 原本的白色圓點
+            Container(
+              width: kInternetRadius * 2,
+              height: kInternetRadius * 2,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                // border: Border.all(color: Colors.white, width: 2),
+              ),
               child: Container(
-                width: 16,  // 白點大小
-                height: 16,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+                width: kInternetRadius * 2,
+                height: kInternetRadius * 2,
+                child: Center(
+                  child: Container(
+                    width: 16,  // 白點大小
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+
+            // 新增的"internet"文字標籤
+            Positioned(
+              // 將文字置中對齊白點，並向上偏移5px
+              left: (kInternetRadius * 2 - 60) / 2, // 50是預估文字寬度，讓文字水平置中
+              top: -5 , // 向上偏移5px，再減去文字高度(約16px)讓文字完全在白點上方
+              child: Container(
+                width: 60, // 文字容器寬度
+                child: Text(
+                  'Internet',
+                  textAlign: TextAlign.center, // 文字置中
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    // fontWeight: FontWeight.w400, // 普通字重
+                    fontWeight: FontWeight.bold, // 粗體字重
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

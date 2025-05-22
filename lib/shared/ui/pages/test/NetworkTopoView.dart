@@ -1102,7 +1102,7 @@ class SpeedChartWidget extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  '$speed Mb/s',
+                  '$speed Mbps',
                   style: const TextStyle(
                     color: Color.fromRGBO(255, 255, 255, 0.8),
                     fontSize: 14,
