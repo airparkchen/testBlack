@@ -20,12 +20,16 @@ class NetworkTopoView extends StatefulWidget {
   // 設備連接數據源
   final List<DeviceConnection>? externalDeviceConnections;
 
+  // 新增：是否啟用點擊互動功能（預設啟用）
+  final bool enableInteractions;
+
   const NetworkTopoView({
     Key? key,
     this.showDeviceCountController = false, // 預設不顯示測試控制器
-    this.defaultDeviceCount = 4, // 預設顯示4個設備
+    this.defaultDeviceCount = 0, // 預設顯示4個設備
     this.externalDevices, // 允許外部傳入設備列表
     this.externalDeviceConnections, // 允許外部傳入連接數據
+    this.enableInteractions = false, // 新增：預設啟用點擊互動功能 開關
   }) : super(key: key);
 
   @override
@@ -129,8 +133,11 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     super.dispose();
   }
 
-  // 處理設備選擇
+  // 處理設備選擇 - 新增互動檢查
   void _handleDeviceSelected(NetworkDevice device) {
+    // 如果禁用互動功能，直接返回不執行任何操作
+    if (!widget.enableInteractions) return;
+
     // 獲取設備連接的子設備數量
     int connectionCount = 2; // 預設值
     bool isGateway = false;
@@ -167,8 +174,11 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     );
   }
 
-  // 處理視圖模式切換
+  // 處理視圖模式切換 - 新增互動檢查
   void _handleViewModeChanged(String mode) {
+    // 如果禁用互動功能，直接返回不執行任何操作
+    if (!widget.enableInteractions) return;
+
     if (mode != _viewMode) {
       setState(() {
         _viewMode = mode;
@@ -176,8 +186,11 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     }
   }
 
-  // 處理底部選項卡切換
+  // 處理底部選項卡切換 - 新增互動檢查
   void _handleBottomTabChanged(int index) {
+    // 如果禁用互動功能，直接返回不執行任何操作
+    if (!widget.enableInteractions) return;
+
     setState(() {
       _selectedBottomTab = index;
     });
@@ -228,246 +241,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     );
   }
 
-  // 構建裝置數量控制器
-  Widget _buildDeviceCountController() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: const Color(0xFFEFEFEF),
-      child: Row(
-        children: [
-          const Text(
-            '裝置數量:',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(width: 16),
-
-          // 減少按鈕
-          InkWell(
-            onTap: () {
-              if (_deviceCount > 0) {
-                setState(() {
-                  _deviceCount--;
-                  _deviceCountController.text = _deviceCount.toString();
-                });
-              }
-            },
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD9D9D9),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Icon(Icons.remove),
-            ),
-          ),
-
-          // 數量輸入框
-          Container(
-            width: 60,
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            child: TextField(
-              controller: _deviceCountController,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(2),
-              ],
-            ),
-          ),
-
-          // 增加按鈕
-          InkWell(
-            onTap: () {
-              if (_deviceCount < 10) {
-                setState(() {
-                  _deviceCount++;
-                  _deviceCountController.text = _deviceCount.toString();
-                });
-              }
-            },
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD9D9D9),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Icon(Icons.add),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 構建選項卡
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsetsDirectional.only(start: 60, end: 60, top: 10, bottom: 5),
-      height: 30,
-      child: CustomPaint(
-        painter: GradientBorderPainter(),
-        child: Container(
-          margin: const EdgeInsets.all(2), // 為邊框留出空間
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(13),
-            color: Colors.transparent,
-          ),
-          child: Row(
-            children: [
-              // Topology 選項卡
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _handleViewModeChanged('topology'),
-                  child: Container(
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _viewMode == 'topology'
-                          ? const Color.fromRGBO(255, 255, 255, 0.15)
-                          : Colors.transparent,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(13),
-                        bottomLeft: Radius.circular(13),
-                      ),
-                    ),
-                    child: Text(
-                      'Topology',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: _viewMode == 'topology' ? FontWeight.bold : FontWeight.w500,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // List 選項卡
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _handleViewModeChanged('list'),
-                  child: Container(
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _viewMode == 'list'
-                          ? const Color.fromRGBO(255, 255, 255, 0.15)
-                          : Colors.transparent,
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(13),
-                        bottomRight: Radius.circular(13),
-                      ),
-                    ),
-                    child: Text(
-                      'List',
-                      style: TextStyle(
-                        color: _viewMode == 'list'
-                            ? const Color.fromRGBO(255, 255, 255, 0.8)
-                            : Colors.white,
-                        fontWeight: _viewMode == 'list' ? FontWeight.bold : FontWeight.w500,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 獲取設備數據 - 從外部數據源或生成測試數據
-  List<NetworkDevice> _getDevices() {
-    // 如果提供了外部設備數據，優先使用
-    if (widget.externalDevices != null && widget.externalDevices!.isNotEmpty) {
-      return widget.externalDevices!;
-    }
-
-    // 否則生成測試數據
-    List<NetworkDevice> dummyDevices = [];
-
-    // 根據裝置數量生成設備
-    for (int i = 0; i < _deviceCount; i++) {
-      String name = '';
-      String deviceType = '';
-
-      // 創建與圖片相符的設備
-      switch (i) {
-        case 0:
-          name = 'TV';
-          deviceType = 'OWA813V_6G';
-          break;
-        case 1:
-          name = 'Xbox';
-          deviceType = 'Connected via Ethernet';
-          break;
-        case 2:
-          name = 'Iphone';
-          deviceType = 'OWA813V_6G';
-          break;
-        case 3:
-          name = 'Laptop';
-          deviceType = 'OWA813V_5G';
-          break;
-        default:
-          name = '設備 ${i + 1}';
-          deviceType = 'OWA813V_6G';
-      }
-
-      // 決定連接類型
-      final isWired = (name == 'Xbox');
-
-      final device = NetworkDevice(
-        name: name,
-        id: 'device-${i + 1}',
-        mac: '48:21:0B:4A:47:9B', // 使用與圖片匹配的MAC地址
-        ip: '192.168.1.164',      // 使用與圖片匹配的IP地址
-        connectionType: isWired ? ConnectionType.wired : ConnectionType.wireless,
-        additionalInfo: {
-          'type': deviceType,
-          'status': 'online',
-        },
-      );
-
-      dummyDevices.add(device);
-    }
-
-    return dummyDevices;
-  }
-
-  // 獲取設備連接數據 - 從外部數據源或生成測試數據
-  List<DeviceConnection> _getDeviceConnections(List<NetworkDevice> devices) {
-    // 如果提供了外部連接數據，優先使用
-    if (widget.externalDeviceConnections != null && widget.externalDeviceConnections!.isNotEmpty) {
-      return widget.externalDeviceConnections!;
-    }
-
-    // 否則生成測試數據
-    List<DeviceConnection> connections = [];
-
-    // 為每個設備創建連接數據
-    for (var device in devices) {
-      connections.add(
-        DeviceConnection(
-          deviceId: device.id,
-          connectedDevicesCount: 2,// 固定為2個連接設備 裝置連接數量
-        ),
-      );
-    }
-
-    return connections;
-  }
-
-  // 構建拓撲視圖 - 現在使用新的 Stack + Image.asset 組件
+  // 構建拓撲視圖 - 傳遞互動控制參數
   Widget _buildTopologyView() {
     final screenSize = MediaQuery.of(context).size;
 
@@ -488,13 +262,14 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
           deviceConnections: deviceConnections,
           totalConnectedDevices: devices.length, // 主機上的數字顯示 數字標籤預設
           height: screenSize.height * 0.50,  // 調整高度為屏幕高度的50%
-          onDeviceSelected: _handleDeviceSelected,
+          // 根據互動開關決定是否傳遞回調函數
+          onDeviceSelected: widget.enableInteractions ? _handleDeviceSelected : null,
         ),
       ),
     );
   }
 
-  // 構建列表視圖
+  // 構建列表視圖 - 修改點擊處理
   Widget _buildListView() {
     // 獲取設備數據
     List<NetworkDevice> devices = _getDevices();
@@ -544,39 +319,177 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
                 ? Colors.green
                 : Colors.blue,
           ),
-          onTap: () => _handleDeviceSelected(device),
+          // 根據互動開關決定是否響應點擊
+          onTap: widget.enableInteractions ? () => _handleDeviceSelected(device) : null,
         );
       },
     );
   }
 
-  // 構建速度區域 (Speed Area)
-  Widget _buildSpeedArea() {
-    // 使用 MediaQuery 獲取確切的寬度，避免 double.infinity 造成的 NaN 錯誤
-    final screenWidth = MediaQuery.of(context).size.width;
+  // 其餘方法保持不變...
+  // 以下是原本的方法，為了節省空間，只顯示修改的部分
 
+  // 構建裝置數量控制器
+  Widget _buildDeviceCountController() {
     return Container(
-      margin: const EdgeInsets.only(left: 3, right: 3, top: 0, bottom: 20),
-      child: _appTheme.whiteBoxTheme.buildStandardCard(
-        // 使用實際的寬度而不是 double.infinity
-        width: screenWidth - 36, // 考慮水平邊距 3+3
-        height: 160,
-        child: Stack(
-          clipBehavior: Clip.none, // 允許子元素溢出
-          children: [
-            // 速度曲線
-            SpeedChartWidget(
-              dataGenerator: _speedDataGenerator,
-              animationController: _animationController,
-              endAtPercent: 0.7, // 數據線在70%處結束
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: const Color(0xFFEFEFEF),
+      child: Row(
+        children: [
+          const Text(
+            '裝置數量:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 16),
+
+          // 減少按鈕 - 新增互動檢查
+          InkWell(
+            onTap: widget.enableInteractions ? () {
+              if (_deviceCount > 0) {
+                setState(() {
+                  _deviceCount--;
+                  _deviceCountController.text = _deviceCount.toString();
+                });
+              }
+            } : null, // 如果禁用互動，設為null
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD9D9D9),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Icon(Icons.remove),
             ),
-          ],
+          ),
+
+          // 數量輸入框
+          Container(
+            width: 60,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            child: TextField(
+              controller: _deviceCountController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              // 根據互動開關決定是否啟用輸入
+              enabled: widget.enableInteractions,
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(2),
+              ],
+            ),
+          ),
+
+          // 增加按鈕 - 新增互動檢查
+          InkWell(
+            onTap: widget.enableInteractions ? () {
+              if (_deviceCount < 10) {
+                setState(() {
+                  _deviceCount++;
+                  _deviceCountController.text = _deviceCount.toString();
+                });
+              }
+            } : null, // 如果禁用互動，設為null
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD9D9D9),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 構建選項卡
+  Widget _buildTabBar() {
+    return Container(
+      margin: const EdgeInsetsDirectional.only(start: 60, end: 60, top: 10, bottom: 5),
+      height: 30,
+      child: CustomPaint(
+        painter: GradientBorderPainter(),
+        child: Container(
+          margin: const EdgeInsets.all(2), // 為邊框留空間
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(13),
+            color: Colors.transparent,
+          ),
+          child: Stack(
+            children: [
+              // 移動的白色膠囊背景
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                left: _getTabCapsulePosition(),
+                top: 0,
+                bottom: 0,
+                child: _buildTabCapsule(),
+              ),
+
+              // 文字按鈕層
+              Row(
+                children: [
+                  // Topology 選項卡
+                  Expanded(
+                    child: GestureDetector(
+                      // 根據互動開關決定是否響應點擊
+                      onTap: widget.enableInteractions ? () => _handleViewModeChanged('topology') : null,
+                      child: Container(
+                        alignment: Alignment.center,
+                        child: Text(
+                          'Topology',
+                          style: TextStyle(
+                            color: _viewMode == 'topology'
+                                ? Color(0xFF7B2CBF)     // 選中時紫色字體
+                                : Colors.white,   // 未選中時白色字體
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // List 選項卡
+                  Expanded(
+                    child: GestureDetector(
+                      // 根據互動開關決定是否響應點擊
+                      onTap: widget.enableInteractions ? () => _handleViewModeChanged('list') : null,
+                      child: Container(
+                        alignment: Alignment.center,
+                        child: Text(
+                          'List',
+                          style: TextStyle(
+                            color: _viewMode == 'list'
+                                ? Colors.black      // 選中時黑色字體（在白色膠囊上）
+                                : Colors.white,     // 未選中時白色字體
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-// 構建底部導航欄
+  // 構建底部導航欄
   Widget _buildBottomNavBar() {
     final screenWidth = MediaQuery.of(context).size.width;
 
@@ -651,75 +564,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     );
   }
 
-// 計算圓圈位置 - 修正 barWidth 計算
-  double _getCirclePosition() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final barWidth = screenWidth * 0.70; // 修正：bar的實際寬度 (100% - 15% * 2)
-    final circleSize = 47.0; // 要與 _buildAnimatedCircle() 中的大小一致
-
-    // Bar 的圓角半徑 (從 BottomNavBarPainter 中的設定)
-    final barRadius = 35.0; // bar height (70) / 2
-
-    // 計算圓圈與圓弧切齊時的位置
-    final edgeDistance = barRadius - (circleSize / 2); // 圓圈中心距離邊緣的距離
-
-    // 每個區域的寬度（三等分）
-    final sectionWidth = barWidth / 3;
-
-    // 計算中間位置
-    final centerOffset = (sectionWidth - circleSize) / 2;
-
-    switch (_selectedBottomTab) {
-      case 0: // Dashboard - 與左側圓弧切齊
-        return edgeDistance - 1.9; // 圓圈與左邊圓弧完美貼合
-      case 1: // 中間 - 保持居中
-        return sectionWidth + centerOffset;
-      case 2: // Setting - 與右側圓弧切齊
-        return barWidth - circleSize - edgeDistance -0.2; // 修正右側位置
-      default:
-        return sectionWidth + centerOffset; // 預設中間
-    }
-  }
-
-// 構建會移動的圓圈
-  Widget _buildAnimatedCircle() {
-    return Container(
-      width: 47,
-      height: 47,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // 發光效果
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  Colors.white.withOpacity(0.1),
-                  const Color(0xFF9747FF).withOpacity(0.0),  //圓圈中心顏色模糊
-                  Colors.transparent,
-                ],
-                stops: const [0.0, 0.7, 1.0],
-              ),
-            ),
-          ),
-
-          // 漸變邊框圓圈
-          Container(
-            width: 47,
-            height: 47,
-            child: CustomPaint(
-              painter: GradientRingPainter(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-// 構建底部導航圖標
+  // 構建底部導航圖標 - 新增互動檢查
   Widget _buildBottomNavIconWithImage(
       int index,
       String imagePath,
@@ -728,7 +573,8 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     final isSelected = index == _selectedBottomTab;
 
     return GestureDetector(
-      onTap: () => _handleBottomTabChanged(index),
+      // 根據互動開關決定是否響應點擊
+      onTap: widget.enableInteractions ? () => _handleBottomTabChanged(index) : null,
       child: Container(
         width: 60,
         height: 60,
@@ -755,7 +601,198 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     );
   }
 
-// 獲取預設圖標
+  // 其餘的輔助方法保持不變...
+  double _getTabCapsulePosition() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final totalMargin = 120 + 4;
+    final tabBarWidth = screenWidth - totalMargin;
+    final capsuleWidth = tabBarWidth / 2;
+
+    switch (_viewMode) {
+      case 'topology':
+        return 0;
+      case 'list':
+        return capsuleWidth;
+      default:
+        return 0;
+    }
+  }
+
+  Widget _buildTabCapsule() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final totalMargin = 120 + 4;
+        final tabBarWidth = screenWidth - totalMargin;
+        final capsuleWidth = tabBarWidth / 2;
+
+        return Container(
+          width: capsuleWidth,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withOpacity(0.2),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  List<NetworkDevice> _getDevices() {
+    if (widget.externalDevices != null && widget.externalDevices!.isNotEmpty) {
+      return widget.externalDevices!;
+    }
+
+    List<NetworkDevice> dummyDevices = [];
+
+    for (int i = 0; i < _deviceCount; i++) {
+      String name = '';
+      String deviceType = '';
+
+      switch (i) {
+        case 0:
+          name = 'TV';
+          deviceType = 'OWA813V_6G';
+          break;
+        case 1:
+          name = 'Xbox';
+          deviceType = 'Connected via Ethernet';
+          break;
+        case 2:
+          name = 'Iphone';
+          deviceType = 'OWA813V_6G';
+          break;
+        case 3:
+          name = 'Laptop';
+          deviceType = 'OWA813V_5G';
+          break;
+        default:
+          name = '設備 ${i + 1}';
+          deviceType = 'OWA813V_6G';
+      }
+
+      final isWired = (name == 'Xbox');
+
+      final device = NetworkDevice(
+        name: name,
+        id: 'device-${i + 1}',
+        mac: '48:21:0B:4A:47:9B',
+        ip: '192.168.1.164',
+        connectionType: isWired ? ConnectionType.wired : ConnectionType.wireless,
+        additionalInfo: {
+          'type': deviceType,
+          'status': 'online',
+        },
+      );
+
+      dummyDevices.add(device);
+    }
+
+    return dummyDevices;
+  }
+
+  List<DeviceConnection> _getDeviceConnections(List<NetworkDevice> devices) {
+    if (widget.externalDeviceConnections != null && widget.externalDeviceConnections!.isNotEmpty) {
+      return widget.externalDeviceConnections!;
+    }
+
+    List<DeviceConnection> connections = [];
+
+    for (var device in devices) {
+      connections.add(
+        DeviceConnection(
+          deviceId: device.id,
+          connectedDevicesCount: 2,
+        ),
+      );
+    }
+
+    return connections;
+  }
+
+  Widget _buildSpeedArea() {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Container(
+      margin: const EdgeInsets.only(left: 3, right: 3, top: 0, bottom: 20),
+      child: _appTheme.whiteBoxTheme.buildStandardCard(
+        width: screenWidth - 36,
+        height: 160,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            SpeedChartWidget(
+              dataGenerator: _speedDataGenerator,
+              animationController: _animationController,
+              endAtPercent: 0.7,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _getCirclePosition() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final barWidth = screenWidth * 0.70;
+    final circleSize = 47.0;
+    final barRadius = 35.0;
+    final edgeDistance = barRadius - (circleSize / 2);
+    final sectionWidth = barWidth / 3;
+    final centerOffset = (sectionWidth - circleSize) / 2;
+
+    switch (_selectedBottomTab) {
+      case 0:
+        return edgeDistance - 1.9;
+      case 1:
+        return sectionWidth + centerOffset;
+      case 2:
+        return barWidth - circleSize - edgeDistance - 0.2;
+      default:
+        return sectionWidth + centerOffset;
+    }
+  }
+
+  Widget _buildAnimatedCircle() {
+    return Container(
+      width: 47,
+      height: 47,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Colors.white.withOpacity(0.1),
+                  const Color(0xFF9747FF).withOpacity(0.0),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.7, 1.0],
+              ),
+            ),
+          ),
+          Container(
+            width: 47,
+            height: 47,
+            child: CustomPaint(
+              painter: GradientRingPainter(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   IconData _getDefaultIcon(int index) {
     switch (index) {
       case 0:
@@ -769,13 +806,11 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     }
   }
 
-
-  // 構建底部導航項
   Widget _buildBottomNavItem(int index, String label) {
     final isSelected = index == _selectedBottomTab;
 
     return GestureDetector(
-      onTap: () => _handleBottomTabChanged(index),
+      onTap: widget.enableInteractions ? () => _handleBottomTabChanged(index) : null,
       child: Container(
         width: 80,
         height: 80,

@@ -63,23 +63,23 @@ class NetworkTopologyComponent extends StatefulWidget {
 
 class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   // 佈局常量 - 互聯網圖標位置
-  static const double kInternetHorizontalPosition = 0.5;  // 水平位置 (比例，0.5 = 50%)
+  static const double kInternetHorizontalPosition = 0.45;  // 水平位置 (比例，0.5 = 50%)
   static const double kInternetVerticalPosition = 0.25;   // 垂直位置 (比例，0.25 = 25%)
   static const double kInternetHorizontalPosition34 = 0.3;  // 3-4設備時的水平位置
 
   // 佈局常量 - 主路由器/網關位置
-  static const double kGatewayHorizontalPosition = 0.5;   // 水平位置 (比例，0.5 = 50%)
+  static const double kGatewayHorizontalPosition = 0.45;   // 水平位置 (比例，0.5 = 50%)
   static const double kGatewayVerticalPosition = 0.5;     // 垂直位置 (比例，0.5 = 50%)
   static const double kGatewayHorizontalPosition34 = 0.3; // 3-4設備時的網關水平位置
 
   // 佈局常量 - 單一設備位置 (一個設備時)
-  static const double kSingleDeviceHorizontalPosition = 0.5;  // 水平位置 (比例，0.5 = 50%)
+  static const double kSingleDeviceHorizontalPosition = 0.45;  // 水平位置 (比例，0.5 = 50%)
   static const double kSingleDeviceVerticalPosition = 0.85;   // 垂直位置 (比例，0.85 = 85%)
 
   // 佈局常量 - 兩個設備位置 (兩個設備時的水平分布)
   static const double kTwoDevicesLeftPosition = 0.3;     // 左側設備水平位置 (比例，0.3 = 30%)
-  static const double kTwoDevicesRightPosition = 0.7;    // 右側設備水平位置 (比例，0.7 = 70%)
-  static const double kTwoDevicesVerticalPosition = 0.85; // 兩個設備共用的垂直位置 (比例，0.85 = 85%)
+  static const double kTwoDevicesRightPosition = 0.6;    // 右側設備水平位置 (比例，0.7 = 70%)
+  static const double kTwoDevicesVerticalPosition = 0.80; // 兩個設備共用的垂直位置 (比例，0.85 = 85%)
 
   // 佈局常量 - 設備右側列位置 (3-4個設備時)
   static const double kRightColumnHorizontalPosition = 0.65;  // 右側列水平位置 (比例，0.65 = 65%)
