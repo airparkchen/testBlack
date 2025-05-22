@@ -15,10 +15,11 @@ class DeviceConnection {
   });
 }
 
-/// 網絡拓撲圖元件
+/// 網絡拓撲圖元件 - 使用 Stack + Image.asset() 方式
 ///
 /// 顯示網絡設備之間的連接關係，包括有線和無線連接
 /// 根據設備數量自動調整佈局
+/// 這種實現方式與專案中其他圖片使用方式保持一致
 class NetworkTopologyComponent extends StatefulWidget {
   /// 中央路由器/網關名稱
   final String gatewayName;
@@ -44,15 +45,6 @@ class NetworkTopologyComponent extends StatefulWidget {
   /// 當設備被點擊時的回調
   final Function(NetworkDevice)? onDeviceSelected;
 
-  /// 路由器圖標構建器
-  final Widget Function()? routerIconBuilder;
-
-  /// 互聯網圖標構建器
-  final Widget Function()? internetIconBuilder;
-
-  /// 設備圖標構建器
-  final Widget Function(ConnectionType)? deviceIconBuilder;
-
   const NetworkTopologyComponent({
     Key? key,
     required this.gatewayName,
@@ -63,9 +55,6 @@ class NetworkTopologyComponent extends StatefulWidget {
     this.width = double.infinity,
     this.height = 400,
     this.onDeviceSelected,
-    this.routerIconBuilder,
-    this.internetIconBuilder,
-    this.deviceIconBuilder,
   }) : super(key: key);
 
   @override
@@ -75,15 +64,13 @@ class NetworkTopologyComponent extends StatefulWidget {
 class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   // 佈局常量 - 互聯網圖標位置
   static const double kInternetHorizontalPosition = 0.5;  // 水平位置 (比例，0.5 = 50%)
-  static const double kInternetVerticalPosition = 0.25;   // 垂直位置 (比例，0.15 = 15%)
-  static const double kInternetHorizontalPosition34 = 0.3;  // 水平位置 (比例，0.5 = 50%)
+  static const double kInternetVerticalPosition = 0.25;   // 垂直位置 (比例，0.25 = 25%)
+  static const double kInternetHorizontalPosition34 = 0.3;  // 3-4設備時的水平位置
 
   // 佈局常量 - 主路由器/網關位置
   static const double kGatewayHorizontalPosition = 0.5;   // 水平位置 (比例，0.5 = 50%)
   static const double kGatewayVerticalPosition = 0.5;     // 垂直位置 (比例，0.5 = 50%)
-
-  // 佈局常量 - 當設備數量為3-4時的主路由器/網關位置
-  static const double kGatewayHorizontalPosition34 = 0.3; // 水平位置 (比例，0.3 = 30%)
+  static const double kGatewayHorizontalPosition34 = 0.3; // 3-4設備時的網關水平位置
 
   // 佈局常量 - 單一設備位置 (一個設備時)
   static const double kSingleDeviceHorizontalPosition = 0.5;  // 水平位置 (比例，0.5 = 50%)
@@ -95,7 +82,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   static const double kTwoDevicesVerticalPosition = 0.85; // 兩個設備共用的垂直位置 (比例，0.85 = 85%)
 
   // 佈局常量 - 設備右側列位置 (3-4個設備時)
-  static const double kRightColumnHorizontalPosition = 0.65;  // 右側列水平位置 (比例，0.85 = 85%)
+  static const double kRightColumnHorizontalPosition = 0.65;  // 右側列水平位置 (比例，0.65 = 65%)
 
   // 佈局常量 - 垂直排列設備位置 (3個設備時的垂直分布)
   static const List<double> kThreeDevicesVerticalPositions = [0.2, 0.5, 0.8];  // 垂直位置列表
@@ -109,187 +96,403 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   static const double kDeviceRadius = 25.0;    // 設備圖標半徑
   static const double kLabelRadius = 12.0;     // 標籤圓形半徑
 
-  // 佈局常量 - 連接線
-  static const double kWiredLineWidth = 2.0;    // 有線連接線寬度
-  static const double kWirelessLineWidth = 2.0; // 無線連接線寬度
-  static const double kDashLength = 5.0;        // 虛線長度
-  static const double kGapLength = 5.0;         // 虛線間隔長度
-
-  // 佈局常量 - 標籤偏移
-  static const double kLabelOffsetX = 15.0;     // 標籤水平偏移
-  static const double kLabelOffsetY = 15.0;     // 標籤垂直偏移
-
-  // 佈局常量 - 文字大小
-  static const double kLabelFontSize = 14.0;    // 標籤文字大小
-  static const double kNameFontSize = 12.0;     // 名稱文字大小
-
   @override
   Widget build(BuildContext context) {
+    // 獲取螢幕尺寸並計算實際容器尺寸
+    final screenSize = MediaQuery.of(context).size;
+    final actualWidth = widget.width == double.infinity ? screenSize.width : widget.width;
+    final actualHeight = widget.height;
+
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: actualWidth,
+      height: actualHeight,
       color: Colors.transparent,
-      child: CustomPaint(
-        painter: TopologyPainter(
-          gatewayName: widget.gatewayName,
-          devices: widget.devices,
-          deviceConnections: widget.deviceConnections,
-          totalConnectedDevices: widget.totalConnectedDevices ?? widget.devices.length,
-          showInternet: widget.showInternet,
-          layoutConstants: LayoutConstants(
-            internetHorizontalPosition: kInternetHorizontalPosition,
-            internetVerticalPosition: kInternetVerticalPosition,
-            gatewayHorizontalPosition: kGatewayHorizontalPosition,
-            gatewayVerticalPosition: kGatewayVerticalPosition,
-            internetHorizontalPosition34: kInternetHorizontalPosition34, //
-            gatewayHorizontalPosition34: kGatewayHorizontalPosition34, // 添加3-4設備時的網關水平位置
-            singleDeviceHorizontalPosition: kSingleDeviceHorizontalPosition,
-            singleDeviceVerticalPosition: kSingleDeviceVerticalPosition,
-            twoDevicesLeftPosition: kTwoDevicesLeftPosition,
-            twoDevicesRightPosition: kTwoDevicesRightPosition,
-            twoDevicesVerticalPosition: kTwoDevicesVerticalPosition,
-            rightColumnHorizontalPosition: kRightColumnHorizontalPosition,
-            threeDevicesVerticalPositions: kThreeDevicesVerticalPositions,
-            verticalSpacing: kVerticalSpacing,
-            internetRadius: kInternetRadius,
-            gatewayRadius: kGatewayRadius,
-            deviceRadius: kDeviceRadius,
-            labelRadius: kLabelRadius,
-            wiredLineWidth: kWiredLineWidth,
-            wirelessLineWidth: kWirelessLineWidth,
-            dashLength: kDashLength,
-            gapLength: kGapLength,
-            labelOffsetX: kLabelOffsetX,
-            labelOffsetY: kLabelOffsetY,
-            labelFontSize: kLabelFontSize,
-            nameFontSize: kNameFontSize,
+      child: Stack(
+        children: [
+          // 背景和連接線 - 使用 CustomPainter 只繪製線條
+          Positioned.fill(
+            child: CustomPaint(
+              painter: ConnectionLinesPainter(
+                calculateDevicePosition: _calculateDevicePosition,
+                devices: widget.devices,
+                showInternet: widget.showInternet,
+                gatewayPosition: _calculateGatewayPosition(actualWidth, actualHeight),
+                internetPosition: widget.showInternet ? _calculateInternetPosition(actualWidth, actualHeight) : null,
+                containerWidth: actualWidth,
+                containerHeight: actualHeight,
+              ),
+            ),
           ),
+
+          // 互聯網圖標
+          if (widget.showInternet) _buildInternetIcon(actualWidth, actualHeight),
+
+          // 網關圖標（無數字標籤）
+          _buildGatewayIcon(actualWidth, actualHeight),
+
+          // 設備圖標們（無數字標籤）
+          ...widget.devices.map((device) => _buildDeviceIcon(device, actualWidth, actualHeight)),
+
+          // 獨立的數字標籤們 - 放在最後確保在最上層
+          _buildGatewayLabel(actualWidth, actualHeight),
+          ...widget.devices.map((device) => _buildDeviceLabel(device, actualWidth, actualHeight)),
+        ],
+      ),
+    );
+  }
+
+  // 建構網關的獨立數字標籤
+  Widget _buildGatewayLabel(double containerWidth, double containerHeight) {
+    final centerPosition = _calculateGatewayPosition(containerWidth, containerHeight);
+    final totalDevices = widget.totalConnectedDevices ?? widget.devices.length;
+
+    if (totalDevices <= 0) {
+      return const SizedBox.shrink(); // 返回空 Widget
+    }
+
+    return Positioned(
+      left: centerPosition.dx + (kDeviceRadius * 1) - kLabelRadius,  // 往左移一點
+      top: centerPosition.dy + (kDeviceRadius * 0.9) - kLabelRadius,   // 往上移一點
+      child: Container(
+        width: kLabelRadius * 2,
+        height: kLabelRadius * 2,
+        decoration: BoxDecoration(
+          color: Color(0xFF9747FF),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1),
         ),
-        child: GestureDetector(
-          onTapDown: (details) {
-            // 處理點擊事件，檢查是否點擊了設備
-            _handleTap(details.localPosition);
-          },
-          // 使元件能夠接收手勢
-          behavior: HitTestBehavior.opaque,
-          child: Container(),
+        child: Center(
+          child: Text(
+            totalDevices.toString(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // 處理點擊事件
-  void _handleTap(Offset position) {
-    // 檢查是否點擊了設備
-    for (var device in widget.devices) {
-      // 計算設備圓心位置
-      final centerPosition = _calculateDevicePosition(device);
+  // 建構網關的獨立數字標籤
+// 建構獨立的數字標籤
+  Widget _buildDeviceLabel(NetworkDevice device, double containerWidth, double containerHeight) {
+    final centerPosition = _calculateDevicePosition(device, containerWidth, containerHeight);
+    final connectionCount = _getDeviceConnectionCount(device.id);
 
-      // 計算點擊位置與設備圓心的距離
-      final distance = (position - centerPosition).distance;
-
-      // 如果距離小於設備圖標半徑，則認為點擊了該設備
-      if (distance <= kDeviceRadius) {
-        // 如果有設備選中回調，觸發回調
-        if (widget.onDeviceSelected != null) {
-          widget.onDeviceSelected!(device);
-        }
-        return;
-      }
+    //如果數量為 0 就不顯示
+    if (connectionCount <= 0) {
+      return const SizedBox.shrink(); // 返回空 Widget
     }
 
-    // 檢查是否點擊了中央網關
-    final gatewayPosition = _calculateGatewayPosition();
-    final gatewayDistance = (position - gatewayPosition).distance;
-
-    if (gatewayDistance <= kGatewayRadius) {
-      // 如果有設備選中回調，觸發回調，指明這是網關
-      if (widget.onDeviceSelected != null) {
-        // 創建一個表示網關的虛擬設備
-        final gatewayDevice = NetworkDevice(
-          name: widget.gatewayName,
-          id: 'gateway',
-          mac: '48:21:0B:4A:46:CF', // 預設 MAC
-          ip: '192.168.1.1',        // 預設 IP
-          connectionType: ConnectionType.wired,
-          additionalInfo: {
-            'type': 'gateway',
-            'status': 'online',
-          },
-        );
-
-        // 傳遞網關設備
-        widget.onDeviceSelected!(gatewayDevice);
-      }
-    }
+    return Positioned(
+      // 計算標籤位置：設備圓心 + 設備半徑 + 標籤偏移
+      left: centerPosition.dx + (kDeviceRadius * 0.8) - kLabelRadius,  // 往左移一點
+      top: centerPosition.dy + (kDeviceRadius * 0.8) - kLabelRadius,   // 往上移一點
+      child: Container(
+        width: kLabelRadius * 2,
+        height: kLabelRadius * 2,
+        decoration: BoxDecoration(
+          color: Color(0xFF9747FF),  // 完全不透明
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1), // 可選：加個白邊
+        ),
+        child: Center(
+          child: Text(
+            connectionCount.toString(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
-  // 計算網關位置 - 根據設備數量決定
-  Offset _calculateGatewayPosition() {
-    // 當設備數量為3或4時，網關位置移到左側30%
+  // 建構互聯網圖標 - 傳入實際尺寸
+  Widget _buildInternetIcon(double containerWidth, double containerHeight) {
+    final centerPosition = _calculateInternetPosition(containerWidth, containerHeight);
+
+    return Positioned(
+      left: centerPosition.dx - kInternetRadius,
+      top: centerPosition.dy - kInternetRadius,
+      child: GestureDetector(
+        onTap: () {
+          print('互聯網圖標被點擊');
+        },
+        child: Container(
+          width: kInternetRadius * 2,
+          height: kInternetRadius * 2,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            // border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: Container(
+            width: kInternetRadius * 2,
+            height: kInternetRadius * 2,
+            child: Center(
+              child: Container(
+                width: 16,  // 白點大小
+                height: 16,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 建構網關圖標 - 傳入實際尺寸
+  Widget _buildGatewayIcon(double containerWidth, double containerHeight) {
+    final centerPosition = _calculateGatewayPosition(containerWidth, containerHeight);
+    final totalDevices = widget.totalConnectedDevices ?? widget.devices.length;
+
+    return Positioned(
+      left: centerPosition.dx - kGatewayRadius,
+      top: centerPosition.dy - kGatewayRadius,
+      child: GestureDetector(
+        onTap: () {
+          if (widget.onDeviceSelected != null) {
+            final gatewayDevice = NetworkDevice(
+              name: widget.gatewayName,
+              id: 'gateway',
+              mac: '48:21:0B:4A:46:CF',
+              ip: '192.168.1.1',
+              connectionType: ConnectionType.wired,
+              additionalInfo: {
+                'type': 'gateway',
+                'status': 'online',
+              },
+            );
+            widget.onDeviceSelected!(gatewayDevice);
+          }
+        },
+        child: Container(
+          width: kGatewayRadius * 2,
+          height: kGatewayRadius * 2,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: ClipOval(
+            child: Container(
+              color: Colors.black.withOpacity(0),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Image.asset(
+                      'assets/images/icon/router.png',
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(
+                          Icons.router,
+                          color: Colors.white,
+                          size: 25,
+                        );
+                      },
+                    ),
+                  ),
+                  // Positioned(
+                  //   right: -5,
+                  //   bottom: -5,
+                  //   child: Container(
+                  //     width: kLabelRadius * 2,
+                  //     height: kLabelRadius * 2,
+                  //     decoration: BoxDecoration(
+                  //       color: Colors.purple.withOpacity(0.7),
+                  //       shape: BoxShape.circle,
+                  //     ),
+                  //     child: Center(
+                  //       child: Text(
+                  //         totalDevices.toString(),
+                  //         style: const TextStyle(
+                  //           color: Colors.white,
+                  //           fontSize: 12,
+                  //           fontWeight: FontWeight.bold,
+                  //         ),
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 建構設備圖標 - 傳入實際尺寸
+  Widget _buildDeviceIcon(NetworkDevice device, double containerWidth, double containerHeight) {
+    final centerPosition = _calculateDevicePosition(device, containerWidth, containerHeight);
+    final connectionCount = _getDeviceConnectionCount(device.id);
+
+    // String iconPath = device.connectionType == ConnectionType.wired
+    //     ? 'assets/images/icon/mesh.png'
+    //     : 'assets/images/icon/router.png';
+    String iconPath = 'assets/images/icon/mesh.png';
+
+    //調整有線與無線 (連線)
+    IconData fallbackIcon = device.connectionType == ConnectionType.wired
+        ? Icons.lan
+        : Icons.wifi;
+
+    return Positioned(
+      left: centerPosition.dx - kDeviceRadius,
+      top: centerPosition.dy - kDeviceRadius,
+      child: GestureDetector(
+        onTap: () {
+          if (widget.onDeviceSelected != null) {
+            widget.onDeviceSelected!(device);
+          }
+        },
+        child: Container(
+          width: kDeviceRadius * 2,
+          height: kDeviceRadius * 2,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: ClipOval(
+            child: Container(
+              color: Colors.purple.withOpacity(0.0),
+              child: Stack(
+                children: [
+                  Center(
+                    child: ColorFiltered(
+                      colorFilter: ColorFilter.mode(
+                        Colors.white.withOpacity(1.0),  //調整裝置圖標顏色飽和度
+                        BlendMode.srcIn,
+                      ),
+                      child: Image.asset(   //裝置圖標大小
+                        iconPath,
+                        width: 30,
+                        height: 30,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            fallbackIcon,
+                            color: Colors.white.withOpacity(0.8),
+                            size: 15,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  // Positioned(
+                  //   right: -5,
+                  //   bottom: -5,
+                  //   child: Container(
+                  //     width: kLabelRadius * 2,
+                  //     height: kLabelRadius * 2,
+                  //     decoration: BoxDecoration(
+                  //       color: Colors.purple.withOpacity(0.7),
+                  //       shape: BoxShape.circle,
+                  //     ),
+                  //     child: Center(
+                  //       child: Text(
+                  //         connectionCount.toString(),
+                  //         style: const TextStyle(
+                  //           color: Colors.white,
+                  //           fontSize: 12,
+                  //           fontWeight: FontWeight.bold,
+                  //         ),
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 計算互聯網圖標位置 - 使用實際尺寸
+  Offset _calculateInternetPosition(double containerWidth, double containerHeight) {
     if (widget.devices.length >= 3 && widget.devices.length <= 4) {
       return Offset(
-          widget.width * kGatewayHorizontalPosition34, // 使用30%水平位置
-          widget.height * kGatewayVerticalPosition
+          containerWidth * kInternetHorizontalPosition34,
+          containerHeight * kInternetVerticalPosition
       );
     } else {
-      // 其他情況下，網關位置固定在中央50%
       return Offset(
-          widget.width * kGatewayHorizontalPosition,
-          widget.height * kGatewayVerticalPosition
+          containerWidth * kInternetHorizontalPosition,
+          containerHeight * kInternetVerticalPosition
       );
     }
   }
 
-  // 計算設備位置
-  Offset _calculateDevicePosition(NetworkDevice device) {
+  // 計算網關位置 - 使用實際尺寸
+  Offset _calculateGatewayPosition(double containerWidth, double containerHeight) {
+    if (widget.devices.length >= 3 && widget.devices.length <= 4) {
+      return Offset(
+          containerWidth * kGatewayHorizontalPosition34,
+          containerHeight * kGatewayVerticalPosition
+      );
+    } else {
+      return Offset(
+          containerWidth * kGatewayHorizontalPosition,
+          containerHeight * kGatewayVerticalPosition
+      );
+    }
+  }
+
+  // 計算設備位置 - 使用實際尺寸，保持原始邏輯
+  Offset _calculateDevicePosition(NetworkDevice device, double containerWidth, double containerHeight) {
     final deviceCount = widget.devices.length;
     final index = widget.devices.indexOf(device);
-    final gatewayPosition = _calculateGatewayPosition(); // 獲取網關位置
 
-    // 根據設備數量決定佈局
+    // 根據設備數量決定佈局 - 保持原始邏輯
     if (deviceCount == 1) {
-      // 只有一個設備：放在下方 (50% 水平, 85% 垂直)
       return Offset(
-          widget.width * kSingleDeviceHorizontalPosition,
-          widget.height * kSingleDeviceVerticalPosition
+          containerWidth * kSingleDeviceHorizontalPosition,
+          containerHeight * kSingleDeviceVerticalPosition
       );
     }
     else if (deviceCount == 2) {
-      // 兩個設備：水平排列在下方
       double horizontalOffset;
-
       if (index == 0) {
-        horizontalOffset = kTwoDevicesLeftPosition; // 左側設備 (30% 水平)
+        horizontalOffset = kTwoDevicesLeftPosition;
       } else {
-        horizontalOffset = kTwoDevicesRightPosition; // 右側設備 (70% 水平)
+        horizontalOffset = kTwoDevicesRightPosition;
       }
 
       return Offset(
-          widget.width * horizontalOffset,
-          widget.height * kTwoDevicesVerticalPosition
+          containerWidth * horizontalOffset,
+          containerHeight * kTwoDevicesVerticalPosition
       );
     }
     else if (deviceCount == 3) {
-      // 三個設備：垂直排列在右側，使用預設的三個位置
       double verticalPosition = kThreeDevicesVerticalPositions[index];
 
       return Offset(
-          widget.width * kRightColumnHorizontalPosition,
-          widget.height * verticalPosition
+          containerWidth * kRightColumnHorizontalPosition, // 調整右側列位置
+          containerHeight * verticalPosition
       );
     }
     else if (deviceCount <= 4) {
-      // 四個設備：垂直排列在右側，均勻分布
-      double verticalPosition = 0.2 + index * kVerticalSpacing; // 0.2, 0.4, 0.6, 0.8
+      double verticalPosition = 0.2 + index * kVerticalSpacing;
 
       return Offset(
-          widget.width * kRightColumnHorizontalPosition,
-          widget.height * verticalPosition
+          containerWidth * kRightColumnHorizontalPosition, // 調整右側列位置
+          containerHeight * verticalPosition
       );
     }
     else {
-      // 超過四個設備時的處理 (這裡簡化為圓形分布)
+      final gatewayPosition = _calculateGatewayPosition(containerWidth, containerHeight);
       final angle = 2 * math.pi * index / deviceCount;
       return Offset(
         gatewayPosition.dx + 150 * math.cos(angle),
@@ -300,7 +503,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
 
   // 獲取裝置的連接數量
   int _getDeviceConnectionCount(String deviceId) {
-    if (widget.deviceConnections == null) return 0;
+    if (widget.deviceConnections == null) return 2;
 
     try {
       final connection = widget.deviceConnections!.firstWhere(
@@ -308,303 +511,96 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
       );
       return connection.connectedDevicesCount;
     } catch (e) {
-      return 0; // 如果找不到連接信息，返回0
+      return 2;
     }
   }
 }
 
-/// 拓撲圖布局常量集合
-class LayoutConstants {
-  final double internetHorizontalPosition;
-  final double internetVerticalPosition;
-  final double gatewayHorizontalPosition;
-  final double gatewayVerticalPosition;
-  final double gatewayHorizontalPosition34; // 添加3-4設備時的網關水平位置
-  final double internetHorizontalPosition34; // 添加3-4設備時的internet logo水平位置
-  final double singleDeviceHorizontalPosition;
-  final double singleDeviceVerticalPosition;
-  final double twoDevicesLeftPosition;
-  final double twoDevicesRightPosition;
-  final double twoDevicesVerticalPosition;
-  final double rightColumnHorizontalPosition;
-  final List<double> threeDevicesVerticalPositions;
-  final double verticalSpacing;
-  final double internetRadius;
-  final double gatewayRadius;
-  final double deviceRadius;
-  final double labelRadius;
-  final double wiredLineWidth;
-  final double wirelessLineWidth;
-  final double dashLength;
-  final double gapLength;
-  final double labelOffsetX;
-  final double labelOffsetY;
-  final double labelFontSize;
-  final double nameFontSize;
-
-  const LayoutConstants({
-    required this.internetHorizontalPosition,
-    required this.internetVerticalPosition,
-    required this.internetHorizontalPosition34,
-    required this.gatewayHorizontalPosition,
-    required this.gatewayVerticalPosition,
-    required this.gatewayHorizontalPosition34, // 添加3-4設備時的網關水平位置
-    required this.singleDeviceHorizontalPosition,
-    required this.singleDeviceVerticalPosition,
-    required this.twoDevicesLeftPosition,
-    required this.twoDevicesRightPosition,
-    required this.twoDevicesVerticalPosition,
-    required this.rightColumnHorizontalPosition,
-    required this.threeDevicesVerticalPositions,
-    required this.verticalSpacing,
-    required this.internetRadius,
-    required this.gatewayRadius,
-    required this.deviceRadius,
-    required this.labelRadius,
-    required this.wiredLineWidth,
-    required this.wirelessLineWidth,
-    required this.dashLength,
-    required this.gapLength,
-    required this.labelOffsetX,
-    required this.labelOffsetY,
-    required this.labelFontSize,
-    required this.nameFontSize,
-  });
-}
-
-/// 拓撲圖繪製器
-class TopologyPainter extends CustomPainter {
-  final String gatewayName;
+/// 只負責繪製連接線的 CustomPainter
+class ConnectionLinesPainter extends CustomPainter {
   final List<NetworkDevice> devices;
-  final List<DeviceConnection>? deviceConnections;
-  final int totalConnectedDevices;
   final bool showInternet;
-  final LayoutConstants layoutConstants;
+  final Offset gatewayPosition;
+  final Offset? internetPosition;
+  final double containerWidth;
+  final double containerHeight;
+  final Offset Function(NetworkDevice, double, double) calculateDevicePosition;
 
-
-  TopologyPainter({
-    required this.gatewayName,
+  ConnectionLinesPainter({
     required this.devices,
-    this.deviceConnections,
-    required this.totalConnectedDevices,
     required this.showInternet,
-    required this.layoutConstants,
+    required this.gatewayPosition,
+    this.internetPosition,
+    required this.containerWidth,
+    required this.containerHeight,
+    required this.calculateDevicePosition,  // 新增
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 計算網關位置 - 根據設備數量決定
-    final center = _calculateGatewayPosition(size);
-
-    // 繪製互聯網圖標（如果啟用）
-    if (showInternet) {
-      // 互聯網圖標位置 - 根據設備數量決定
-      final internetPosition = _calculateInternetPosition(size);
-      _drawInternetIcon(canvas, internetPosition);
-
-      // 繪製互聯網到網關的連線
-      _drawConnectionBetweenCircles(
-          canvas,
-          internetPosition,
-          layoutConstants.internetRadius,
-          center,
-          layoutConstants.gatewayRadius,
-          ConnectionType.wired
-      );
+    // 繪製互聯網到網關的連線
+    if (showInternet && internetPosition != null) {
+      _drawConnection(canvas, internetPosition!, gatewayPosition, ConnectionType.wired);
     }
-    // 繪製中央網關
-    _drawGateway(canvas, center, gatewayName, totalConnectedDevices);
 
-    // 繪製設備和連接線
+    // 繪製設備到網關的連線
     for (var device in devices) {
-      // 計算設備位置
-      final devicePosition = _calculateDevicePosition(device, size, center);
-
-      // 獲取設備連接數量
-      final connectionCount = _getDeviceConnectionCount(device.id);
-
-      // 繪製設備與網關之間的連接線
-      _drawConnectionBetweenCircles(
-          canvas,
-          center,
-          layoutConstants.gatewayRadius,
-          devicePosition,
-          layoutConstants.deviceRadius,
-          device.connectionType
-      );
-
-      // 繪製設備圖標
-      _drawDevice(canvas, devicePosition, device, connectionCount);
-    }
-  }
-  // 添加計算互聯網位置的方法
-  Offset _calculateInternetPosition(Size size) {
-    // 當設備數量為3或4時，互聯網位置也移到左側30%
-    if (devices.length >= 3 && devices.length <= 4) {
-      return Offset(
-          size.width * layoutConstants.internetHorizontalPosition34, // 使用30%水平位置
-          size.height * layoutConstants.internetVerticalPosition
-      );
-    } else {
-      // 其他情況下，互聯網位置固定在中央50%
-      return Offset(
-          size.width * layoutConstants.internetHorizontalPosition,
-          size.height * layoutConstants.internetVerticalPosition
-      );
+      final devicePosition = _calculateDevicePosition(device);
+      _drawConnection(canvas, gatewayPosition, devicePosition, device.connectionType);
     }
   }
 
-  // 計算網關位置 - 根據設備數量決定
-  Offset _calculateGatewayPosition(Size size) {
-    // 當設備數量為3或4時，網關位置移到左側30%
-    if (devices.length >= 3 && devices.length <= 4) {
-      return Offset(
-          size.width * layoutConstants.gatewayHorizontalPosition34, // 使用30%水平位置
-          size.height * layoutConstants.gatewayVerticalPosition
-      );
-    } else {
-      // 其他情況下，網關位置固定在中央50%
-      return Offset(
-          size.width * layoutConstants.gatewayHorizontalPosition,
-          size.height * layoutConstants.gatewayVerticalPosition
-      );
-    }
-  }
-
-  // 繪製互聯網圖標
-  void _drawInternetIcon(Canvas canvas, Offset position) {
-    // 繪製白色外框圓形
-    final outerCirclePaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    // 繪製外圈白色圓形
-    canvas.drawCircle(position, layoutConstants.internetRadius, outerCirclePaint);
-
-    // 繪製背景半透明圓形
-    final innerCirclePaint = Paint()
-      ..color = Colors.black.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-
-    // 繪製內部半透明圓形，稍小一些
-    canvas.drawCircle(position, layoutConstants.internetRadius - 1, innerCirclePaint);
-
-    // 繪製Internet圖標
-    final iconSize = layoutConstants.internetRadius * 1.2; // 稍大一些以便可見
-    final iconRect = Rect.fromCenter(
-      center: position,
-      width: iconSize,
-      height: iconSize,
-    );
-
-    // 使用 Canvas.drawImage，但需要先在外部加載圖像
-    // 這部分將在外部處理，這裡先預留位置
-  }
-
-  // 繪製網關圖標
-  void _drawGateway(Canvas canvas, Offset position, String name, int connectionCount) {
-    // 繪製白色外框圓形
-    final outerCirclePaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    // 繪製外圈白色圓形
-    canvas.drawCircle(position, layoutConstants.gatewayRadius, outerCirclePaint);
-
-    // 繪製背景半透明圓形
-    final innerCirclePaint = Paint()
-      ..color = Colors.black.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-
-    // 繪製內部半透明圓形，稍小一些
-    canvas.drawCircle(position, layoutConstants.gatewayRadius - 1, innerCirclePaint);
-
-    // 添加數字標籤，顯示連接的設備數量
-    _drawLabel(canvas, position, connectionCount.toString(), Colors.white);
-
-    // 網關圖標將在外部處理，這裡先預留位置
-  }
-
-  // 繪製設備圖標
-  void _drawDevice(Canvas canvas, Offset position, NetworkDevice device, int connectionCount) {
-    // 繪製白色外框圓形
-    final outerCirclePaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    // 繪製外圈白色圓形
-    canvas.drawCircle(position, layoutConstants.deviceRadius, outerCirclePaint);
-
-    // 繪製背景半透明圓形
-    final innerCirclePaint = Paint()
-      ..color = Colors.purple.withOpacity(0.7) // 使用紫色背景
-      ..style = PaintingStyle.fill;
-
-    // 繪製內部半透明圓形，稍小一些
-    canvas.drawCircle(position, layoutConstants.deviceRadius - 1, innerCirclePaint);
-
-    // 添加數字標籤 - 顯示連接的子設備數量
-    _drawLabel(canvas, position, connectionCount.toString(), Colors.white);
-
-    // 設備圖標將在外部處理，這裡先預留位置
-  }
-
-  // 繪製兩個圓形之間的連接線 (從圓周到圓周，而非圓心到圓心)
-  void _drawConnectionBetweenCircles(
-      Canvas canvas,
-      Offset start,
-      double startRadius,
-      Offset end,
-      double endRadius,
-      ConnectionType type
-      ) {
-    // 計算兩點之間的方向向量
+  // 繪製連接線 連接裝置的線
+  void _drawConnection(Canvas canvas, Offset start, Offset end, ConnectionType type) {
     final dx = end.dx - start.dx;
     final dy = end.dy - start.dy;
     final distance = math.sqrt(dx * dx + dy * dy);
 
-    // 確保距離不為零
     if (distance < 0.001) return;
 
-    // 計算單位向量
     final unitX = dx / distance;
     final unitY = dy / distance;
 
-    // 計算起點圓周上的點
-    final startX = start.dx + unitX * startRadius;
-    final startY = start.dy + unitY * startRadius;
+    double startRadius = 25.0; // 設備圓的半徑
+    double endRadius = 24.0;
 
-    // 計算終點圓周上的點
-    final endX = end.dx - unitX * endRadius;
-    final endY = end.dy - unitY * endRadius;
+    if (start == gatewayPosition) {
+      startRadius = 35.0; // 網關圓的半徑
+    }
+    if (end == gatewayPosition) {
+      endRadius = 35.0;
+    }
+    if (start == internetPosition) {
+      startRadius = 8.0;  // 白點半徑
+    }
+    if (end == internetPosition) {
+      endRadius = 8.0;   // 白點半徑
+    }
 
-    final adjustedStart = Offset(startX, startY);
-    final adjustedEnd = Offset(endX, endY);
-
-    final lineWidth = type == ConnectionType.wired
-        ? layoutConstants.wiredLineWidth
-        : layoutConstants.wirelessLineWidth;
+    final adjustedStart = Offset(
+      start.dx + unitX * startRadius,
+      start.dy + unitY * startRadius,
+    );
+    final adjustedEnd = Offset(
+      end.dx - unitX * endRadius,
+      end.dy - unitY * endRadius,
+    );
 
     final paint = Paint()
-      ..color = Colors.white // 使用白色連線
-      ..strokeWidth = lineWidth;
+      ..color = Colors.white  //線的顏色
+      ..strokeWidth = 2.0;  // 改變粗細
 
     if (type == ConnectionType.wired) {
-      // 有線連接使用實線
-      canvas.drawLine(adjustedStart, adjustedEnd, paint);
+      canvas.drawLine(adjustedStart, adjustedEnd, paint); // 實線
     } else {
-      // 無線連接使用虛線
-      _drawDashedLine(canvas, adjustedStart, adjustedEnd, paint);
+      _drawDashedLine(canvas, adjustedStart, adjustedEnd, paint); // 虛線
     }
   }
 
   // 繪製虛線
   void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
-    final dashLength = layoutConstants.dashLength;
-    final gapLength = layoutConstants.gapLength;
+    const dashLength = 5.0; // 虛線段長度
+    const gapLength = 5.0; // 虛線間隔長度
 
     final dx = end.dx - start.dx;
     final dy = end.dy - start.dy;
@@ -617,135 +613,46 @@ class TopologyPainter extends CustomPainter {
     for (int i = 0; i < iterations; i++) {
       final startDashX = start.dx + normalizedDx * (dashLength + gapLength) * i;
       final startDashY = start.dy + normalizedDy * (dashLength + gapLength) * i;
-
       final endDashX = startDashX + normalizedDx * dashLength;
       final endDashY = startDashY + normalizedDy * dashLength;
 
       canvas.drawLine(
-          Offset(startDashX, startDashY),
-          Offset(endDashX, endDashY),
-          paint
+        Offset(startDashX, startDashY),
+        Offset(endDashX, endDashY),
+        paint,
       );
     }
   }
 
-  // 繪製標籤
-  void _drawLabel(Canvas canvas, Offset position, String label, Color textColor) {
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          color: textColor,
-          fontSize: layoutConstants.labelFontSize,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-
-    textPainter.layout();
-
-    // 調整標籤位置到圓形的右下方
-    final labelPosition = Offset(
-        position.dx + layoutConstants.labelOffsetX,
-        position.dy + layoutConstants.labelOffsetY
-    );
-
-    // 添加一個小圓形作為標籤背景
-    final labelPaint = Paint()
-      ..color = Colors.purple.withOpacity(0.7) // 使用紫色背景
-      ..style = PaintingStyle.fill;
-
-    // 繪製標籤背景圓形
-    canvas.drawCircle(labelPosition, layoutConstants.labelRadius, labelPaint);
-
-    // 繪製標籤文字
-    textPainter.paint(
-      canvas,
-      Offset(
-        labelPosition.dx - textPainter.width / 2,
-        labelPosition.dy - textPainter.height / 2,
-      ),
-    );
+  // 計算設備位置（與主組件邏輯一致）
+  Offset _calculateDevicePosition(NetworkDevice device) {
+    return calculateDevicePosition(device, containerWidth, containerHeight);
   }
-
-  // 計算設備位置
-  Offset _calculateDevicePosition(NetworkDevice device, Size size, Offset gatewayPosition) {
-    final deviceCount = devices.length;
-    final index = devices.indexOf(device);
-
-    // 根據設備數量決定佈局
-    if (deviceCount == 1) {
-      // 只有一個設備：放在下方 (50% 水平, 85% 垂直)
-      return Offset(
-          size.width * layoutConstants.singleDeviceHorizontalPosition,
-          size.height * layoutConstants.singleDeviceVerticalPosition
-      );
-    }
-    else if (deviceCount == 2) {
-      // 兩個設備：水平排列在下方
-      double horizontalOffset;
-
-      if (index == 0) {
-        horizontalOffset = layoutConstants.twoDevicesLeftPosition; // 左側設備 (30% 水平)
-      } else {
-        horizontalOffset = layoutConstants.twoDevicesRightPosition; // 右側設備 (70% 水平)
-      }
-
-      return Offset(
-          size.width * horizontalOffset,
-          size.height * layoutConstants.twoDevicesVerticalPosition
-      );
-    }
-    else if (deviceCount == 3) {
-      // 三個設備：垂直排列在右側，使用預設的三個位置
-      double verticalPosition = layoutConstants.threeDevicesVerticalPositions[index];
-
-      return Offset(
-          size.width * layoutConstants.rightColumnHorizontalPosition,
-          size.height * verticalPosition
-      );
-    }
-    else if (deviceCount <= 4) {
-      // 四個設備：垂直排列在右側，均勻分布
-      double verticalPosition = 0.2 + index * layoutConstants.verticalSpacing; // 0.2, 0.4, 0.6, 0.8
-
-      return Offset(
-          size.width * layoutConstants.rightColumnHorizontalPosition,
-          size.height * verticalPosition
-      );
-    }
-    else {
-      // 超過四個設備時的處理 (這裡簡化為圓形分布)
-      final angle = 2 * math.pi * index / deviceCount;
-      return Offset(
-        gatewayPosition.dx + 150 * math.cos(angle),
-        gatewayPosition.dy + 150 * math.sin(angle),
-      );
-    }
-  }
-
-  // 獲取裝置的連接數量
-  int _getDeviceConnectionCount(String deviceId) {
-    if (deviceConnections == null) return 0;
-
-    try {
-      final connection = deviceConnections!.firstWhere(
-              (conn) => conn.deviceId == deviceId
-      );
-      return connection.connectedDevicesCount;
-    } catch (e) {
-      return 0; // 如果找不到連接信息，返回0
-    }
-  }
+  //   final deviceCount = devices.length;
+  //   final index = devices.indexOf(device);
+  //
+  //   if (deviceCount == 1) {
+  //     return Offset(containerWidth * 0.5, containerHeight * 0.85);
+  //   } else if (deviceCount == 2) {
+  //     double horizontalOffset = index == 0 ? 0.3 : 0.7;
+  //     return Offset(containerWidth * horizontalOffset, containerHeight * 0.85);
+  //   } else if (deviceCount == 3) {
+  //     final positions = [0.2, 0.5, 0.8];
+  //     return Offset(containerWidth * 0.65, containerHeight * positions[index]);
+  //   } else if (deviceCount <= 4) {
+  //     double verticalPosition = 0.2 + index * 0.2;
+  //     return Offset(containerWidth * 0.65, containerHeight * verticalPosition);
+  //   } else {
+  //     final angle = 2 * math.pi * index / deviceCount;
+  //     return Offset(
+  //       gatewayPosition.dx + 150 * math.cos(angle),
+  //       gatewayPosition.dy + 150 * math.sin(angle),
+  //     );
+  //   }
+  // }
 
   @override
-  bool shouldRepaint(TopologyPainter oldDelegate) {
-    return oldDelegate.gatewayName != gatewayName ||
-        oldDelegate.devices != devices ||
-        oldDelegate.totalConnectedDevices != totalConnectedDevices ||
-        oldDelegate.showInternet != showInternet;
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 /// 網絡設備類
