@@ -12,6 +12,7 @@ class SetSSIDComponent extends StatefulWidget {
   final String? initialSsid;
   final String? initialSecurityOption;
   final String? initialPassword;
+  final double? height; // 新增高度參數
 
   const SetSSIDComponent({
     Key? key,
@@ -22,6 +23,7 @@ class SetSSIDComponent extends StatefulWidget {
     this.initialSsid,
     this.initialSecurityOption,
     this.initialPassword,
+    this.height, // 高度參數可選
   }) : super(key: key);
 
   @override
@@ -32,6 +34,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final AppTheme _appTheme = AppTheme();
+  final ScrollController _scrollController = ScrollController(); // 添加滾動控制器
   String _selectedSecurityOption = ''; // Initial empty value, will be set to first option
   bool _passwordVisible = false;
   bool _showPasswordField = true;
@@ -106,6 +109,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     _passwordController.removeListener(_notifyFormChanged);
     _ssidController.dispose();
     _passwordController.dispose();
+    _scrollController.dispose(); // 處理滾動控制器
     super.dispose();
   }
 
@@ -224,76 +228,109 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final String? errorMessage = _getErrorMessage();
+
+    // 使用傳入的高度參數或默認值
+    double cardHeight = widget.height ?? (_showPasswordField ? screenSize.height * 0.5 : screenSize.height * 0.35);
+
+    // 鍵盤彈出時調整卡片高度
+    if (bottomInset > 0) {
+      // 根據鍵盤高度調整卡片高度
+      cardHeight = screenSize.height - bottomInset - 190; // 保留上方空間，這個值需要根據您的UI調整
+      // 確保最小高度
+      cardHeight = cardHeight < 300 ? 300 : cardHeight;
+    }
 
     // 使用 buildStandardCard 替代原始的 Container
     return _appTheme.whiteBoxTheme.buildStandardCard(
       width: screenSize.width * 0.9,
-      height: _showPasswordField
-          ? screenSize.height * 0.5  // 顯示密碼欄位時，增加高度
-          : screenSize.height * 0.35, // 基本高度
-      child: Padding(
-        padding: const EdgeInsets.all(25.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
+      height: cardHeight,
+      child: Column(
+        children: [
+          // 標題區域(固定)
+          Container(
+            padding: EdgeInsets.fromLTRB(25, bottomInset > 0 ? 15 : 25, 25, bottomInset > 0 ? 5 : 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
                 'Set SSID',
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: bottomInset > 0 ? 18 : 22, // 鍵盤彈出時縮小字體
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // SSID 輸入欄位
-              _buildLabelAndField(
-                label: 'SSID',
-                isError: _isSsidError,
-                child: _buildTextField(
-                  controller: _ssidController,
-                  isError: _isSsidError,
-                ),
-                errorText: _isSsidError ? _ssidErrorText : null,
-              ),
-
-              const SizedBox(height: 20),
-
-              // 安全選項下拉選單
-              _buildLabelAndField(
-                label: 'Security Option',
-                isError: false,
-                child: _buildSecurityOptionDropdown(),
-              ),
-
-              // 如果需要顯示密碼欄位
-              if (_showPasswordField) ...[
-                const SizedBox(height: 20),
-
-                // 密碼輸入欄位
-                _buildLabelAndField(
-                  label: 'Password',
-                  isError: _isPasswordError,
-                  child: _buildPasswordField(
-                    controller: _passwordController,
-                    isVisible: _passwordVisible,
-                    isError: _isPasswordError,
-                  ),
-                  errorText: _isPasswordError ? _passwordErrorText : null,
-                ),
-              ],
-
-              // 顯示表單錯誤訊息
-              if (errorMessage != null && !_validateForm()) ...[
-                const SizedBox(height: 20),
-                _buildErrorContainer(errorMessage),
-              ],
-            ],
+            ),
           ),
-        ),
+
+          // 可滾動的內容區域
+          Expanded(
+            child: _buildContent(bottomInset, errorMessage),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 分離內容構建，專注於可滾動性
+  Widget _buildContent(double bottomInset, String? errorMessage) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(25, 10, 25, bottomInset > 0 ? 10 : 25),
+      child: ListView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          // SSID 輸入欄位
+          _buildLabelAndField(
+            label: 'SSID',
+            isError: _isSsidError,
+            child: _buildTextField(
+              controller: _ssidController,
+              isError: _isSsidError,
+            ),
+            errorText: _isSsidError ? _ssidErrorText : null,
+            bottomInset: bottomInset,
+          ),
+
+          SizedBox(height: bottomInset > 0 ? 10 : 20),
+
+          // 安全選項下拉選單
+          _buildLabelAndField(
+            label: 'Security Option',
+            isError: false,
+            child: _buildSecurityOptionDropdown(),
+            bottomInset: bottomInset,
+          ),
+
+          // 如果需要顯示密碼欄位
+          if (_showPasswordField) ...[
+            SizedBox(height: bottomInset > 0 ? 10 : 20),
+
+            // 密碼輸入欄位
+            _buildLabelAndField(
+              label: 'Password',
+              isError: _isPasswordError,
+              child: _buildPasswordField(
+                controller: _passwordController,
+                isVisible: _passwordVisible,
+                isError: _isPasswordError,
+              ),
+              errorText: _isPasswordError ? _passwordErrorText : null,
+              bottomInset: bottomInset,
+            ),
+          ],
+
+          // 顯示表單錯誤訊息
+          if (errorMessage != null && !_validateForm()) ...[
+            SizedBox(height: bottomInset > 0 ? 10 : 20),
+            _buildErrorContainer(errorMessage),
+          ],
+
+          // 鍵盤彈出時的額外空間
+          if (bottomInset > 0)
+            SizedBox(height: bottomInset * 0.5),
+        ],
       ),
     );
   }
@@ -306,6 +343,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     required bool isError,
     required Widget child,
     String? errorText,
+    required double bottomInset,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,7 +351,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 18,
+            fontSize: bottomInset > 0 ? 16 : 18, // 鍵盤彈出時縮小字體
             fontWeight: FontWeight.normal,
             color: isError ? const Color(0xFFFF00E5) : Colors.white,
           ),
@@ -325,9 +363,9 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
             padding: const EdgeInsets.only(top: 4.0),
             child: Text(
               errorText,
-              style: const TextStyle(
-                color: Color(0xFFFF00E5),
-                fontSize: 12,
+              style: TextStyle(
+                color: const Color(0xFFFF00E5),
+                fontSize: bottomInset > 0 ? 10 : 12, // 鍵盤彈出時縮小字體
               ),
             ),
           ),

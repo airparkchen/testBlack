@@ -301,9 +301,27 @@ class WifiApiService {
 
   // ============ 簡化的 API 方法 ============
 
-  /// 獲取系統資訊
+  /// 獲取系統資訊（增強錯誤處理版本）
   static Future<Map<String, dynamic>> getSystemInfo() async {
-    return await _get(_endpoints['systemInfo']!);
+    try {
+      // 先檢查連接
+      if (!await _isApiReachable()) {
+        throw Exception('Unable to connect to router. Please check network connection');
+      }
+
+      return await _get(_endpoints['systemInfo']!);
+    } catch (e) {
+      print('Failed to get system information: $e');
+
+      // 提供更具體的錯誤信息
+      if (e.toString().contains('Connection timed out')) {
+        throw Exception('Connection to router timed out. Please check if connected to the correct WiFi network');
+      } else if (e.toString().contains('Connection refused')) {
+        throw Exception('Router refused connection. Please check router status');
+      } else {
+        throw Exception('Unable to get system information: $e');
+      }
+    }
   }
 
   /// 獲取網路狀態
@@ -444,17 +462,83 @@ class WifiApiService {
     }
   }
 
-  /// 計算初始密碼 - 使用 PasswordService
+  /// 新增：快速連接測試方法
+  static Future<bool> _isApiReachable() async {
+    try {
+      print('正在測試 API 連接...');
+
+      // 設置較短的超時時間進行快速測試
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/v1/system/info'),
+        headers: _getHeaders(),
+      ).timeout(
+        const Duration(seconds: 3), // 3秒超時
+        onTimeout: () {
+          throw Exception('連接超時');
+        },
+      );
+
+      print('API 連接測試完成，狀態碼: ${response.statusCode}');
+      return response.statusCode >= 200 && response.statusCode < 500; // 包括4xx錯誤，因為至少表示服務可達
+
+    } catch (e) {
+      print('API 連接測試失敗: $e');
+      return false;
+    }
+  }
+
+  /// 計算初始密碼 - 使用 PasswordService（增強驗證版本）
   static Future<String> calculateInitialPassword({
     String? providedSSID,
     String? serialNumber,
     String? loginSalt,
   }) async {
-    // 如果缺少必要參數，嘗試從系統資訊獲取
-    if (serialNumber == null || loginSalt == null) {
-      final systemInfo = await getSystemInfo();
-      serialNumber ??= systemInfo['serial_number'];
-      loginSalt ??= systemInfo['login_salt'];
+    // 早期驗證 - 如果已知參數不足，立即嘗試獲取
+    bool needSystemInfo = (serialNumber == null || serialNumber.isEmpty) ||
+        (loginSalt == null || loginSalt.isEmpty);
+
+    if (needSystemInfo) {
+      print('缺少必要參數，嘗試獲取系統資訊...');
+
+      // 先做一個快速的連接測試
+      if (!await _isApiReachable()) {
+        throw Exception('無法連接到路由器 API 服務');
+      }
+
+      try {
+        final systemInfo = await getSystemInfo();
+
+        // 檢查系統資訊是否包含必要欄位
+        if (!systemInfo.containsKey('serial_number') ||
+            systemInfo['serial_number'] == null ||
+            systemInfo['serial_number'].toString().isEmpty) {
+          throw Exception('無法從系統資訊獲取序列號');
+        }
+
+        if (!systemInfo.containsKey('login_salt') ||
+            systemInfo['login_salt'] == null ||
+            systemInfo['login_salt'].toString().isEmpty) {
+          throw Exception('無法從系統資訊獲取登入鹽值');
+        }
+
+        serialNumber ??= systemInfo['serial_number'];
+        loginSalt ??= systemInfo['login_salt'];
+
+        print('成功從系統資訊獲取: 序列號=${serialNumber}, 登入鹽值=${loginSalt}');
+
+      } catch (e) {
+        print('獲取系統資訊失敗: $e');
+        throw Exception('無法獲取計算密碼所需的系統資訊: $e');
+      }
+    }
+
+    // 最終驗證所有必要參數
+    if (serialNumber == null || serialNumber.isEmpty) {
+      throw Exception('序列號不能為空');
+    }
+
+    if (loginSalt == null || loginSalt.isEmpty) {
+      throw Exception('登入鹽值不能為空');
     }
 
     // 使用 PasswordService 計算初始密碼
@@ -517,19 +601,27 @@ class WifiApiService {
     }
   }
 
-  /// 計算初始密碼並提供詳細日誌
+  /// 計算初始密碼並提供詳細日誌（增強版本）
   static Future<String> calculatePasswordWithLogs({
     String? providedSSID,
     String? serialNumber,
     String? loginSalt,
   }) async {
+    // 早期 SSID 驗證
     if (providedSSID == null || providedSSID.isEmpty) {
       print("無法計算密碼: 缺少 SSID");
-      return "";
+      throw Exception('SSID 不能為空');
     }
 
     try {
       print("正在計算初始密碼...");
+      print("使用的 SSID: $providedSSID");
+
+      // 檢查是否需要獲取系統資訊
+      if ((serialNumber == null || serialNumber.isEmpty) ||
+          (loginSalt == null || loginSalt.isEmpty)) {
+        print("需要從系統獲取額外參數...");
+      }
 
       final password = await calculateInitialPassword(
         providedSSID: providedSSID,
@@ -537,11 +629,16 @@ class WifiApiService {
         loginSalt: loginSalt,
       );
 
+      if (password.isEmpty) {
+        throw Exception('計算出的密碼為空');
+      }
+
       print("成功計算初始密碼");
       return password;
+
     } catch (e) {
       print("計算初始密碼時出錯: $e");
-      rethrow;
+      rethrow; // 重新拋出異常，保持錯誤信息
     }
   }
 

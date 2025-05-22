@@ -5,24 +5,20 @@ class AccountPasswordComponent extends StatefulWidget {
   final Function(String, String, String, bool)? onFormChanged;
   final Function()? onNextPressed;
   final Function()? onBackPressed;
-  // 新增顯示選項參數
   final List<String> displayOptions;
-  // 新增固定的用戶名參數
   final String fixedUsername;
-  // 新增是否禁用用戶名輸入的參數
   final bool disableUsername;
+  final double? height; // 新增高度參數
 
   const AccountPasswordComponent({
     Key? key,
     this.onFormChanged,
     this.onNextPressed,
     this.onBackPressed,
-    // 預設顯示所有選項
     this.displayOptions = const ['User', 'Password', 'Confirm Password'],
-    // 預設用戶名為空
     this.fixedUsername = 'admin',
-    // 預設不禁用用戶名輸入
     this.disableUsername = true,
+    this.height, // 高度參數可選
   }) : super(key: key);
 
   @override
@@ -30,17 +26,18 @@ class AccountPasswordComponent extends StatefulWidget {
 }
 
 class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
-  // 添加 AppTheme 實例
   final AppTheme _appTheme = AppTheme();
-
   final TextEditingController _userController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  // 焦點節點
+  final FocusNode _passwordFocusNode = FocusNode();
+  final FocusNode _confirmPasswordFocusNode = FocusNode();
 
   bool _passwordVisible = false;
   bool _confirmPasswordVisible = false;
-
-  // 錯誤狀態
   bool _isPasswordError = false;
   bool _isConfirmPasswordError = false;
 
@@ -48,7 +45,6 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
   void initState() {
     super.initState();
 
-    // 如果有固定用戶名，則設置到控制器中
     if (widget.fixedUsername.isNotEmpty) {
       _userController.text = widget.fixedUsername;
     }
@@ -62,10 +58,19 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
       _validateConfirmPassword();
       _notifyFormChanged();
     });
+
+    // 添加焦點監聽
+    _passwordFocusNode.addListener(_handlePasswordFocus);
+    _confirmPasswordFocusNode.addListener(_handleConfirmPasswordFocus);
   }
 
   @override
   void dispose() {
+    _passwordFocusNode.removeListener(_handlePasswordFocus);
+    _confirmPasswordFocusNode.removeListener(_handleConfirmPasswordFocus);
+    _passwordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
+    _scrollController.dispose();
     _userController.removeListener(_notifyFormChanged);
     _passwordController.removeListener(_notifyFormChanged);
     _confirmPasswordController.removeListener(_notifyFormChanged);
@@ -75,11 +80,43 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
     super.dispose();
   }
 
-  // 驗證密碼是否符合規則
-  void _validatePassword() {
-    final password = _passwordController.text;
+  // 處理密碼輸入框獲得焦點
+  void _handlePasswordFocus() {
+    if (_passwordFocusNode.hasFocus) {
+      // 延遲執行，確保鍵盤已完全彈出
+      Future.delayed(Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          // 滾動到合適的位置，這個值需要根據您的UI調整
+          _scrollController.animateTo(
+            widget.displayOptions.contains('User') ? 80.0 : 0.0,
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
 
-    // 檢查長度和字元
+  // 處理確認密碼輸入框獲得焦點
+  void _handleConfirmPasswordFocus() {
+    if (_confirmPasswordFocusNode.hasFocus) {
+      // 延遲執行，確保鍵盤已完全彈出
+      Future.delayed(Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          // 滾動到合適的位置，這個值需要根據您的UI調整
+          _scrollController.animateTo(
+            widget.displayOptions.contains('Password') ? 150.0 : 80.0,
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _validatePassword() {
+    // 驗證密碼的代碼保持不變
+    final password = _passwordController.text;
     final bool isValid = password.isNotEmpty &&
         password.length >= 8 &&
         password.length <= 32 &&
@@ -89,39 +126,21 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
       _isPasswordError = password.isNotEmpty && !isValid;
     });
 
-    // 如果確認密碼已經輸入，則重新驗證確認密碼
     if (_confirmPasswordController.text.isNotEmpty) {
       _validateConfirmPassword();
     }
   }
 
-  /// 檢查密碼字元是否合法
-  ///
-  /// 密碼必須滿足:
-  /// 1. 只包含合法字元 (ASCII 可視字元，除了空格和雙引號)
-  /// 2. 至少包含一個大寫字母
-  /// 3. 至少包含一個小寫字母
-  /// 4. 至少包含一個數字
-  /// 5. 至少包含一個特殊字元
   bool _isPasswordCharactersValid(String password) {
-    // 檢查是否只包含合法字元
+    // 密碼驗證代碼保持不變
     final RegExp validChars = RegExp(
         r'^[\x21\x23-\x2F\x30-\x39\x3A-\x3B\x3D\x3F-\x40\x41-\x5A\x5B\x5D-\x60\x61-\x7A\x7B-\x7E]+$'
     );
-
-    // 檢查是否至少包含一個大寫字母
     final RegExp hasUppercase = RegExp(r'[A-Z]');
-
-    // 檢查是否至少包含一個小寫字母
     final RegExp hasLowercase = RegExp(r'[a-z]');
-
-    // 檢查是否至少包含一個數字
     final RegExp hasDigit = RegExp(r'[0-9]');
-
-    // 檢查是否至少包含一個特殊字元
     final RegExp hasSpecialChar = RegExp(r'[\x21\x23-\x2F\x3A-\x3B\x3D\x3F-\x40\x5B\x5D-\x60\x7B-\x7E]');
 
-    // 所有條件都必須滿足
     return validChars.hasMatch(password) &&
         hasUppercase.hasMatch(password) &&
         hasLowercase.hasMatch(password) &&
@@ -129,8 +148,8 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
         hasSpecialChar.hasMatch(password);
   }
 
-  // 驗證確認密碼是否與密碼相符
   void _validateConfirmPassword() {
+    // 驗證確認密碼的代碼保持不變
     final confirmPassword = _confirmPasswordController.text;
     final password = _passwordController.text;
 
@@ -141,6 +160,7 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
   }
 
   void _notifyFormChanged() {
+    // 通知表單變更的代碼保持不變
     if (widget.onFormChanged != null) {
       widget.onFormChanged!(
         _userController.text,
@@ -151,15 +171,14 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
     }
   }
 
-  // 根據顯示選項驗證表單
   bool _validateForm() {
+    // 驗證表單的代碼保持不變
     if (widget.displayOptions.contains('User') &&
         _userController.text.isEmpty) {
       return false;
     }
 
     if (widget.displayOptions.contains('Password')) {
-      // 密碼非空且符合要求才算有效
       final password = _passwordController.text;
       if (password.isEmpty ||
           password.length < 8 ||
@@ -170,7 +189,6 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
     }
 
     if (widget.displayOptions.contains('Confirm Password')) {
-      // 確認密碼非空且與密碼一致才算有效
       final confirmPassword = _confirmPasswordController.text;
       if (confirmPassword.isEmpty ||
           confirmPassword != _passwordController.text) {
@@ -181,16 +199,113 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
     return true;
   }
 
-  // 創建自定義密碼輸入框
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    // 使用傳入的高度參數或默認值
+    double cardHeight = widget.height ?? (screenSize.height * 0.5);
+
+    // 鍵盤彈出時調整卡片高度
+    if (bottomInset > 0) {
+      // 根據鍵盤高度調整卡片高度
+      cardHeight = screenSize.height - bottomInset - 190; // 保留上方空間，這個值需要根據您的UI調整
+      // 確保最小高度
+      cardHeight = cardHeight < 300 ? 300 : cardHeight;
+    }
+
+    return _appTheme.whiteBoxTheme.buildStandardCard(
+      width: screenSize.width * 0.9,
+      height: cardHeight,
+      child: Column(
+        children: [
+          // 標題區域(固定)
+          Container(
+            padding: EdgeInsets.fromLTRB(25, bottomInset > 0 ? 15 : 25, 25, bottomInset > 0 ? 5 : 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Set Password',
+                style: TextStyle(
+                  fontSize: bottomInset > 0 ? 18 : 22, // 鍵盤彈出時縮小字體
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+
+          // 可滾動的內容區域
+          Expanded(
+            child: _buildContent(bottomInset),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 分離內容構建，專注於可滾動性
+  Widget _buildContent(double bottomInset) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(25, 10, 25, bottomInset > 0 ? 10 : 25),
+      child: ListView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          // 表單項目
+          if (widget.displayOptions.contains('User'))
+            _buildUserField(),
+
+          if (widget.displayOptions.contains('Password')) ...[
+            _buildPasswordField(
+              controller: _passwordController,
+              label: 'Password',
+              isError: _isPasswordError,
+              isVisible: _passwordVisible,
+              focusNode: _passwordFocusNode, // 使用專用的焦點節點
+              onVisibilityChanged: (visible) {
+                setState(() {
+                  _passwordVisible = visible;
+                });
+              },
+            ),
+            SizedBox(height: bottomInset > 0 ? 10 : 20), // 鍵盤彈出時減少間距
+          ],
+
+          if (widget.displayOptions.contains('Confirm Password'))
+            _buildPasswordField(
+              controller: _confirmPasswordController,
+              label: 'Confirm Password',
+              isError: _isConfirmPasswordError,
+              isVisible: _confirmPasswordVisible,
+              focusNode: _confirmPasswordFocusNode, // 使用專用的焦點節點
+              onVisibilityChanged: (visible) {
+                setState(() {
+                  _confirmPasswordVisible = visible;
+                });
+              },
+            ),
+
+          // 鍵盤彈出時的額外空間
+          if (bottomInset > 0)
+            SizedBox(height: bottomInset * 0.5),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPasswordField({
     required TextEditingController controller,
     required String label,
     required bool isError,
     required bool isVisible,
     required Function(bool) onVisibilityChanged,
+    FocusNode? focusNode, // 添加焦點節點參數
     String hintText = '',
   }) {
     final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,7 +313,7 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 18,
+            fontSize: bottomInset > 0 ? 16 : 18, // 鍵盤彈出時縮小字體
             fontWeight: FontWeight.normal,
             color: isError ? Color(0xFFFF00E5) : Colors.white,
           ),
@@ -209,10 +324,10 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
           height: AppDimensions.inputHeight,
           child: Stack(
             children: [
-              // 使用模糊背景輸入框，但根據錯誤狀態設置不同的邊框顏色
               CustomTextField(
                 width: screenSize.width * 0.9,
                 controller: controller,
+                focusNode: focusNode, // 設置焦點節點
                 obscureText: !isVisible,
                 borderColor: isError ? Color(0xFFFF00E5) : AppColors.primary,
                 borderOpacity: 0.7,
@@ -220,8 +335,6 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
                 backgroundOpacity: 0.4,
                 hintText: hintText,
               ),
-
-              // 添加密碼可見性切換按鈕
               Positioned(
                 right: 8,
                 top: 0,
@@ -246,7 +359,7 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
         Text(
           'Your password must be at least 8 characters',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: bottomInset > 0 ? 10 : 12, // 鍵盤彈出時縮小字體
             color: isError ? Color(0xFFFF00E5) : Colors.white,
           ),
         ),
@@ -254,23 +367,22 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
     );
   }
 
-  // 創建用戶名輸入框
   Widget _buildUserField() {
     final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'User',
           style: TextStyle(
-            fontSize: 18,
+            fontSize: bottomInset > 0 ? 16 : 18, // 鍵盤彈出時縮小字體
             fontWeight: FontWeight.normal,
             color: Colors.white,
           ),
         ),
         const SizedBox(height: 8),
-        // 使用模糊背景輸入框
         CustomTextField(
           width: screenSize.width * 0.9,
           controller: _userController,
@@ -280,87 +392,8 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
             color: widget.disableUsername ? Colors.grey[400] : Colors.white,
           ),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: bottomInset > 0 ? 10 : 24), // 鍵盤彈出時縮小間距
       ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-
-    // 根據顯示選項計算適當的容器高度
-    double containerHeight = screenSize.height * 0.25; // 基本高度
-
-    // 每個表單項目增加高度
-    if (widget.displayOptions.contains('User')) {
-      containerHeight += screenSize.height * 0.09;
-    }
-    if (widget.displayOptions.contains('Password')) {
-      containerHeight += screenSize.height * 0.09;
-    }
-    if (widget.displayOptions.contains('Confirm Password')) {
-      containerHeight += screenSize.height * 0.09;
-    }
-
-    // 使用 buildStandardCard 替代原有的容器
-    return _appTheme.whiteBoxTheme.buildStandardCard(
-      width: screenSize.width * 0.9,
-      height: containerHeight,
-      child: Padding(
-        padding: const EdgeInsets.all(25.0),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Set Password',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // 動態顯示 User 輸入框
-              if (widget.displayOptions.contains('User'))
-                _buildUserField(),
-
-              // 動態顯示 Password 輸入框
-              if (widget.displayOptions.contains('Password')) ...[
-                _buildPasswordField(
-                  controller: _passwordController,
-                  label: 'Password',
-                  isError: _isPasswordError,
-                  isVisible: _passwordVisible,
-                  onVisibilityChanged: (visible) {
-                    setState(() {
-                      _passwordVisible = visible;
-                    });
-                  },
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // 動態顯示 Confirm Password 輸入框
-              if (widget.displayOptions.contains('Confirm Password'))
-                _buildPasswordField(
-                  controller: _confirmPasswordController,
-                  label: 'Confirm Password',
-                  isError: _isConfirmPasswordError,
-                  isVisible: _confirmPasswordVisible,
-                  onVisibilityChanged: (visible) {
-                    setState(() {
-                      _confirmPasswordVisible = visible;
-                    });
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

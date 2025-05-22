@@ -205,7 +205,6 @@ Future<bool> loginWithInitialPassword() async {
 對於支援 SRP (Secure Remote Password) 協議的設備，框架提供了專門的 `SrpLoginService` 來實現安全登入。
 
 ```dart
-import 'package:whitebox/shared/api/srp_login_service.dart';
 
 Future<void> srpLogin(String username, String password) async {
   final srpService = SrpLoginService(

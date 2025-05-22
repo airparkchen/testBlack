@@ -1,213 +1,327 @@
-# Wi-Fi 5G IOT APP 框架
+# Wi-Fi 5G IoT App 框架
 
-一個為物聯網、Wi-Fi和5G設備管理設計的模組化Flutter應用框架。此框架提供統一的方法來建立可控制和監控各種類型智能設備的移動應用程式。
+一個模組化的 Flutter 應用框架，專為物聯網、Wi-Fi 和 5G 設備管理設計，支援多產品線的設備控制與監控。
 
 ## 概述
 
-此框架設計以模組化為核心，讓開發者能夠創建適用於不同產品線的應用程式，包括Wi-Fi設備、5G設備和IoT系統。架構遵循基於元件的方法，提供可在不同產品實現中共享的可重用模組。
-
-### 主要特點
-
-- **多產品支援**：支援Wi-Fi、5G和IoT產品線
-- **模組化UI元件**：跨不同設備類型的可重用UI元素
-- **一致的API整合**：統一的設備、雲端和第三方API連接方法
-- **標準化的初始化和運行時流程**：設備設置和管理的通用模式
-- **統一的設計風格**：簡潔灰色調，方形元素設計
-- **完整的安全機制**：包含初始密碼計算和API身份驗證
+- **目標**：提供統一、可重用的框架，用於開發控制 Wi-Fi、5G 和 IoT 設備的移動應用。
+- **設計理念**：模組化架構，支援跨產品線的 UI 和 API 整合。
+- **核心特點**：
+    - 多產品支援（Wi-Fi、5G、IoT）
+    - 可重用模組化 UI 元件
+    - 統一 API 整合（設備、雲端、第三方）
+    - 標準化初始化與運行流程
+    - 統一紫色漸層色調、現代化設計
+    - 完整安全機制（初始密碼、API 認證）
 
 ## 目前實現功能
 
-- **設備初始化流程**：完整的Wi-Fi設備設定嚮導
-- **帳戶設定**：用戶名和密碼設定界面
-- **連線類型選擇**：支持DHCP、Static IP和PPPoE
-- **SSID設定**：Wi-Fi網絡名稱和安全選項配置
-- **QR碼掃描**：支援透過QR碼快速添加設備
-- **Wi-Fi掃描**：自動發現可用的Wi-Fi設備
-- **多設備型號配置**：通過JSON文件支援不同設備型號
-- **安全機制**：支援初始密碼計算和API身份驗證
-- **流程進度顯示**：支援設定完成時的進度顯示
-- **SRP安全登入**：實現安全遠程密碼認證協議
+- **設備初始化**：Wi-Fi 設備設定嚮導
+- **帳戶設定**：用戶名與密碼設定
+- **連線類型**：DHCP、Static IP、PPPoE
+- **SSID 配置**：Wi-Fi 網絡名稱與安全選項
+- **QR 碼掃描**：快速添加設備
+- **Wi-Fi 掃描**：自動發現可用設備
+- **多設備支援**：JSON 配置不同型號
+- **安全機制**：
+    - 初始密碼計算
+    - API 身份驗證
+    - SRP 安全登入
+- **進度顯示**：設定流程進度條
 
 ## 專案結構
-
-框架組織為層次結構：
 
 ```
 lib/
 ├── main.dart                            # 應用程式入口點
 ├── shared/
-    ├── api/
-    │   ├── wifi_api_service.dart        # Wi-Fi API服務封裝
-    │   └── srp_login_service.dart       # SRP登入服務
-    ├── config/
-    │   ├── api/
-    │   │   └── wifi.json                # API端點配置
-    │   └── flows/
-    │       └── initialization/
-    │           └── wifi.json            # Wi-Fi 初始化流程配置
-    ├── models/
-    │   └── StaticIpConfig.dart          # 靜態IP配置模型
-    ├── theme/
-    │   └── app_theme.dart               # 應用程式主題設定
-    └── ui/
-        ├── components/
-        │   └── basic/                   # 基礎UI組件
-        │       ├── AccountPasswordComponent.dart  # 帳戶密碼設定組件
-        │       ├── ConnectionTypeComponent.dart   # 連線類型選擇組件
-        │       ├── SetSSIDComponent.dart         # SSID設定組件
-        │       ├── StepperComponent.dart         # 步驟導航組件
-        │       ├── SummaryComponent.dart         # 設定摘要組件
-        │       ├── FinishingWizardComponent.dart # 完成嚮導組件
-        │       └── WifiScannerComponent.dart     # Wi-Fi掃描組件
-        └── pages/
-            └── initialization/          # 初始化相關頁面
-                ├── InitializationPage.dart        # 初始化主頁面
-                ├── QrCodeScannerPage.dart         # QR碼掃描頁面
-                ├── WifiConnectionPage.dart        # Wi-Fi連線頁面
-                ├── WifiSettingFlowPage.dart       # Wi-Fi設定流程頁面
-                └── LoginPage.dart                 # 登入頁面
+│   ├── api/                             # API 服務層
+│   │   ├── wifi_api_service.dart        # Wi-Fi API 服務封裝
+│   │   └── wifi_api/                    # Wi-Fi API 詳細實現
+│   │       ├── login_process.dart       # 登入處理流程
+│   │       ├── password_service.dart    # 密碼服務
+│   │       └── ...
+│   ├── connection/                      # 連接相關類
+│   │   ├── abs_api_request.dart         # API 請求抽象類
+│   │   ├── api_service.dart             # API 服務實現
+│   │   ├── connection_utils.dart        # 連接工具類
+│   │   ├── login_process.dart           # 登入流程
+│   │   └── ...
+│   ├── config/                          # 配置文件
+│   │   ├── api/
+│   │   │   └── wifi.json                # API 端點配置
+│   │   └── flows/
+│   │       └── initialization/
+│   │           └── wifi.json            # Wi-Fi 初始化流程配置
+│   ├── models/                          # 數據模型
+│   │   ├── StaticIpConfig.dart          # 靜態 IP 配置模型
+│   │   └── ...
+│   ├── theme/                           # 主題設定
+│   │   └── app_theme.dart               # 應用程式主題設定
+│   ├── utils/                           # 工具類
+│   │   ├── resource.dart                # 資源管理
+│   │   ├── srp_helper.dart              # SRP 協議幫助類
+│   │   ├── utility.dart                 # 通用工具
+│   │   └── validators.dart              # 驗證工具
+│   └── ui/
+│       ├── components/                  # UI 組件
+│       │   └── basic/                   # 基礎 UI 組件
+│       │       ├── AccountPasswordComponent.dart   # 帳戶密碼設定組件
+│       │       ├── ConnectionTypeComponent.dart    # 連線類型選擇組件
+│       │       ├── FinishingWizardComponent.dart   # 完成嚮導組件
+│       │       ├── SetSSIDComponent.dart           # SSID 設定組件
+│       │       ├── StepperComponent.dart           # 步驟導航組件
+│       │       ├── SummaryComponent.dart           # 設定摘要組件
+│       │       └── WifiScannerComponent.dart       # Wi-Fi 掃描組件
+│       └── pages/                       # 頁面
+│           ├── initialization/          # 初始化相關頁面
+│           │   ├── InitializationPage.dart         # 初始化主頁面
+│           │   ├── LoginPage.dart                  # 登入頁面
+│           │   ├── QrCodeScannerPage.dart          # QR 碼掃描頁面
+│           │   ├── WifiConnectionPage.dart         # Wi-Fi 連線頁面
+│           │   └── WifiSettingFlowPage.dart        # Wi-Fi 設定流程頁面
+│           └── test/                    # 測試頁面
+│               ├── SrpLoginModifiedTestPage.dart   # SRP 登入測試頁面
+│               ├── SrpLoginTestPage.dart           # SRP 登入標準測試頁面
+│               ├── TestPage.dart                   # 通用測試頁面
+│               ├── TestPasswordPage.dart           # 密碼測試頁面
+│               └── theme_test_page.dart            # 主題測試頁面
+└── docs/                                # 技術文檔
+    ├── 01-app-structure.md              # 專案結構與組件說明
+    ├── 02-ui-components-guide.md        # UI 組件使用指南
+    ├── 03-wifi-setting-flow-guide.md    # Wi-Fi 設定流程實作指南
+    ├── 04-ui-components-design-guide.md # UI 佈局風格指南
+    ├── 05-api-integration-guide.md      # API 整合指南
+    ├── 06-security-implementation-guide.md # 安全機制實現指南
+    └── README.md                        # 文檔索引
 ```
 
 ## 開始使用
 
 ### 前置需求
 
-- Flutter SDK (版本 3.7.2 或更高)
-- Dart SDK (與Flutter版本兼容)
-- Android Studio 或 Visual Studio Code 並安裝Flutter插件
-- 以下套件：
-    - wifi_scan: Wi-Fi網絡掃描
-    - mobile_scanner: QR碼掃描
-    - http: 網絡請求
-    - connectivity_plus: 網絡連接管理
-    - network_info_plus: 網絡信息獲取
-    - crypto: 加密運算
-    - json序列化相關套件
+- Flutter SDK (≥3.7.2)
+- Dart SDK (與 Flutter 兼容)
+- Android Studio / VS Code + Flutter 插件
+- 套件：wifi_scan, mobile_scanner, http, connectivity_plus, network_info_plus, crypto, JSON 序列化
 
-### 安裝
+### 安裝步驟
 
-1. 複製專案庫：
-   ```bash
-   git clone https://github.com/yourusername/wifi-5g-iot-app.git
-   ```
+1. 複製專案：
 
-2. 進入專案目錄：
-   ```bash
-   cd wifi-5g-iot-app
-   ```
+    ```bash
+    git clone https://github.com/yourusername/wifi-5g-iot-app.git
+    ```
+
+2. 進入目錄：
+
+    ```bash
+    cd wifi-5g-iot-app
+    ```
 
 3. 安裝依賴：
-   ```bash
-   flutter pub get
-   ```
+
+    ```bash
+    flutter pub get
+    ```
 
 4. 運行應用：
-   ```bash
-   flutter run
-   ```
+
+    ```bash
+    flutter run
+    ```
+
 
 ## 設計風格
 
-此框架採用簡潔的灰色基調設計風格：
-
-- **主色調**：白色和灰色
-- **按鈕樣式**：方形，無圓角，灰色背景
+- **主色調**：紫色 (#9747FF) 和深藍色 (#162140)
+- **背景色**：淺灰色 (#D9D9D9) 和卡片背景色 (#EEEEEE)
+- **按鈕樣式**：方形或微圓角，帶紫色漸層背景
 - **元件佈局**：清晰的邊界和簡潔的元素間距
 - **統一文字樣式**：標題 32px，副標題 22px，正文 16px
+- **漸層效果**：從深藍色 (#162140) 到紫色 (#9747FF) 的漸層
+
+此設計風格更現代化，具有前衛的紫色漸層元素，同時保持了清晰的佈局和簡潔結構。紫色和深藍色的漸層為應用程式增添了時尚感，同時保持了專業的外觀。
 
 ## 安全機制
 
-框架內置多層安全機制：
-
-- **初始密碼計算**：基於設備序號、登入鹽值和SSID計算初始密碼
-- **JWT身份驗證**：支援基於JWT的API訪問授權
-- **SRP安全登入**：實現零知識證明的安全登入協議
-- **通訊加密**：使用標準加密方式保護數據傳輸
-- **密碼複雜度校驗**：確保用戶設置的密碼符合安全要求
+- **初始密碼**：基於設備序號、鹽值、SSID 計算
+- **JWT 認證**：API 訪問授權
+- **SRP 登入**：零知識證明協議
+- **通訊加密**：標準加密保護數據
+- **密碼校驗**：確保密碼複雜度
 
 ## 開發指南
 
 ### 使用標準元件
 
-框架提供多種預先定義的UI元件，可無縫集成到您的應用中：
-
-- **StepperComponent**：步驟導航元件，支援從JSON文件動態配置
-- **WifiScannerComponent**：掃描並顯示Wi-Fi設備
-- **各種表單元件**：AccountPassword、ConnectionType、SetSSID等
+- **StepperComponent**：動態配置步驟導航
+- **WifiScannerComponent**：掃描並顯示 Wi-Fi 設備
+- **表單元件**：帳戶、連線類型、SSID 等
 
 ### 擴展流程
 
-通過修改 `wifi.json` 配置文件，可以輕鬆擴展或修改設備初始化流程：
+- 修改 `wifi.json` 配置設備初始化流程。例如，針對 "Micky" 設備型號的配置如下：
 
-```json
-{
-  "models": {
-    "A": {
-      "steps": [
-        {
-          "id": 1,
-          "name": "帳戶",
-          "next": 2,
-          "components": ["AccountPasswordComponent"]
-        },
-        // 添加更多步驟...
-      ]
+    ```json
+    {
+      "models": {
+        "Micky": {
+          "steps": [
+            {
+              "id": 1,
+              "name": "Account",
+              "next": 2,
+              "components": [
+                "AccountPasswordComponent"
+              ],
+              "detail": [
+                "User",
+                "Password",
+                "Confirm Password"
+              ],
+              "apiCalls": [
+                {
+                  "type": "start",
+                  "methods": [
+                    "systemInfo",
+                    "userLogin"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Internet",
+              "next": 3,
+              "components": [
+                "ConnectionTypeComponent"
+              ],
+              "detail": [
+                "DHCP",
+                "Static IP",
+                "PPPoE"
+              ],
+              "detailOptions": {
+                "Static IP": ["IP Address", "IP Subnet Mask", "Gateway IP Address", "Primary DNS"],
+                "PPPoE": ["User", "Password"]
+              },
+              "apiCalls": [
+                {
+                  "type": "start",
+                  "methods": [
+                    "wanEthGet"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "name": "Wireless",
+              "next": 4,
+              "components": [
+                "SetSSIDComponent"
+              ],
+              "detail": [
+                "WPA3 Personal"
+              ],
+              "detailOptions": {
+                "WPA3 Personal": ["Password"]
+              },
+              "apiCalls": [
+                {
+                  "type": "start",
+                  "methods": [
+                    "wirelessBasicGet"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": 4,
+              "name": "Summary",
+              "next": null,
+              "components": [
+                "SummaryComponent"
+              ],
+              "detail": [
+                "Model Name",
+                "Operation Mode",
+                "Wireless SSID",
+                "Wireless Key"
+              ],
+              "apiCalls": [
+                {
+                  "type": "finish",
+                  "method": "postWizardFinish"
+                },
+                {
+                  "type": "end",
+                  "methods": [
+                    "wizardStart",
+                    "userChangePassword",
+                    "wanEthUpdate",
+                    "wirelessBasicUpdate",
+                    "wizardFinish"
+                  ]
+                }
+              ]
+            }
+          ],
+          "type": "JSON",
+          "API": "WifiAPI"
+        }
+      }
     }
-  }
-}
-```
+    ```
 
-### 添加新的設備型號
 
-1. 在 `wifi.json` 中添加新型號定義
-2. 為該型號實現特定的組件和流程
-3. 確保在設備選擇頁面中註冊新型號
+### 添加新設備型號
 
-### API服務使用方式
+1. 在 `wifi.json` 添加型號定義（如上面的 "Micky"）
+2. 實現特定組件與流程
+3. 在設備選擇頁面註冊型號
 
-框架通過 `WifiApiService` 類提供與設備通信的API封裝：
+### API 服務
 
 ```dart
 // 獲取系統信息
 final systemInfo = await WifiApiService.getSystemInfo();
-
-// 設置無線網絡參數
+// 更新 Wi-Fi 參數
 await WifiApiService.updateWirelessBasic({
   'ssid': 'MyNetwork',
   'security': 'WPA3',
   'password': 'SecurePassword'
 });
-
-// 使用計算的初始密碼登入
+// 初始密碼登入
 await WifiApiService.loginWithInitialPassword();
 ```
 
 ## 待實現功能
 
-1. **設備儀表板**：實現設備運行狀態顯示和管理界面
-2. **高級設定選項**：更多針對特定設備的設定
-3. **設備管理功能**：多設備添加、刪除和管理
-4. **多設備協同控制**：IoT設備間的聯動設定
-5. **固件升級**：支援設備固件更新
+- 設備儀表板：運行狀態與管理
+- 高級設定：設備特定選項
+- 設備管理：多設備添加/刪除
+- 協同控制：IoT 設備聯動
+- 固件升級：設備更新支援
 
 ## 貢獻
 
-1. Fork 此專案
-2. 創建您的功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交您的更改 (`git commit -m '添加一些功能'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 開啟Pull Request
+1. Fork 專案
+2. 創建功能分支：`git checkout -b feature/amazing-feature`
+3. 提交更改：`git commit -m '添加功能'`
+4. 推送分支：`git push origin feature/amazing-feature`
+5. 開啟 Pull Request
 
 ## 文檔
 
-完整文檔可在 `docs/` 目錄中找到：
-- [專案結構與組件說明](./docs/01-app-structure.md)
-- [UI 組件使用指南](./docs/02-ui-components-guide.md)
-- [Wi-Fi 設定流程實作指南](./docs/03-wifi-setting-flow-guide.md)
-- [UI 佈局風格指南](./docs/04-ui-components-design-guide.md)
-- [API 整合指南](./docs/05-api-integration-guide.md)
-- [安全機制實現指南](./docs/06-security-implementation-guide.md)
+- 位於 `docs/` 目錄，包含：
+    - 專案結構與組件說明
+    - UI 組件使用指南
+    - Wi-Fi 設定流程
+    - UI 佈局與風格
+    - API 整合與安全機制
 
 ## 許可證
 
-本專案採用 Apache 許可證 2.0 版 - 詳見 LICENSE 文件。
+- Apache 許可證 2.0（詳見 LICENSE 文件）

@@ -5,7 +5,7 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
-import 'package:whitebox/shared/ui/pages/test/DeviceDetailPage.dart';
+// import 'package:whitebox/shared/ui/pages/test/DeviceDetailPage.dart';
 
 class NetworkTopoView extends StatefulWidget {
   // 是否顯示測試控制器
@@ -161,17 +161,17 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
       }
     }
 
-    // 導航到設備詳情頁
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => DeviceDetailPage(
-          device: device,
-          connectedDevicesCount: connectionCount,
-          isGateway: isGateway,
-        ),
-      ),
-    );
+    // // 導航到設備詳情頁
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (context) => DeviceDetailPage(
+    //       device: device,
+    //       connectedDevicesCount: connectionCount,
+    //       isGateway: isGateway,
+    //     ),
+    //   ),
+    // );
   }
 
   // 處理視圖模式切換 - 新增互動檢查
@@ -497,7 +497,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
       margin: EdgeInsets.only(
         left: screenWidth * 0.145,     // 15%-85%
         right: screenWidth * 0.151,
-        bottom: MediaQuery.of(context).size.height * 0.05,
+        bottom: MediaQuery.of(context).size.height * 0.08,
       ),
       height: 70, // 增加高度
       decoration: BoxDecoration(

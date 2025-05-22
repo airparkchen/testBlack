@@ -1,279 +1,565 @@
 import 'package:flutter/material.dart';
+import 'package:whitebox/shared/theme/app_theme.dart';
+import 'package:whitebox/shared/api/wifi_api_service.dart';
+import 'package:whitebox/shared/ui/pages/test/TestPage.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final Function()? onLoginSuccess;
+  final Function()? onBackPressed;
+  final bool showBackButton;
+  final String fixedAccount;
+
+  const LoginPage({
+    Key? key,
+    this.onLoginSuccess,
+    this.onBackPressed,
+    this.showBackButton = true,
+    this.fixedAccount = 'admin',
+  }) : super(key: key);
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final AppTheme _appTheme = AppTheme();
   final TextEditingController _accountController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _passwordVisible = false;
-  bool _isFormValid = false;
+  final ScrollController _scrollController = ScrollController();
 
-  // 比例參數 - 可以統一調整
-  final double _topSpaceRatio = 0.2;        // 頂部空白高度比例
-  final double _titleHeightRatio = 0.05;     // 標題高度比例
-  final double _titleSpaceRatio = 0.01;      // 標題下方間距比例
-  final double _grayAreaHeightRatio = 0.4;  // 灰色區域高度比例
-  final double _grayAreaMarginRatio = 0.04;  // 灰色區域水平邊距比例
-  final double _innerPaddingRatio = 0.05;    // 內部元素邊距比例
-  final double _labelSpaceRatio = 0.035;     // 標籤之間的間距比例
-  final double _inputFieldHeightRatio = 0.06; // 輸入框高度比例
-  final double _inputLabelSpaceRatio = 0.01; // 標籤與輸入框間距比例
-  final double _buttonHeightRatio = 0.07;    // 按鈕高度比例
-  final double _buttonSpaceRatio = 0.02;     // 按鈕間距比例
-  final double _bottomMarginRatio = 0.02;    // 底部邊距比例
+  // 焦點節點
+  final FocusNode _passwordFocusNode = FocusNode();
+
+  bool _passwordVisible = false;
+  bool _isPasswordError = false;
+  bool _isFormValid = false;
+  bool _isLoggingIn = false;
+  String _ellipsis = '';
+  String _errorMessage = '';
+
+  // 所有比例參數保持不變...
+  final double _topSpaceRatio = 0.06;
+  final double _titleHeightRatio = 0.05;
+  final double _titleSpaceRatio = 0.03;
+  final double _cardHeightRatio = 0.40;
+  final double _cardToButtonSpaceRatio = 0.15;
+  final double _cardPaddingRatio = 0.05;
+  final double _userTitleToAccountSpaceRatio = 0.025;
+  final double _inputFieldsSpaceRatio = 0.025;
+  final double _labelToInputSpaceRatio = 0.008;
+  final double _inputExtraBottomSpaceRatio = 0.015;
+  final double _inputFieldHeightRatio = 0.06;
+  final double _mainTitleFontSize = 28.0;
+  final double _userTitleFontSize = 24.0;
+  final double _labelFontSize = 18.0;
+  final double _inputTextFontSize = 16.0;
+  final double _errorTextFontSize = 12.0;
+  final double _buttonHeightRatio = 0.07;
+  final double _buttonSpacingRatio = 0.02;
+  final double _bottomMarginRatio = 0.02;
+  final double _horizontalPaddingRatio = 0.05;
+  final double _buttonBorderRadius = 8.0;
+  final double _buttonTextFontSize = 18.0;
+  final double _visibilityIconSize = 25.0;
 
   @override
   void initState() {
     super.initState();
-    _accountController.addListener(_validateForm);
-    _passwordController.addListener(_validateForm);
+    _accountController.text = widget.fixedAccount;
+    _passwordController.addListener(() {
+      _validatePassword();
+      _validateForm();
+    });
+    _passwordFocusNode.addListener(_handlePasswordFocus);
+    _validateForm();
   }
 
   @override
   void dispose() {
-    _accountController.removeListener(_validateForm);
-    _passwordController.removeListener(_validateForm);
+    _passwordFocusNode.removeListener(_handlePasswordFocus);
+    _passwordFocusNode.dispose();
+    _scrollController.dispose();
     _accountController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _validateForm() {
+  // 省略號動畫
+  void _startEllipsisAnimation() {
+    if (_isLoggingIn) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && _isLoggingIn) {
+          setState(() {
+            _ellipsis = _ellipsis.length < 3 ? _ellipsis + '.' : '';
+          });
+          _startEllipsisAnimation();
+        }
+      });
+    }
+  }
+
+  void _handlePasswordFocus() {
+    if (_passwordFocusNode.hasFocus) {
+      Future.delayed(Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            80.0,
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _validatePassword() {
+    final password = _passwordController.text;
     setState(() {
-      _isFormValid = _accountController.text.isNotEmpty && _passwordController.text.isNotEmpty;
+      // 清除錯誤訊息當用戶開始輸入時
+      if (password.isNotEmpty && _errorMessage.isNotEmpty) {
+        _errorMessage = '';
+      }
     });
   }
 
-  void _handleLogin() {
+  void _validateForm() {
+    setState(() {
+      _isFormValid = _passwordController.text.isNotEmpty;
+    });
+  }
+
+  // 解析錯誤訊息
+  String _parseErrorMessage(dynamic error) {
+    String errorString = error.toString().toLowerCase();
+
+    if (errorString.contains('invalid username or password')) {
+      return 'Invalid username or password';
+    } else if (errorString.contains('connection') || errorString.contains('network')) {
+      return 'Network connection failed';
+    } else if (errorString.contains('timeout')) {
+      return 'Connection timeout';
+    } else if (errorString.contains('unauthorized')) {
+      return 'Unauthorized access';
+    } else if (errorString.contains('forbidden')) {
+      return 'Access forbidden';
+    } else if (errorString.contains('500')) {
+      return 'Invalid username or password';
+    } else {
+      return 'Login failed';
+    }
+  }
+
+  void _handleLogin() async {
     if (!_isFormValid) {
-      // 如果表單無效，顯示提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _accountController.text.isEmpty ? '請輸入帳號' : '請輸入密碼',
-          ),
-        ),
-      );
+      _validatePassword();
       return;
     }
 
-    // 導航到下一個頁面或執行登入邏輯
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('登入成功！')),
-    );
+    setState(() {
+      _isLoggingIn = true;
+      _ellipsis = '';
+      _errorMessage = '';
+      _isPasswordError = false;
+    });
+    _startEllipsisAnimation();
+
+    try {
+      final loginResult = await WifiApiService.loginWithSRP(
+        widget.fixedAccount,
+        _passwordController.text,
+      );
+
+      print('Login result: success=${loginResult.success}, message=${loginResult.message}');
+
+      // 如果 API 返回成功但實際上應該失敗（基於您觀察到的行為）
+      // 我們可以通過檢查特定條件來判斷
+      bool shouldTreatAsFailure = false;
+
+      // 檢查 message 中是否包含失敗指示
+      if (loginResult.message != null) {
+        String msg = loginResult.message!.toLowerCase();
+        if (msg.contains('invalid username or password') ||
+            msg.contains('status_code: 500') ||
+            msg.contains('警告: 伺服器回應中未找到jwt令牌')) {
+          shouldTreatAsFailure = true;
+        }
+      }
+
+      // 檢查 JWT token 是否真的有效
+      if (loginResult.jwtToken == null ||
+          loginResult.jwtToken!.isEmpty ||
+          loginResult.jwtToken!.length < 20) {
+        shouldTreatAsFailure = true;
+      }
+
+      if (loginResult.success == true && !shouldTreatAsFailure) {
+        // 真正的成功
+        WifiApiService.setJwtToken(loginResult.jwtToken!);
+
+        setState(() {
+          _isLoggingIn = false;
+        });
+
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const TestPage(),
+            ),
+          );
+        }
+
+        if (widget.onLoginSuccess != null) {
+          widget.onLoginSuccess!();
+        }
+      } else {
+        // 登入失敗
+        String errorMsg = 'Invalid username or password';
+
+        setState(() {
+          _isLoggingIn = false;
+          _isPasswordError = true;
+          _errorMessage = errorMsg;
+        });
+
+        print('Login treated as failure: $errorMsg');
+      }
+    } catch (e) {
+      print('Login exception: $e');
+
+      setState(() {
+        _isLoggingIn = false;
+        _isPasswordError = true;
+        _errorMessage = 'Login failed';
+      });
+    }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final screenHeight = size.height;
-    final screenWidth = size.width;
-
-    // 計算實際尺寸
-    final double topSpace = screenHeight * _topSpaceRatio;
-    final double titleHeight = screenHeight * _titleHeightRatio;
-    final double titleSpace = screenHeight * _titleSpaceRatio;
-    final double grayAreaHeight = screenHeight * _grayAreaHeightRatio;
-    final double grayAreaMargin = screenWidth * _grayAreaMarginRatio;
-    final double innerPadding = screenWidth * _innerPaddingRatio;
-    final double labelSpace = screenHeight * _labelSpaceRatio;
-    final double inputFieldHeight = screenHeight * _inputFieldHeightRatio;
-    final double inputLabelSpace = screenHeight * _inputLabelSpaceRatio;
-    final double buttonHeight = screenHeight * _buttonHeightRatio;
-    final double buttonVerticalSpace = screenHeight * _buttonSpaceRatio;
-    final double bottomMargin = screenHeight * _bottomMarginRatio;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 頂部空白區域
-            SizedBox(height: topSpace),
-
-            // Account 標題
-            Container(
-              height: titleHeight,
-              alignment: Alignment.center,
-              child: const Text(
-                "Account",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.normal,
-                  color: Colors.black,
+  Widget _buildNavigationButtons({
+    required double buttonHeight,
+    required double buttonSpacing,
+    required double horizontalPadding,
+    required double buttonBorderRadius,
+    required double buttonTextFontSize,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(horizontalPadding),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Back 按鈕 - 只有在 showBackButton 為 true 時顯示
+          if (widget.showBackButton)
+            Expanded(
+              child: GestureDetector(
+                onTap: _isLoggingIn ? null : widget.onBackPressed,
+                child: Container(
+                  width: double.infinity,
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(buttonBorderRadius),
+                    color: _isLoggingIn
+                        ? AppColors.primary.withOpacity(0.1)
+                        : AppColors.primary.withOpacity(0.2),
+                    border: Border.all(
+                      color: AppColors.primary,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Back',
+                      style: AppTextStyles.buttonText.copyWith( // 使用主題樣式
+                        fontSize: buttonTextFontSize,
+                        color: _isLoggingIn
+                            ? Colors.white.withOpacity(0.5)
+                            : Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
 
-            // Account 標題與灰色區域之間的間距
-            SizedBox(height: titleSpace),
+          // 如果有 Back 按鈕，則添加間距
+          if (widget.showBackButton)
+            SizedBox(width: buttonSpacing),
 
-            // 中間區域 - 灰色背景，含 User 標籤和輸入框
-            Container(
-              height: grayAreaHeight,
-              width: double.infinity,
-              margin: EdgeInsets.symmetric(horizontal: grayAreaMargin),
-              color: const Color(0xFFEFEFEF),
-              padding: EdgeInsets.all(innerPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // User 標籤
-                  const Text(
-                    "User",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+          // Login 按鈕
+          Expanded(
+            child: GestureDetector(
+              onTap: _isLoggingIn ? null : _handleLogin,
+              child: _appTheme.whiteBoxTheme.buildSimpleColorButton(
+                width: double.infinity,
+                height: buttonHeight,
+                borderRadius: BorderRadius.circular(buttonBorderRadius),
+                child: Center(
+                  child: Text(
+                    'Login',
+                    style: AppTextStyles.buttonText.copyWith( // 使用主題樣式
+                      fontSize: buttonTextFontSize,
+                      color: _isLoggingIn
+                          ? Colors.white.withOpacity(0.5)
+                          : Colors.white,
                     ),
                   ),
-
-                  SizedBox(height: labelSpace),
-
-                  // Account 標籤
-                  const Text(
-                    "Account",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.normal,
-                      color: Colors.black,
-                    ),
-                  ),
-
-                  SizedBox(height: inputLabelSpace),
-
-                  // Account 輸入框
-                  Container(
-                    height: inputFieldHeight,
-                    decoration: BoxDecoration(
-                      color: Color(0xFFEFEFEF),
-                      border: Border.all(color: Colors.black),
-                    ),
-                    child: TextField(
-                      controller: _accountController,
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        border: InputBorder.none,
-                      ),
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-
-                  SizedBox(height: labelSpace),
-
-                  // Password 標籤
-                  const Text(
-                    "Password",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.normal,
-                      color: Colors.black,
-                    ),
-                  ),
-
-                  SizedBox(height: inputLabelSpace),
-
-                  // Password 輸入框
-                  Container(
-                    height: inputFieldHeight,
-                    decoration: BoxDecoration(
-                      color: Color(0xFFEFEFEF),
-                      border: Border.all(color: Colors.black),
-                    ),
-                    child: TextField(
-                      controller: _passwordController,
-                      obscureText: !_passwordVisible,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        border: InputBorder.none,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _passwordVisible ? Icons.visibility : Icons.visibility_off,
-                            color: Colors.grey,
-                            size: 24,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _passwordVisible = !_passwordVisible;
-                            });
-                          },
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-
-            // 灰色區域與底部按鈕之間的間距 (剩餘空間)
-            Spacer(),
-
-            // 底部導航按鈕
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: screenWidth * _innerPaddingRatio,
-                vertical: buttonVerticalSpace,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // 返回按鈕
-                  Container(
-                    width: (screenWidth - (screenWidth * _innerPaddingRatio * 2) - 10) / 2, // 計算寬度
-                    height: buttonHeight,
-                    color: Color(0xFFD9D9D9),
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(0),
-                        ),
-                      ),
-                      child: const Text(
-                        'Back',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                    ),
-                  ),
-
-                  // 下一步按鈕
-                  Container(
-                    width: (screenWidth - (screenWidth * _innerPaddingRatio * 2) - 10) / 2, // 計算寬度
-                    height: buttonHeight,
-                    color: Color(0xFFD9D9D9),
-                    child: TextButton(
-                      onPressed: _handleLogin,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(0),
-                        ),
-                      ),
-                      child: const Text(
-                        'Next',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // 底部邊距
-            SizedBox(height: bottomMargin),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          // 主要內容
+          SafeArea(
+            child: SingleChildScrollView(
+              child: Container(
+                width: screenSize.width,
+                height: screenSize.height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 標題 - 使用 heading1 樣式
+                    Container(
+                      height: screenSize.height * _titleHeightRatio,
+                      alignment: Alignment.center,
+                      child: Text(
+                        "Account",
+                        style: AppTextStyles.heading1, // 使用 heading1 樣式
+                      ),
+                    ),
+
+                    SizedBox(height: screenSize.height * _titleSpaceRatio),
+
+                    // 中間區域 - 使用 StandardCard
+                    _appTheme.whiteBoxTheme.buildStandardCard(
+                      width: screenSize.width * 0.9,
+                      height: screenSize.height * _cardHeightRatio,
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        child: Padding(
+                          padding: EdgeInsets.all(screenSize.width * _cardPaddingRatio),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // User 標籤 - 使用 heading2 樣式
+                              Text(
+                                "User",
+                                style: AppTextStyles.heading2, // 使用 heading2 樣式
+                              ),
+
+                              SizedBox(height: screenSize.height * _userTitleToAccountSpaceRatio),
+
+                              // Account 標籤和輸入框（固定並禁用）
+                              _buildDisabledUserField(),
+
+                              SizedBox(height: screenSize.height * _inputFieldsSpaceRatio),
+
+                              // Password 標籤和輸入框
+                              _buildLabelWithPasswordField(
+                                label: 'Password',
+                                controller: _passwordController,
+                                focusNode: _passwordFocusNode,
+                                isVisible: _passwordVisible,
+                                isError: _isPasswordError,
+                                errorText: _errorMessage.isNotEmpty ? _errorMessage : 'Please enter password',
+                                labelFontSize: _labelFontSize,
+                                errorFontSize: _errorTextFontSize,
+                                labelToInputSpace: screenSize.height * _labelToInputSpaceRatio,
+                                inputHeight: screenSize.height * _inputFieldHeightRatio,
+                                iconSize: _visibilityIconSize,
+                                onVisibilityChanged: (visible) {
+                                  setState(() {
+                                    _passwordVisible = visible;
+                                  });
+                                },
+                              ),
+
+                              SizedBox(height: screenSize.height * _inputExtraBottomSpaceRatio),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: screenSize.height * _cardToButtonSpaceRatio),
+
+                    // 底部導航按鈕
+                    _buildNavigationButtons(
+                      buttonHeight: screenSize.height * _buttonHeightRatio,
+                      buttonSpacing: screenSize.width * _buttonSpacingRatio,
+                      horizontalPadding: screenSize.width * _horizontalPaddingRatio,
+                      buttonBorderRadius: _buttonBorderRadius,
+                      buttonTextFontSize: _buttonTextFontSize,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 登入動畫遮罩層
+          if (_isLoggingIn)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      'Logging in$_ellipsis',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+// 構建帶標籤的密碼輸入框
+  Widget _buildLabelWithPasswordField({
+    required String label,
+    required TextEditingController controller,
+    required bool isVisible,
+    required bool isError,
+    required String errorText,
+    required Function(bool) onVisibilityChanged,
+    required double labelFontSize,
+    required double errorFontSize,
+    required double labelToInputSpace,
+    required double inputHeight,
+    required double iconSize,
+    FocusNode? focusNode,
+  }) {
+    final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 標籤 - 使用 heading3 樣式
+        Text(
+          label,
+          style: AppTextStyles.heading3.copyWith(
+            color: isError ? Color(0xFFFF00E5) : AppTextStyles.heading3.color, // 保持錯誤顏色邏輯
+          ),
+        ),
+
+        SizedBox(height: labelToInputSpace),
+
+        // 輸入框
+        Container(
+          width: double.infinity,
+          height: inputHeight,
+          child: Stack(
+            children: [
+              CustomTextField(
+                width: double.infinity,
+                height: inputHeight,
+                controller: controller,
+                focusNode: focusNode,
+                obscureText: !isVisible,
+                enabled: !_isLoggingIn, // 登入期間禁用輸入
+                borderColor: isError ? Color(0xFFFF00E5) : AppColors.primary, // 使用正確的邊框顏色
+                borderOpacity: 0.7,
+                backgroundColor: Colors.black, // 使用黑色背景
+                backgroundOpacity: 0.4, // 設置透明度
+                textStyle: TextStyle(
+                  fontSize: _inputTextFontSize,
+                  color: _isLoggingIn ? Colors.white.withOpacity(0.5) : Colors.white,
+                ),
+              ),
+              Positioned(
+                right: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: IconButton(
+                    icon: Icon(
+                      isVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      color: _isLoggingIn
+                          ? (isError ? Color(0xFFFF00E5).withOpacity(0.5) : Colors.white.withOpacity(0.5))
+                          : (isError ? Color(0xFFFF00E5) : Colors.white), // 使用正確的圖標顏色
+                      size: iconSize,
+                    ),
+                    onPressed: _isLoggingIn ? null : () {
+                      onVisibilityChanged(!isVisible);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        SizedBox(height: 4),
+
+        // 錯誤提示或密碼要求說明 - 使用 bodySmall 樣式
+        if (isError && _errorMessage.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              _errorMessage,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: Color(0xFFFF00E5), // 保持錯誤顏色
+              ),
+            ),
+          )
+      ],
+    );
+  }
+
+// 修改構建固定且禁用的帳號輸入框
+  Widget _buildDisabledUserField() {
+    final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Account 標籤 - 使用 heading3 樣式
+        Text(
+          'Account',
+          style: AppTextStyles.heading3, // 使用 heading3 樣式
+        ),
+
+        SizedBox(height: screenSize.height * _labelToInputSpaceRatio),
+
+        // 使用自定義的輸入框，設置為禁用狀態
+        CustomTextField(
+          width: double.infinity,
+          height: screenSize.height * _inputFieldHeightRatio,
+          controller: _accountController,
+          enabled: false, // 禁用輸入
+          borderColor: AppColors.primary,
+          borderOpacity: 0.7,
+          backgroundColor: Colors.grey, // 禁用狀態使用灰色背景
+          backgroundOpacity: 0.3, // 降低透明度
+          enableBlur: false, // 不使用模糊效果
+          textStyle: TextStyle(
+            fontSize: _inputTextFontSize,
+            color: Colors.grey[400], // 使用灰色文字
+          ),
+        ),
+      ],
+    );
+  }
+
 }
