@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:io';
 
 // WiFi掃描元件回調函數類型
 typedef OnWifiScanComplete = void Function(List<WiFiAccessPoint> devices, String? error);
 typedef OnDeviceSelected = void Function(WiFiAccessPoint device);
 typedef OnWifiConnectRequested = void Function(WiFiAccessPoint device);
+
+
+
 // WiFi掃描控制器
 class WifiScannerController {
   _WifiScannerComponentState? _state;
@@ -130,111 +134,150 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
     }
   }
 
-  Future<void> startScan() async {
-    if (isScanning) return;
-
-    setState(() {
-      isScanning = true;
-      errorMessage = null;
-    });
-
+// 修改：檢查當前連線的 WiFi SSID - 使用 network_info_plus
+  Future<String?> _getCurrentWifiSSID() async {
     try {
-      // 先檢查並請求權限
-      if (!_permissionRequested) {
-        bool permissionsGranted = await _checkAndRequestPermissions();
-        _permissionRequested = true;
+      final connectivityResult = await Connectivity().checkConnectivity();
 
-        if (!permissionsGranted) {
-          setState(() {
-            errorMessage = 'WiFi scanning requires location permission\nPlease allow "Location" and "Nearby devices" in settings';
-            isScanning = false;
-          });
+      if (connectivityResult.contains(ConnectivityResult.wifi)) {
+        final info = NetworkInfo();
+        final currentSSID = await info.getWifiName();
 
-          if (widget.onScanComplete != null) {
-            widget.onScanComplete!([], errorMessage);
-          }
-          return;
+        print('原始獲取的 SSID: "$currentSSID"');
+
+        // 詳細的清理和格式化 SSID
+        if (currentSSID != null && currentSSID.isNotEmpty) {
+          String cleanedSSID = currentSSID
+              .replaceAll('"', '')           // 移除引號
+              .replaceAll("'", '')           // 移除單引號
+              .replaceAll('<', '')           // 移除 < 符號
+              .replaceAll('>', '')           // 移除 > 符號
+              .trim();                       // 移除前後空白
+
+          print('清理後的 SSID: "$cleanedSSID"');
+
+          return cleanedSSID.isEmpty ? null : cleanedSSID;
         }
       }
-
-      // 檢查是否可以開始掃描
-      final canStart = await WiFiScan.instance.canStartScan();
-      print('canStartScan 狀態: $canStart');
-
-      if (canStart != CanStartScan.yes) {
-        String detailedError = _getStartScanErrorMessage(canStart);
-        setState(() {
-          errorMessage = detailedError;
-          isScanning = false;
-        });
-
-        if (widget.onScanComplete != null) {
-          widget.onScanComplete!([], detailedError);
-        }
-        return;
-      }
-
-      // 檢查是否可以獲取掃描結果
-      final canGetResults = await WiFiScan.instance.canGetScannedResults();
-      print('canGetScannedResults 狀態: $canGetResults');
-
-      if (canGetResults != CanGetScannedResults.yes) {
-        String detailedError = _getScanResultsErrorMessage(canGetResults);
-        setState(() {
-          errorMessage = detailedError;
-          isScanning = false;
-        });
-
-        if (widget.onScanComplete != null) {
-          widget.onScanComplete!([], detailedError);
-        }
-        return;
-      }
-
-      // 開始掃描
-      print('開始 WiFi 掃描...');
-      await WiFiScan.instance.startScan();
-
-      // 等待掃描完成
-      await Future.delayed(const Duration(milliseconds: 2000));
-
-      // 獲取掃描結果
-      final results = await WiFiScan.instance.getScannedResults();
-      print('掃描到 ${results.length} 個 WiFi 網路');
-
-      // 過濾和處理結果
-      final seenSsids = <String>{};
-      final uniqueResults = <WiFiAccessPoint>[];
-
-      for (var result in results) {
-        if (result.ssid.isNotEmpty && seenSsids.add(result.ssid)) {
-          uniqueResults.add(result);
-        }
-      }
-
-      uniqueResults.sort((a, b) => b.level.compareTo(a.level));
-      final limitedResults = uniqueResults.take(widget.maxDevicesToShow).toList();
-
-      setState(() {
-        discoveredDevices = limitedResults;
-        isScanning = false;
-      });
-
-      if (widget.onScanComplete != null) {
-        widget.onScanComplete!(limitedResults, null);
-      }
+      return null;
     } catch (e) {
-      print('WiFi 掃描錯誤: $e');
-      final error = 'Error occurred while scanning WiFi: $e';
-      setState(() {
-        errorMessage = error;
-        isScanning = false;
-      });
-
-      if (widget.onScanComplete != null) {
-        widget.onScanComplete!([], error);
-      }
+      print('取得當前 WiFi SSID 時發生錯誤: $e');
+      return null;
     }
+  }
+
+// 修改：SSID 比較函數
+  bool _compareSSID(String? currentSSID, String selectedSSID) {
+    if (currentSSID == null || selectedSSID.isEmpty) {
+      return false;
+    }
+
+    // 清理兩個 SSID 進行比較
+    String cleanedCurrent = currentSSID
+        .replaceAll('"', '')
+        .replaceAll("'", '')
+        .replaceAll('<', '')
+        .replaceAll('>', '')
+        .trim()
+        .toLowerCase();
+
+    String cleanedSelected = selectedSSID
+        .replaceAll('"', '')
+        .replaceAll("'", '')
+        .replaceAll('<', '')
+        .replaceAll('>', '')
+        .trim()
+        .toLowerCase();
+
+    print('比較 SSID:');
+    print('  當前清理後: "$cleanedCurrent"');
+    print('  選擇清理後: "$cleanedSelected"');
+    print('  是否相同: ${cleanedCurrent == cleanedSelected}');
+
+    return cleanedCurrent == cleanedSelected;
+  }
+  // 簡潔版本的對話框
+  void _showWifiConnectionDialog(BuildContext context, String selectedSSID) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A2A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: const Color(0xFF9747FF).withOpacity(0.5),
+              width: 1,
+            ),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.wifi_off,
+                color: const Color(0xFFFF00E5),
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'WiFi Connection Required',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Please connect to "$selectedSSID" first.',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.white60,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF9747FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Go to Settings',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // 獲取開始掃描錯誤訊息
@@ -256,189 +299,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         return 'Unable to start WiFi scan: $canStart';
     }
   }
-// 顯示連線確認對話框
-  void _showConnectionDialog(WiFiAccessPoint device) {
-    bool hasPassword = device.capabilities != null && device.capabilities.isNotEmpty;
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF2A2A2A),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: Row(
-            children: [
-              Icon(
-                Icons.wifi,
-                color: const Color(0xFF9747FF),
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Connect to WiFi',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF9747FF).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: const Color(0xFF9747FF).withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        device.ssid.isNotEmpty ? device.ssid : 'Unknown Network',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    if (hasPassword)
-                      Icon(
-                        Icons.lock,
-                        color: const Color(0xFFFF00E5),
-                        size: 16,
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                hasPassword
-                    ? 'This network is password protected. You will be redirected to WiFi settings to enter the password and connect.'
-                    : 'You will be redirected to WiFi settings to connect to this network.',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white70,
-              ),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _handleWifiConnection(device);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Open Settings'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-// 處理 WiFi 連線請求
-  Future<void> _handleWifiConnection(WiFiAccessPoint device) async {
-    try {
-      // 先執行外部回調（如果有的話）
-      if (widget.onDeviceSelected != null) {
-        widget.onDeviceSelected!(device);
-      }
-
-      if (widget.onConnectRequested != null) {
-        widget.onConnectRequested!(device);
-      }
-
-      // 開啟 WiFi 設定
-      await _openWifiSettings();
-
-      // 顯示成功訊息
-      _showMessage('Redirected to WiFi settings\nPlease select "${device.ssid}" to connect');
-
-    } catch (e) {
-      print('開啟 WiFi 設定時發生錯誤: $e');
-      _showMessage('Unable to open WiFi settings\nPlease go to Settings manually');
-    }
-  }
-
-// 開啟 WiFi 設定（簡化版）
-  Future<void> _openWifiSettings() async {
-    try {
-      if (Platform.isAndroid) {
-        // Android: 嘗試開啟 WiFi 設定
-        final Uri uri = Uri.parse('android.settings.WIFI_SETTINGS');
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          // 回退到一般設定
-          await openAppSettings();
-        }
-      } else if (Platform.isIOS) {
-        // iOS: 開啟 WiFi 設定
-        const wifiUrl = 'App-Prefs:WIFI';
-        final Uri uri = Uri.parse(wifiUrl);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-        } else {
-          // 回退到一般設定
-          await openAppSettings();
-        }
-      } else {
-        // 其他平台回退到一般設定
-        await openAppSettings();
-      }
-    } catch (e) {
-      print('無法開啟 WiFi 設定: $e');
-      // 最終回退
-      await openAppSettings();
-    }
-  }
-
-// 顯示訊息
-  void _showMessage(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: const TextStyle(color: Colors.white),
-          ),
-          backgroundColor: const Color(0xFF9747FF).withOpacity(0.8),
-          duration: const Duration(seconds: 3),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-        ),
-      );
-    }
-  }
   // 獲取掃描結果錯誤訊息
   String _getScanResultsErrorMessage(CanGetScannedResults canGet) {
     switch (canGet) {
@@ -572,25 +433,67 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
     }
 
     return InkWell(
-      onTap: () {
-        // 修改這裡：顯示連線對話框而不是直接回調
-        _showConnectionDialog(device);
+      onTap: () async {
+        try {
+          // 檢查當前連線的 WiFi
+          final currentSSID = await _getCurrentWifiSSID();
+          final selectedSSID = device.ssid;
+
+          print('=== WiFi 連線檢查 ===');
+          print('當前連線的 WiFi: "$currentSSID"');
+          print('選擇的 WiFi: "$selectedSSID"');
+
+          // 使用比較函數
+          bool isConnectedToSelected = _compareSSID(currentSSID, selectedSSID);
+
+          print('是否已連線到選擇的網路: $isConnectedToSelected');
+
+          // 如果沒有連線到選擇的網路，顯示對話框
+          if (!isConnectedToSelected) {
+            if (mounted) {
+              _showWifiConnectionDialog(context, selectedSSID);
+            }
+            return;
+          }
+
+          // 如果已經連線到正確的網路，執行原有的選擇邏輯
+          print('已連線到正確網路，執行選擇邏輯');
+          if (widget.onDeviceSelected != null) {
+            widget.onDeviceSelected!(device);
+          }
+        } catch (e) {
+          print('檢查 WiFi 連線時發生錯誤: $e');
+          // 發生錯誤時，直接執行選擇邏輯（容錯處理）
+          if (widget.onDeviceSelected != null) {
+            widget.onDeviceSelected!(device);
+          }
+        }
       },
       child: Container(
         height: 52,
         child: Row(
           children: [
+            // SSID 名稱 - 使用 Expanded 讓它佔用剩餘空間
             Expanded(
-              child: Text(
-                device.ssid.isNotEmpty ? device.ssid : 'Unknown Network',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color.fromRGBO(255, 255, 255, 0.8),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: FutureBuilder<String?>(
+                future: _getCurrentWifiSSID(),
+                builder: (context, snapshot) {
+                  bool isCurrentWifi = snapshot.hasData && _compareSSID(snapshot.data, device.ssid);
+
+                  return Text(
+                    device.ssid.isNotEmpty ? device.ssid : 'Unknown Network',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: const Color.fromRGBO(255, 255, 255, 0.8),
+                      fontWeight: isCurrentWifi ? FontWeight.bold : FontWeight.normal, // 當前連線的顯示為粗體
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                },
               ),
             ),
+            // 鎖定圖示
             if (hasPassword)
               Padding(
                 padding: const EdgeInsets.only(right: 10),
@@ -606,6 +509,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
                   ),
                 ),
               ),
+            // WiFi 信號圖示
             Icon(
               wifiIcon,
               color: Colors.white.withOpacity(0.8),
@@ -615,5 +519,113 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         ),
       ),
     );
+  }
+
+
+  Future<void> startScan() async {
+    if (isScanning) return;
+
+    setState(() {
+      isScanning = true;
+      errorMessage = null;
+    });
+
+    try {
+      // 先檢查並請求權限
+      if (!_permissionRequested) {
+        bool permissionsGranted = await _checkAndRequestPermissions();
+        _permissionRequested = true;
+
+        if (!permissionsGranted) {
+          setState(() {
+            errorMessage = 'WiFi scanning requires location permission\nPlease allow "Location" and "Nearby devices" in settings';
+            isScanning = false;
+          });
+
+          if (widget.onScanComplete != null) {
+            widget.onScanComplete!([], errorMessage);
+          }
+          return;
+        }
+      }
+
+      // 檢查是否可以開始掃描
+      final canStart = await WiFiScan.instance.canStartScan();
+      print('canStartScan 狀態: $canStart');
+
+      if (canStart != CanStartScan.yes) {
+        String detailedError = _getStartScanErrorMessage(canStart);
+        setState(() {
+          errorMessage = detailedError;
+          isScanning = false;
+        });
+
+        if (widget.onScanComplete != null) {
+          widget.onScanComplete!([], detailedError);
+        }
+        return;
+      }
+
+      // 檢查是否可以獲取掃描結果
+      final canGetResults = await WiFiScan.instance.canGetScannedResults();
+      print('canGetScannedResults 狀態: $canGetResults');
+
+      if (canGetResults != CanGetScannedResults.yes) {
+        String detailedError = _getScanResultsErrorMessage(canGetResults);
+        setState(() {
+          errorMessage = detailedError;
+          isScanning = false;
+        });
+
+        if (widget.onScanComplete != null) {
+          widget.onScanComplete!([], detailedError);
+        }
+        return;
+      }
+
+      // 開始掃描
+      print('開始 WiFi 掃描...');
+      await WiFiScan.instance.startScan();
+
+      // 等待掃描完成
+      await Future.delayed(const Duration(milliseconds: 2000));
+
+      // 獲取掃描結果
+      final results = await WiFiScan.instance.getScannedResults();
+      print('掃描到 ${results.length} 個 WiFi 網路');
+
+      // 過濾和處理結果
+      final seenSsids = <String>{};
+      final uniqueResults = <WiFiAccessPoint>[];
+
+      for (var result in results) {
+        if (result.ssid.isNotEmpty && seenSsids.add(result.ssid)) {
+          uniqueResults.add(result);
+        }
+      }
+
+      uniqueResults.sort((a, b) => b.level.compareTo(a.level));
+      final limitedResults = uniqueResults.take(widget.maxDevicesToShow).toList();
+
+      setState(() {
+        discoveredDevices = limitedResults;
+        isScanning = false;
+      });
+
+      if (widget.onScanComplete != null) {
+        widget.onScanComplete!(limitedResults, null);
+      }
+    } catch (e) {
+      print('WiFi 掃描錯誤: $e');
+      final error = 'Error occurred while scanning WiFi: $e';
+      setState(() {
+        errorMessage = error;
+        isScanning = false;
+      });
+
+      if (widget.onScanComplete != null) {
+        widget.onScanComplete!([], error);
+      }
+    }
   }
 }

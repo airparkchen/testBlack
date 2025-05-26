@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
-import 'package:whitebox/shared/ui/pages/test/TestPage.dart';
+import 'package:whitebox/shared/ui/pages/test/NetworkTopoView.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onLoginSuccess;
@@ -203,7 +203,7 @@ class _LoginPageState extends State<LoginPage> {
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => const TestPage(),
+              builder: (context) => const NetworkTopoView(),
             ),
           );
         }

@@ -3,10 +3,8 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:srp/client.dart' as client;
-
 // 引入 wifi_api 資料夾內的功能
 import 'wifi_api/login_process.dart';
 import 'wifi_api/password_service.dart';
@@ -134,6 +132,11 @@ class WifiApiService {
       final response = await http.get(
         Uri.parse('$baseUrl$endpoint'),
         headers: _getHeaders(),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout (10 seconds)');
+        },
       );
 
       print('GET 請求響應狀態碼: ${response.statusCode}');
@@ -152,6 +155,12 @@ class WifiApiService {
       }
     } catch (e) {
       print('GET 請求錯誤: $e');
+
+      // 針對 timeout 錯誤提供特別的處理
+      if (e.toString().contains('請求超時') || e.toString().contains('timeout')) {
+        return {'error': '連線超時，請檢查網路連線'};
+      }
+
       return {'error': '$e'};
     }
   }

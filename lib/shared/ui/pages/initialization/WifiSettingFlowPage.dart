@@ -2,28 +2,33 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:whitebox/shared/ui/components/basic/StepperComponent.dart';
-import 'package:whitebox/shared/ui/components/basic/AccountPasswordComponent.dart';
-import 'package:whitebox/shared/ui/components/basic/ConnectionTypeComponent.dart';
-import 'package:whitebox/shared/ui/components/basic/SetSSIDComponent.dart';
-import 'package:whitebox/shared/ui/components/basic/SummaryComponent.dart';
-import 'package:whitebox/shared/ui/components/basic/FinishingWizardComponent.dart';
-import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart';
-import 'package:whitebox/shared/models/StaticIpConfig.dart';
-
-// 引入需要的 API 服務類
-import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:wifi_iot/wifi_iot.dart';
 
-import '../../../theme/app_theme.dart';
-import 'LoginPage.dart';
+import 'package:whitebox/shared/api/wifi_api_service.dart';
+import 'package:whitebox/shared/models/StaticIpConfig.dart';
+import 'package:whitebox/shared/ui/components/basic/AccountPasswordComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/ConnectionTypeComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/FinishingWizardComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/SetSSIDComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/StepperComponent.dart';
+import 'package:whitebox/shared/ui/components/basic/SummaryComponent.dart';
+import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart';
+import 'package:whitebox/shared/ui/pages/initialization/LoginPage.dart';
+import 'package:whitebox/shared/theme/app_theme.dart';
+
 
 class WifiSettingFlowPage extends StatefulWidget {
-  const WifiSettingFlowPage({super.key});
+  // 新增：總開關，用於繞過所有限制
+  final bool bypassAllRestrictions;
+
+  const WifiSettingFlowPage({
+    super.key,
+    this.bypassAllRestrictions = true, // 預設為 false，啟用所有限制
+  });
 
   @override
   State<WifiSettingFlowPage> createState() => _WifiSettingFlowPageState();
@@ -31,49 +36,67 @@ class WifiSettingFlowPage extends StatefulWidget {
 
 class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   final AppTheme _appTheme = AppTheme();
-  // 基本設定
+
+  // ==================== 模型與步驟控制 ====================
   String currentModel = 'Micky';
   int currentStepIndex = 0;
   bool isLastStepCompleted = false;
-  bool isShowingFinishingWizard = false;
-  bool isLoading = true;
   bool isCurrentStepComplete = false;
   bool _isUpdatingStep = false;
 
-  // 登入相關變數
+  // ==================== 精靈狀態控制 ====================
+  bool isShowingFinishingWizard = false;
+  bool isLoading = true;
+
+  // 完成精靈的步驟名稱
+  final List<String> _processNames = [
+    'Process 01', 'Process 02', 'Process 03', 'Process 04', 'Process 05',
+  ];
+
+  // ==================== 權限與限制 ====================
+  // 檢查是否應該繞過限制
+  bool get _shouldBypassRestrictions => widget.bypassAllRestrictions;
+
+  // ==================== 認證與登入狀態 ====================
   bool isAuthenticated = false;
   String? jwtToken;
   String currentSSID = '';
   String calculatedPassword = '';
   bool isAuthenticating = false;
   bool hasInitialized = false;
-  bool isConnecting = false; // 新增變數，追蹤 Wi-Fi 連線狀態
 
+  // ==================== 網路連線狀態 ====================
+  bool isConnecting = false; // 追蹤 Wi-Fi 連線狀態
+
+  // ==================== UI 動畫效果 ====================
   // 省略號動畫
   String _ellipsis = '';
   late Timer _ellipsisTimer;
 
-  // 表單狀態
+  // ==================== 表單配置與靜態 IP 設定 ====================
   Map<String, dynamic> stepsConfig = {};
   StaticIpConfig staticIpConfig = StaticIpConfig();
+
+  // ==================== 用戶帳號設定 ====================
   String userName = 'admin'; // 預設用戶名
   String password = '';
   String confirmPassword = '';
+
+  // ==================== 網路連線設定 ====================
   String connectionType = 'DHCP';
-  String ssid = '';
-  String securityOption = 'WPA3 Personal';
-  String ssidPassword = '';
   String pppoeUsername = '';
   String pppoePassword = '';
 
-  // 控制器
+  // ==================== Wi-Fi 無線網路設定 ====================
+  String ssid = '';
+  String securityOption = 'WPA3 Personal';
+  String ssidPassword = '';
+
+  // ==================== 控制器 ====================
   late PageController _pageController;
   final StepperController _stepperController = StepperController();
 
-  // 完成精靈的步驟名稱
-  final List<String> _processNames = [
-    'Process 01', 'Process 02', 'Process 03', 'Process 04', 'Process 05',
-  ];
+  // ==================== 當前設定快取 ====================
   Map<String, dynamic> _currentWanSettings = {};
   Map<String, dynamic> _currentWirelessSettings = {};
   bool _isLoadingWirelessSettings = false;
@@ -86,13 +109,24 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _stepperController.addListener(_onStepperControllerChanged);
     _startEllipsisAnimation();
 
-    // 僅在尚未初始化時執行認證
-    if (!hasInitialized) {
+    // 修改：更完整的繞過限制處理
+    if (_shouldBypassRestrictions) {
+      // 如果繞過限制，直接設定為已認證並停止載入
+      setState(() {
+        isAuthenticated = true;
+        hasInitialized = true;
+        isLoading = false; // 重要：停止載入狀態
+        isAuthenticating = false; // 停止認證動畫
+      });
+      print('繞過限制模式：已設定為認證完成狀態');
+    } else if (!hasInitialized) {
+      // 正常模式下才執行認證流程
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _initializeAuthentication();
       });
     }
   }
+
 
   @override
   void dispose() {
@@ -154,6 +188,17 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   }
 
   Future _initializeAuthentication() async {
+    // 在方法開始就檢查是否要繞過
+    if (_shouldBypassRestrictions) {
+      setState(() {
+        isAuthenticated = true;
+        hasInitialized = true;
+        isAuthenticating = false;
+        isLoading = false;
+        _updateStatus("Authentication bypassed");
+      });
+      return;
+    }
     try {
       setState(() {
         isAuthenticating = true;
@@ -270,8 +315,19 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
-  // Handle authentication failure
+  // 修改認證失敗處理
   void _handleAuthenticationFailure(String errorMessage) {
+    if (_shouldBypassRestrictions) {
+      // 繞過限制時，不顯示錯誤，直接設定為已認證
+      setState(() {
+        isAuthenticated = true;
+        hasInitialized = true;
+        isLoading = false;
+      });
+      return;
+    }
+
+    // 原有的錯誤處理邏輯
     if (mounted) {
       showDialog(
         context: context,
@@ -284,7 +340,6 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                 child: const Text('OK'),
                 onPressed: () {
                   Navigator.of(context).pop();
-                  // Navigate back to InitializationPage and remove current page
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => const InitializationPage()),
                         (route) => false,
@@ -449,6 +504,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       });
     }
   }
+
   Future<void> _submitWirelessSettings() async {
     try {
       setState(() {
@@ -522,14 +578,24 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       });
     }
   }
-  // 修改自動重新連線方法
+
+  // 修改 WiFi 重連方法
   Future<void> _reconnectToWifi() async {
+    if (_shouldBypassRestrictions) {
+      // 繞過限制時，跳過 WiFi 連線檢查
+      print('跳過 WiFi 連線（繞過限制模式）');
+      setState(() {
+        _updateStatus('Wi-Fi connection bypassed');
+      });
+      return;
+    }
+
+    // 原有的 WiFi 連線邏輯
     if (ssid.isEmpty || ssidPassword.isEmpty) {
       print('No SSID or password set, skipping Wi-Fi connection');
       _handleConnectionFailure('No SSID or password set');
       return;
     }
-
     setState(() {
       isConnecting = true;
       _updateStatus('Connecting to Wi-Fi...');
@@ -551,13 +617,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         }
       }
 
-      // 使用 wifi_iot 連接到 Wi-Fi
+      // 使用 wifi_iot 連接到 Wi-Fi，縮短超時時間為15秒
       bool? isConnected = await WiFiForIoTPlugin.connect(
         ssid,
         password: ssidPassword,
         security: getNetworkSecurity(),
         joinOnce: true,
-        timeoutInSeconds: 30,
+        timeoutInSeconds: 15, // 縮短超時時間為15秒
       );
 
       if (isConnected != true) {
@@ -594,22 +660,36 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
-  // 新增處理連線失敗的方法
+// 修改連線失敗處理 - 顯示設定提示
   void _handleConnectionFailure(String errorMessage) {
+    if (_shouldBypassRestrictions) {
+      // 繞過限制時，不顯示錯誤，繼續流程
+      print('連線失敗（已繞過）: $errorMessage');
+      // 直接導航到 LoginPage
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+              (route) => false,
+        );
+      }
+      return;
+    }
+
+    // 修改錯誤處理邏輯 - 提示用戶手動連接WiFi
     if (mounted) {
       showDialog(
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
             title: const Text('Wi-Fi Connection Failed'),
-            content: Text('Unable to connect to Wi-Fi: $errorMessage\nPlease try again.'),
+            content: const Text('Unable to connect to Wi-Fi automatically.\nPlease go to Settings to connect to Wi-Fi manually.'),
             actions: <Widget>[
               TextButton(
                 child: const Text('OK'),
                 onPressed: () {
                   Navigator.of(context).pop();
                   Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const InitializationPage()),
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
                         (route) => false,
                   );
                 },
@@ -621,51 +701,49 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
-  // 修改處理精靈完成的方法
+// 修改精靈完成處理 - 縮短等待時間
   void _handleWizardCompleted() async {
     try {
-      print('Step 1: Submitting network settings...');
-      await _submitWanSettings();
-      await Future.delayed(const Duration(seconds: 2));
+      if (!_shouldBypassRestrictions) {
+        // 正常模式下執行所有步驟
+        print('Step 1: Submitting network settings...');
+        await _submitWanSettings();
+        await Future.delayed(const Duration(seconds: 2));
 
-      print('Step 2: Submitting wireless settings...');
-      await _submitWirelessSettings();
-      await Future.delayed(const Duration(seconds: 2));
+        print('Step 2: Submitting wireless settings...');
+        await _submitWirelessSettings();
+        await Future.delayed(const Duration(seconds: 2));
 
-      if (password.isNotEmpty && confirmPassword.isNotEmpty && password == confirmPassword) {
-        print('Step 3: Changing user password...');
-        await _changePassword();
-      }
+        if (password.isNotEmpty && confirmPassword.isNotEmpty && password == confirmPassword) {
+          print('Step 3: Changing user password...');
+          await _changePassword();
+        }
 
-      print('Step 4: Completing configuration...');
-      await WifiApiService.configFinish();
-      print('Configuration completed');
+        print('Step 4: Completing configuration...');
+        await WifiApiService.configFinish();
+        print('Configuration completed');
 
-      print('Step 5: Applying settings and waiting for 220 seconds...');
-      setState(() {
-        _updateStatus("Applying settings, please wait...");
-      });
-
-      try {
-        await Future.delayed(const Duration(seconds: 220));
-        print('Settings applied and wait completed');
-      } catch (e) {
-        print('Error during settings application or wait: $e');
+        print('Step 5: Applying settings and waiting for 220 seconds...');
         setState(() {
-          _updateStatus("Failed to apply settings: $e");
+          _updateStatus("Applying settings, please wait...");
         });
-        throw e; // 繼續拋出異常以進入 catch 塊
+
+        await Future.delayed(const Duration(seconds: 220)); // 保持220秒等待時間
+        print('Settings applied and wait completed');
+
+        print('Step 6: Reconnecting to Wi-Fi with new SSID and password...');
+        setState(() {
+          _updateStatus("Connecting to Wi-Fi...");
+          isConnecting = true;
+        });
+        await _reconnectToWifi();
+      } else {
+        // 繞過模式下，快速完成
+        print('繞過限制模式：跳過設定提交和等待');
+        await Future.delayed(const Duration(seconds: 2)); // 只等待2秒
       }
 
-      // 步驟 6: 重新連接到新的 Wi-Fi
-      print('Step 6: Reconnecting to Wi-Fi with new SSID and password...');
-      setState(() {
-        _updateStatus("Connecting to Wi-Fi...");
-        isConnecting = true;
-      });
-      await _reconnectToWifi();
-
-      // 連線成功，導航到 LoginPage
+      // 導航到 LoginPage
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -677,28 +755,41 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       setState(() {
         isConnecting = false;
       });
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Setup Failed'),
-              content: Text('Unable to complete setup: $e'),
-              actions: <Widget>[
-                TextButton(
-                  child: const Text('OK'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => const LoginPage()),
-                          (route) => false,
-                    );
-                  },
-                ),
-              ],
-            );
-          },
-        );
+
+      if (_shouldBypassRestrictions) {
+        // 繞過模式下，即使出錯也導航到 LoginPage
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+          );
+        }
+        return;
+      } else {
+        // 正常模式下顯示錯誤
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Setup Failed'),
+                content: Text('Unable to complete setup: $e'),
+                actions: <Widget>[
+                  TextButton(
+                    child: const Text('OK'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                            (route) => false,
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        }
       }
     }
   }
@@ -891,8 +982,12 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     });
   }
 
-  // 驗證表單
+  // 修改密碼驗證
   bool _validateForm() {
+    if (_shouldBypassRestrictions) {
+      // 繞過限制時，總是返回 true
+      return true;
+    }
     List<String> detailOptions = _getStepDetailOptions();
 
     if (detailOptions.isEmpty) {
@@ -946,155 +1041,6 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     if (detailOptions.contains('Confirm Password') &&
         (confirmPassword.isEmpty || confirmPassword != password)) {
       return false;
-    }
-
-    return true;
-  }
-
-  // 獲取當前步驟詳細選項
-  List<String> _getStepDetailOptions() {
-    List<String> detailOptions = [];
-    final steps = _getCurrentModelSteps();
-
-    if (steps.isNotEmpty && currentStepIndex < steps.length) {
-      var currentStep = steps[currentStepIndex];
-      if (currentStep.containsKey('detail')) {
-        detailOptions = List<String>.from(currentStep['detail']);
-      }
-    }
-
-    return detailOptions;
-  }
-
-
-  // 處理 SSID 表單變更（增強版本）
-  void _handleSSIDFormChanged(String newSsid, String newSecurityOption, String newPassword, bool isValid) {
-    setState(() {
-      // 只有當值真正改變時才更新，避免無必要的重建
-      if (ssid != newSsid || securityOption != newSecurityOption || ssidPassword != newPassword || isCurrentStepComplete != isValid) {
-        ssid = newSsid;
-        securityOption = newSecurityOption;
-        ssidPassword = newPassword;
-        isCurrentStepComplete = isValid;
-
-        // Debug 輸出
-        print('SSID 表單更新: SSID=$ssid, 安全選項=$securityOption, 密碼=${ssidPassword.isEmpty ? "空" : "已設置"}, 有效=$isValid');
-      }
-    });
-  }
-// 確認並保存當前步驟資料
-  void _confirmAndSaveCurrentStepData() {
-    final currentComponents = _getCurrentStepComponents();
-
-    // 確認帳戶密碼資料
-    if (currentComponents.contains('AccountPasswordComponent')) {
-      print('確認帳戶密碼資料: 用戶名=$userName, 密碼長度=${password.length}');
-    }
-
-    // 確認並準備WAN設置資料
-    else if (currentComponents.contains('ConnectionTypeComponent')) {
-      _prepareWanSettingsForSubmission();
-      print('確認連接類型資料: 類型=$connectionType');
-      if (connectionType == 'Static IP') {
-        print('靜態IP: ${staticIpConfig.ipAddress}');
-      } else if (connectionType == 'PPPoE') {
-        print('PPPoE: 用戶名=$pppoeUsername');
-      }
-    }
-
-    // 確認SSID設置資料
-    else if (currentComponents.contains('SetSSIDComponent')) {
-      print('確認SSID資料: SSID=$ssid, 安全選項=$securityOption, 密碼長度=${ssidPassword.length}');
-    }
-  }
-  // 處理下一步操作 - 增強版本
-  void _handleNext() {
-    final steps = _getCurrentModelSteps();
-    if (steps.isEmpty) return;
-    final currentComponents = _getCurrentStepComponents();
-
-    // 只對非最後一步進行表單驗證
-    if (currentStepIndex < steps.length - 1) {
-      if (!_validateCurrentStep(currentComponents)) {
-        return;
-      }
-
-      // 在進入下一步前，確認並保存當前步驟資料
-      _confirmAndSaveCurrentStepData();
-
-      _isUpdatingStep = true;
-      setState(() {
-        currentStepIndex++;
-        isCurrentStepComplete = false;
-      });
-
-      // 載入下一步的資料
-      _reloadStepData(currentStepIndex);
-
-      _stepperController.jumpToStep(currentStepIndex);
-      _pageController.animateToPage(
-        currentStepIndex,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-      _isUpdatingStep = false;
-    }
-    // 最後一步（摘要頁）不需要驗證，直接進入完成精靈
-    else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
-      _isUpdatingStep = true;
-      setState(() {
-        isLastStepCompleted = true;
-        isShowingFinishingWizard = true;
-      });
-      _stepperController.jumpToStep(currentStepIndex);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _stepperController.notifyListeners();
-      });
-      _isUpdatingStep = false;
-    }
-  }
-
-  // 驗證當前步驟
-  bool _validateCurrentStep(List<String> currentComponents) {
-    // 檢查 AccountPasswordComponent
-    if (currentComponents.contains('AccountPasswordComponent')) {
-      if (!_validateForm()) {
-        List<String> detailOptions = _getStepDetailOptions();
-        if (detailOptions.isEmpty) {
-          detailOptions = ['User', 'Password', 'Confirm Password'];
-        }
-
-        String errorMessage = _getAccountPasswordError(detailOptions);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
-        return false;
-      }
-      setState(() {
-        isCurrentStepComplete = true;
-      });
-    }
-
-    // 檢查 ConnectionTypeComponent
-    else if (currentComponents.contains('ConnectionTypeComponent')) {
-      if (!isCurrentStepComplete) {
-        String errorMessage = _getConnectionTypeError();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
-        return false;
-      }
-    }
-
-    // 檢查 SetSSIDComponent
-    else if (currentComponents.contains('SetSSIDComponent')) {
-      if (!isCurrentStepComplete) {
-        String errorMessage = _getSSIDError();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
-        return false;
-      }
     }
 
     return true;
@@ -1156,6 +1102,162 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
 
     return 'Please complete all required fields';
+  }
+
+  // 獲取當前步驟詳細選項
+  List<String> _getStepDetailOptions() {
+    List<String> detailOptions = [];
+    final steps = _getCurrentModelSteps();
+
+    if (steps.isNotEmpty && currentStepIndex < steps.length) {
+      var currentStep = steps[currentStepIndex];
+      if (currentStep.containsKey('detail')) {
+        detailOptions = List<String>.from(currentStep['detail']);
+      }
+    }
+
+    return detailOptions;
+  }
+
+
+  // 處理 SSID 表單變更（增強版本）
+  void _handleSSIDFormChanged(String newSsid, String newSecurityOption, String newPassword, bool isValid) {
+    setState(() {
+      // 只有當值真正改變時才更新，避免無必要的重建
+      if (ssid != newSsid || securityOption != newSecurityOption || ssidPassword != newPassword || isCurrentStepComplete != isValid) {
+        ssid = newSsid;
+        securityOption = newSecurityOption;
+        ssidPassword = newPassword;
+        isCurrentStepComplete = isValid;
+
+        // Debug 輸出
+        print('SSID 表單更新: SSID=$ssid, 安全選項=$securityOption, 密碼=${ssidPassword.isEmpty ? "空" : "已設置"}, 有效=$isValid');
+      }
+    });
+  }
+
+  // 確認並保存當前步驟資料
+  void _confirmAndSaveCurrentStepData() {
+    final currentComponents = _getCurrentStepComponents();
+
+    // 確認帳戶密碼資料
+    if (currentComponents.contains('AccountPasswordComponent')) {
+      print('確認帳戶密碼資料: 用戶名=$userName, 密碼長度=${password.length}');
+    }
+
+    // 確認並準備WAN設置資料
+    else if (currentComponents.contains('ConnectionTypeComponent')) {
+      _prepareWanSettingsForSubmission();
+      print('確認連接類型資料: 類型=$connectionType');
+      if (connectionType == 'Static IP') {
+        print('靜態IP: ${staticIpConfig.ipAddress}');
+      } else if (connectionType == 'PPPoE') {
+        print('PPPoE: 用戶名=$pppoeUsername');
+      }
+    }
+
+    // 確認SSID設置資料
+    else if (currentComponents.contains('SetSSIDComponent')) {
+      print('確認SSID資料: SSID=$ssid, 安全選項=$securityOption, 密碼長度=${ssidPassword.length}');
+    }
+  }
+
+  // 修改 handleNext 方法
+  void _handleNext() {
+    final steps = _getCurrentModelSteps();
+    if (steps.isEmpty) return;
+    final currentComponents = _getCurrentStepComponents();
+
+    // 只對非最後一步進行表單驗證
+    if (currentStepIndex < steps.length - 1) {
+      // 如果不是繞過限制模式，才進行驗證
+      if (!_shouldBypassRestrictions && !_validateCurrentStep(currentComponents)) {
+        return;
+      }
+
+      _confirmAndSaveCurrentStepData();
+
+      _isUpdatingStep = true;
+      setState(() {
+        currentStepIndex++;
+        isCurrentStepComplete = _shouldBypassRestrictions ? true : false;
+      });
+
+      _reloadStepData(currentStepIndex);
+
+      _stepperController.jumpToStep(currentStepIndex);
+      _pageController.animateToPage(
+        currentStepIndex,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      _isUpdatingStep = false;
+    }
+    else if (currentStepIndex == steps.length - 1 && !isLastStepCompleted) {
+      _isUpdatingStep = true;
+      setState(() {
+        isLastStepCompleted = true;
+        isShowingFinishingWizard = true;
+      });
+      _stepperController.jumpToStep(currentStepIndex);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _stepperController.notifyListeners();
+      });
+      _isUpdatingStep = false;
+    }
+  }
+
+  // 修改表單驗證
+  bool _validateCurrentStep(List<String> currentComponents) {
+    if (_shouldBypassRestrictions) {
+      // 繞過限制時，總是返回 true
+      setState(() {
+        isCurrentStepComplete = true;
+      });
+      return true;
+    }
+    // 檢查 AccountPasswordComponent
+    if (currentComponents.contains('AccountPasswordComponent')) {
+      if (!_validateForm()) {
+        List<String> detailOptions = _getStepDetailOptions();
+        if (detailOptions.isEmpty) {
+          detailOptions = ['User', 'Password', 'Confirm Password'];
+        }
+
+        String errorMessage = _getAccountPasswordError(detailOptions);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        return false;
+      }
+      setState(() {
+        isCurrentStepComplete = true;
+      });
+    }
+
+    // 檢查 ConnectionTypeComponent
+    else if (currentComponents.contains('ConnectionTypeComponent')) {
+      if (!isCurrentStepComplete) {
+        String errorMessage = _getConnectionTypeError();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        return false;
+      }
+    }
+
+    // 檢查 SetSSIDComponent
+    else if (currentComponents.contains('SetSSIDComponent')) {
+      if (!isCurrentStepComplete) {
+        String errorMessage = _getSSIDError();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // 獲取連接類型錯誤訊息
@@ -1269,6 +1371,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       print('摘要頁面，重置完成狀態為 false');
     }
   }
+
   // 重新載入指定步驟的資料
   void _reloadStepData(int stepIndex) {
     final components = _getCurrentStepComponents(stepIndex: stepIndex);
@@ -1355,293 +1458,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     return 'Step ${currentStepIndex + 1}';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // 獲取螢幕尺寸
-    final screenSize = MediaQuery.of(context).size;
-    final screenHeight = screenSize.height;
-    final screenWidth = screenSize.width;
-
-    // ===== 全域比例設定 =====
-    // 主要區域高度比例
-    final stepperAreaHeightRatio = 0.17; // Stepper區域佔總高度的17%
-    final contentAreaHeightRatio = 0.55; // 內容區域佔總高度的55%
-    final navigationAreaHeightRatio = 0.15; // 導航按鈕區域佔總高度的15%
-
-    // 內容區域內部比例
-    final titleHeightRatio = 0.07; // 標題區域佔總高度的7%
-    final contentHeightRatio = 0.45; // 內容區域佔總高度的45%
-
-    // 間距和內邊距比例
-    final horizontalPaddingRatio = 0.06; // 水平內邊距為螢幕寬度的6%
-    final verticalPaddingRatio = 0.025; // 垂直內邊距為螢幕高度的2.5%
-    final itemSpacingRatio = 0.025; // 元素間距為螢幕高度的2.5%
-    final buttonSpacingRatio = 0.05; // 按鈕間距為螢幕寬度的5%
-
-    // 字體大小比例
-    final titleFontSizeRatio = 0.042; // 標題字體大小為螢幕高度的4.2%
-    final subtitleFontSizeRatio = 0.028; // 副標題字體大小為螢幕高度的2.8%
-    final bodyTextFontSizeRatio = 0.018; // 正文字體大小為螢幕高度的1.8%
-    final buttonTextFontSizeRatio = 0.022; // 按鈕字體大小為螢幕高度的2.2%
-    final smallTextFontSizeRatio = 0.016; // 小字體大小為螢幕高度的1.6%
-
-    // 按鈕尺寸比例
-    final buttonHeightRatio = 0.07; // 按鈕高度為螢幕高度的7%
-    final buttonBorderRadiusRatio = 0.01; // 按鈕圓角為螢幕高度的1%
-
-    // ===== 計算實際尺寸 =====
-    // 主要區域高度
-    final stepperAreaHeight = screenHeight * stepperAreaHeightRatio;
-    final contentAreaHeight = screenHeight * contentAreaHeightRatio;
-    final navigationAreaHeight = screenHeight * navigationAreaHeightRatio;
-
-    // 內容區域內部高度
-    final titleHeight = screenHeight * titleHeightRatio;
-    final contentHeight = screenHeight * contentHeightRatio;
-
-    // 間距和內邊距
-    final horizontalPadding = screenWidth * horizontalPaddingRatio;
-    final verticalPadding = screenHeight * verticalPaddingRatio;
-    final itemSpacing = screenHeight * itemSpacingRatio;
-    final buttonSpacing = screenWidth * buttonSpacingRatio;
-
-    // 字體大小
-    final titleFontSize = screenHeight * titleFontSizeRatio;
-    final subtitleFontSize = screenHeight * subtitleFontSizeRatio;
-    final bodyTextFontSize = screenHeight * bodyTextFontSizeRatio;
-    final buttonTextFontSize = screenHeight * buttonTextFontSizeRatio;
-    final smallTextFontSize = screenHeight * smallTextFontSizeRatio;
-
-    // 按鈕尺寸
-    final buttonHeight = screenHeight * buttonHeightRatio;
-    final buttonBorderRadius = screenHeight * buttonBorderRadiusRatio;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 主內容
-          SafeArea(
-            child: Column(
-              children: [
-                // Stepper 區域
-                Container(
-                  height: stepperAreaHeight,
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  child: AbsorbPointer(
-                    absorbing: isAuthenticating || !isAuthenticated, // 認證期間或未認證時禁用交互
-                    child: Opacity(
-                      opacity: isAuthenticating || !isAuthenticated ? 0.5 : 1.0, // 視覺上降低透明度
-                      child: StepperComponent(
-                        configPath: 'lib/shared/config/flows/initialization/wifi.json',
-                        modelType: currentModel,
-                        onStepChanged: _updateCurrentStep,
-                        controller: _stepperController,
-                        isLastStepCompleted: isLastStepCompleted,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // 主內容區域
-                Container(
-                  height: contentAreaHeight,
-                  child: isShowingFinishingWizard
-                      ? _buildFinishingWizard(
-                    titleHeight: titleHeight,
-                    contentHeight: contentHeight,
-                    titleFontSize: titleFontSize,
-                    horizontalPadding: horizontalPadding,
-                    verticalPadding: verticalPadding,
-                  )
-                      : Column(
-                    children: [
-                      // 步驟標題
-                      Container(
-                        height: titleHeight,
-                        width: double.infinity,
-                        alignment: Alignment.center,
-                        child: Text(
-                          _getCurrentStepName(),
-                          style: TextStyle(
-                            fontSize: titleFontSize,
-                            fontWeight: FontWeight.normal,
-                            color: Colors.white,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-
-                      // 步驟內容
-                      Expanded(
-                        child: AbsorbPointer(
-                          absorbing: isAuthenticating || !isAuthenticated, // 認證期間或未認證時禁用交互
-                          child: Opacity(
-                            opacity: isAuthenticating || !isAuthenticated ? 0.5 : 1.0,
-                            child: _buildPageView(
-                              horizontalPadding: horizontalPadding,
-                              verticalPadding: verticalPadding,
-                              itemSpacing: itemSpacing,
-                              subtitleFontSize: subtitleFontSize,
-                              bodyTextFontSize: bodyTextFontSize,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 導航按鈕區域
-                if (!isShowingFinishingWizard)
-                  Container(
-                    height: navigationAreaHeight,
-                    child: _buildNavigationButtons(
-                      buttonHeight: buttonHeight,
-                      buttonSpacing: buttonSpacing,
-                      horizontalPadding: horizontalPadding,
-                      buttonBorderRadius: buttonBorderRadius,
-                      buttonTextFontSize: buttonTextFontSize,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // 認證期間顯示遮罩層
-          if (isAuthenticating)
-            Container(
-              color: Colors.black.withOpacity(0.5), // 半透明黑色遮罩
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: verticalPadding),
-                    Text(
-                      'Logging in$_ellipsis',
-                      style: TextStyle(
-                        fontSize: bodyTextFontSize,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-// 完成精靈介面 - 使用固定高度
-  Widget _buildFinishingWizard({
-    required double titleHeight,
-    required double contentHeight,
-    required double titleFontSize,
-    required double horizontalPadding,
-    required double verticalPadding,
-  }) {
-    final screenSize = MediaQuery.of(context).size;
-
-    // 計算適合的組件高度 - 使用 contentHeight
-    final componentHeight = contentHeight * 0.85; // 使用內容區域的85%，預留一些空間
-
-    return Column(
-      children: [
-        // 標題
-        Container(
-          height: titleHeight,
-          width: double.infinity,
-          alignment: Alignment.center,
-          child: Text(
-            'Finishing Wizard$_ellipsis',
-            style: TextStyle(
-              fontSize: titleFontSize,
-              fontWeight: FontWeight.normal,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-
-        // 內容 - 使用固定高度替代 Expanded
-        Container(
-          height: contentHeight,
-          width: double.infinity,
-          child: Center(
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: verticalPadding,
-              ),
-              child: FinishingWizardComponent(
-                processNames: _processNames,
-                totalDurationSeconds: 10,
-                onCompleted: _handleWizardCompleted,
-                height: componentHeight, // 傳入計算好的高度
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-// 修改 _buildPageView 確保有適當的高度
-  Widget _buildPageView({
-    required double horizontalPadding,
-    required double verticalPadding,
-    required double itemSpacing,
-    required double subtitleFontSize,
-    required double bodyTextFontSize,
-  }) {
-    final steps = _getCurrentModelSteps();
-    if (steps.isEmpty) {
-      return Center(
-        child: Text(
-          '沒有可用的步驟',
-          style: TextStyle(
-            fontSize: bodyTextFontSize,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-
-    // 使用 Container 確保 PageView 有固定高度
-    return Container(
-      height: double.infinity, // 確保使用父容器提供的全部高度
-      child: PageView.builder(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: steps.length,
-        onPageChanged: (index) {
-          if (_isUpdatingStep || index == currentStepIndex) return;
-          _isUpdatingStep = true;
-          setState(() {
-            currentStepIndex = index;
-            isCurrentStepComplete = false;
-          });
-          _stepperController.jumpToStep(index);
-          _isUpdatingStep = false;
-        },
-        itemBuilder: (context, index) {
-          return _buildStepContent(
-            index,
-            horizontalPadding: horizontalPadding,
-            verticalPadding: verticalPadding,
-            itemSpacing: itemSpacing,
-            subtitleFontSize: subtitleFontSize,
-            bodyTextFontSize: bodyTextFontSize,
-          );
-        },
-      ),
-    );
-  }
-
-// 修改 _createComponentByName 方法，為所有組件傳遞高度
+  // 修改 _createComponentByName 方法，為所有組件傳遞高度
   Widget? _createComponentByName(String componentName) {
     List<String> detailOptions = _getStepDetailOptions();
     final screenSize = MediaQuery.of(context).size;
@@ -1752,7 +1569,511 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
-// 構建步驟內容 - 確保內容可滾動且不溢出
+  // 修改後的 WifiSettingFlowPage build 方法
+  @override
+  Widget build(BuildContext context) {
+    // 獲取螢幕尺寸和鍵盤高度
+    final screenSize = MediaQuery.of(context).size;
+    final screenHeight = screenSize.height;
+    final screenWidth = screenSize.width;
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardVisible = keyboardHeight > 0;
+
+    // ===== 全域比例設定 =====
+    // 主要區域高度比例
+    final stepperAreaHeightRatio = 0.17; // Stepper區域佔總高度的17%
+    final contentAreaHeightRatio = 0.55; // 內容區域佔總高度的55%
+    final navigationAreaHeightRatio = 0.15; // 導航按鈕區域佔總高度的15%
+
+    // 內容區域內部比例
+    final titleHeightRatio = 0.07; // 標題區域佔總高度的7%
+    final contentHeightRatio = 0.45; // 內容區域佔總高度的45%
+
+    // 間距和內邊距比例
+    final horizontalPaddingRatio = 0.06; // 水平內邊距為螢幕寬度的6%
+    final verticalPaddingRatio = 0.025; // 垂直內邊距為螢幕高度的2.5%
+    final itemSpacingRatio = 0.025; // 元素間距為螢幕高度的2.5%
+    final buttonSpacingRatio = 0.05; // 按鈕間距為螢幕寬度的5%
+
+    // 字體大小比例
+    final titleFontSizeRatio = 0.042; // 標題字體大小為螢幕高度的4.2%
+    final subtitleFontSizeRatio = 0.028; // 副標題字體大小為螢幕高度的2.8%
+    final bodyTextFontSizeRatio = 0.018; // 正文字體大小為螢幕高度的1.8%
+    final buttonTextFontSizeRatio = 0.022; // 按鈕字體大小為螢幕高度的2.2%
+    final smallTextFontSizeRatio = 0.016; // 小字體大小為螢幕高度的1.6%
+
+    // 按鈕尺寸比例
+    final buttonHeightRatio = 0.07; // 按鈕高度為螢幕高度的7%
+    final buttonBorderRadiusRatio = 0.01; // 按鈕圓角為螢幕高度的1%
+
+    // ===== 計算實際尺寸 =====
+    // 主要區域高度
+    final stepperAreaHeight = screenHeight * stepperAreaHeightRatio;
+    final contentAreaHeight = screenHeight * contentAreaHeightRatio;
+    final navigationAreaHeight = screenHeight * navigationAreaHeightRatio;
+
+    // 內容區域內部高度
+    final titleHeight = screenHeight * titleHeightRatio;
+    final contentHeight = screenHeight * contentHeightRatio;
+
+    // 間距和內邊距
+    final horizontalPadding = screenWidth * horizontalPaddingRatio;
+    final verticalPadding = screenHeight * verticalPaddingRatio;
+    final itemSpacing = screenHeight * itemSpacingRatio;
+    final buttonSpacing = screenWidth * buttonSpacingRatio;
+
+    // 字體大小
+    final titleFontSize = screenHeight * titleFontSizeRatio;
+    final subtitleFontSize = screenHeight * subtitleFontSizeRatio;
+    final bodyTextFontSize = screenHeight * bodyTextFontSizeRatio;
+    final buttonTextFontSize = screenHeight * buttonTextFontSizeRatio;
+    final smallTextFontSize = screenHeight * smallTextFontSizeRatio;
+
+    // 按鈕尺寸
+    final buttonHeight = screenHeight * buttonHeightRatio;
+    final buttonBorderRadius = screenHeight * buttonBorderRadiusRatio;
+
+    // 計算可用的高度（扣除鍵盤高度）
+    final availableHeight = screenHeight - keyboardHeight;
+
+    // 當鍵盤彈出時，檢查內容是否需要滑動
+    final minRequiredHeight = stepperAreaHeight + titleHeight + navigationAreaHeight + 100; // 額外100像素緩衝
+    final needsScrolling = isKeyboardVisible && (availableHeight < minRequiredHeight);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false, // 防止自動調整大小
+      body: Stack(
+        children: [
+          // 主內容 - 使用 DraggableScrollableSheet 實現可滑動隱藏效果
+          SafeArea(
+            child: _buildScrollableContent(
+              screenHeight: screenHeight,
+              stepperAreaHeight: stepperAreaHeight,
+              contentAreaHeight: contentAreaHeight,
+              navigationAreaHeight: navigationAreaHeight,
+              titleHeight: titleHeight,
+              contentHeight: contentHeight,
+              horizontalPadding: horizontalPadding,
+              verticalPadding: verticalPadding,
+              itemSpacing: itemSpacing,
+              buttonSpacing: buttonSpacing,
+              titleFontSize: titleFontSize,
+              subtitleFontSize: subtitleFontSize,
+              bodyTextFontSize: bodyTextFontSize,
+              buttonTextFontSize: buttonTextFontSize,
+              buttonHeight: buttonHeight,
+              buttonBorderRadius: buttonBorderRadius,
+              needsScrolling: needsScrolling,
+              keyboardHeight: keyboardHeight,
+            ),
+          ),
+
+          // 認證期間顯示遮罩層
+          if (isAuthenticating)
+            Container(
+              color: Colors.black.withOpacity(0.5), // 半透明黑色遮罩
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: verticalPadding),
+                    Text(
+                      'Logging in$_ellipsis',
+                      style: TextStyle(
+                        fontSize: bodyTextFontSize,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 新增：構建可滑動的內容區域
+  Widget _buildScrollableContent({
+    required double screenHeight,
+    required double stepperAreaHeight,
+    required double contentAreaHeight,
+    required double navigationAreaHeight,
+    required double titleHeight,
+    required double contentHeight,
+    required double horizontalPadding,
+    required double verticalPadding,
+    required double itemSpacing,
+    required double buttonSpacing,
+    required double titleFontSize,
+    required double subtitleFontSize,
+    required double bodyTextFontSize,
+    required double buttonTextFontSize,
+    required double buttonHeight,
+    required double buttonBorderRadius,
+    required bool needsScrolling,
+    required double keyboardHeight,
+  }) {
+    if (!needsScrolling) {
+      // 不需要滑動時，使用原來的固定佈局
+      return _buildFixedLayout(
+        stepperAreaHeight: stepperAreaHeight,
+        contentAreaHeight: contentAreaHeight,
+        navigationAreaHeight: navigationAreaHeight,
+        titleHeight: titleHeight,
+        contentHeight: contentHeight,
+        horizontalPadding: horizontalPadding,
+        verticalPadding: verticalPadding,
+        itemSpacing: itemSpacing,
+        buttonSpacing: buttonSpacing,
+        titleFontSize: titleFontSize,
+        subtitleFontSize: subtitleFontSize,
+        bodyTextFontSize: bodyTextFontSize,
+        buttonTextFontSize: buttonTextFontSize,
+        buttonHeight: buttonHeight,
+        buttonBorderRadius: buttonBorderRadius,
+      );
+    }
+
+    // 需要滑動時，使用 DraggableScrollableSheet
+    return DraggableScrollableSheet(
+      initialChildSize: 1.0, // 初始大小為全螢幕
+      minChildSize: 0.3, // 最小大小為30%（可以幾乎完全隱藏）
+      maxChildSize: 1.0, // 最大大小為全螢幕
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // 滑動指示器
+              Container(
+                width: 60,
+                height: 4,
+                margin: EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // 主要內容
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: Column(
+                    children: [
+                      // Stepper 區域
+                      Container(
+                        height: stepperAreaHeight,
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                        child: AbsorbPointer(
+                          absorbing: isAuthenticating || !isAuthenticated,
+                          child: Opacity(
+                            opacity: isAuthenticating || !isAuthenticated ? 0.5 : 1.0,
+                            child: StepperComponent(
+                              configPath: 'lib/shared/config/flows/initialization/wifi.json',
+                              modelType: currentModel,
+                              onStepChanged: _updateCurrentStep,
+                              controller: _stepperController,
+                              isLastStepCompleted: isLastStepCompleted,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 主內容區域
+                      Container(
+                        height: contentAreaHeight,
+                        child: isShowingFinishingWizard
+                            ? _buildFinishingWizard(
+                          titleHeight: titleHeight,
+                          contentHeight: contentHeight,
+                          titleFontSize: titleFontSize,
+                          horizontalPadding: horizontalPadding,
+                          verticalPadding: verticalPadding,
+                        )
+                            : Column(
+                          children: [
+                            // 步驟標題
+                            Container(
+                              height: titleHeight,
+                              width: double.infinity,
+                              alignment: Alignment.center,
+                              child: Text(
+                                _getCurrentStepName(),
+                                style: TextStyle(
+                                  fontSize: titleFontSize,
+                                  fontWeight: FontWeight.normal,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+
+                            // 步驟內容
+                            Expanded(
+                              child: AbsorbPointer(
+                                absorbing: isAuthenticating || !isAuthenticated,
+                                child: Opacity(
+                                  opacity: isAuthenticating || !isAuthenticated ? 0.5 : 1.0,
+                                  child: _buildPageView(
+                                    horizontalPadding: horizontalPadding,
+                                    verticalPadding: verticalPadding,
+                                    itemSpacing: itemSpacing,
+                                    subtitleFontSize: subtitleFontSize,
+                                    bodyTextFontSize: bodyTextFontSize,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 導航按鈕區域
+                      if (!isShowingFinishingWizard)
+                        Container(
+                          height: navigationAreaHeight,
+                          child: _buildNavigationButtons(
+                            buttonHeight: buttonHeight,
+                            buttonSpacing: buttonSpacing,
+                            horizontalPadding: horizontalPadding,
+                            buttonBorderRadius: buttonBorderRadius,
+                            buttonTextFontSize: buttonTextFontSize,
+                          ),
+                        ),
+
+                      // 額外的底部空間，避免被鍵盤遮擋
+                      SizedBox(height: keyboardHeight + 20),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 新增：構建固定佈局（不需要滑動時使用）
+  Widget _buildFixedLayout({
+    required double stepperAreaHeight,
+    required double contentAreaHeight,
+    required double navigationAreaHeight,
+    required double titleHeight,
+    required double contentHeight,
+    required double horizontalPadding,
+    required double verticalPadding,
+    required double itemSpacing,
+    required double buttonSpacing,
+    required double titleFontSize,
+    required double subtitleFontSize,
+    required double bodyTextFontSize,
+    required double buttonTextFontSize,
+    required double buttonHeight,
+    required double buttonBorderRadius,
+  }) {
+    return Column(
+      children: [
+        // Stepper 區域
+        Container(
+          height: stepperAreaHeight,
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: AbsorbPointer(
+            absorbing: isAuthenticating || !isAuthenticated,
+            child: Opacity(
+              opacity: isAuthenticating || !isAuthenticated ? 0.5 : 1.0,
+              child: StepperComponent(
+                configPath: 'lib/shared/config/flows/initialization/wifi.json',
+                modelType: currentModel,
+                onStepChanged: _updateCurrentStep,
+                controller: _stepperController,
+                isLastStepCompleted: isLastStepCompleted,
+              ),
+            ),
+          ),
+        ),
+
+        // 主內容區域
+        Container(
+          height: contentAreaHeight,
+          child: isShowingFinishingWizard
+              ? _buildFinishingWizard(
+            titleHeight: titleHeight,
+            contentHeight: contentHeight,
+            titleFontSize: titleFontSize,
+            horizontalPadding: horizontalPadding,
+            verticalPadding: verticalPadding,
+          )
+              : Column(
+            children: [
+              // 步驟標題
+              Container(
+                height: titleHeight,
+                width: double.infinity,
+                alignment: Alignment.center,
+                child: Text(
+                  _getCurrentStepName(),
+                  style: TextStyle(
+                    fontSize: titleFontSize,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              // 步驟內容
+              Expanded(
+                child: AbsorbPointer(
+                  absorbing: isAuthenticating || !isAuthenticated,
+                  child: Opacity(
+                    opacity: isAuthenticating || !isAuthenticated ? 0.5 : 1.0,
+                    child: _buildPageView(
+                      horizontalPadding: horizontalPadding,
+                      verticalPadding: verticalPadding,
+                      itemSpacing: itemSpacing,
+                      subtitleFontSize: subtitleFontSize,
+                      bodyTextFontSize: bodyTextFontSize,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 導航按鈕區域
+        if (!isShowingFinishingWizard)
+          Container(
+            height: navigationAreaHeight,
+            child: _buildNavigationButtons(
+              buttonHeight: buttonHeight,
+              buttonSpacing: buttonSpacing,
+              horizontalPadding: horizontalPadding,
+              buttonBorderRadius: buttonBorderRadius,
+              buttonTextFontSize: buttonTextFontSize,
+            ),
+          ),
+      ],
+    );
+  }
+
+  // 完成精靈介面 - 使用固定高度
+  Widget _buildFinishingWizard({
+    required double titleHeight,
+    required double contentHeight,
+    required double titleFontSize,
+    required double horizontalPadding,
+    required double verticalPadding,
+  }) {
+    final screenSize = MediaQuery.of(context).size;
+
+    // 計算適合的組件高度 - 使用 contentHeight
+    final componentHeight = contentHeight * 0.85; // 使用內容區域的85%，預留一些空間
+
+    return Column(
+      children: [
+        // 標題
+        Container(
+          height: titleHeight,
+          width: double.infinity,
+          alignment: Alignment.center,
+          child: Text(
+            'Finishing Wizard$_ellipsis',
+            style: TextStyle(
+              fontSize: titleFontSize,
+              fontWeight: FontWeight.normal,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        // 內容 - 使用固定高度替代 Expanded
+        Container(
+          height: contentHeight,
+          width: double.infinity,
+          child: Center(
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: verticalPadding,
+              ),
+              child: FinishingWizardComponent(
+                processNames: _processNames,
+                totalDurationSeconds: 10,
+                onCompleted: _handleWizardCompleted,
+                height: componentHeight, // 傳入計算好的高度
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 修改 _buildPageView 確保有適當的高度
+  Widget _buildPageView({
+    required double horizontalPadding,
+    required double verticalPadding,
+    required double itemSpacing,
+    required double subtitleFontSize,
+    required double bodyTextFontSize,
+  }) {
+    final steps = _getCurrentModelSteps();
+    if (steps.isEmpty) {
+      return Center(
+        child: Text(
+          '沒有可用的步驟',
+          style: TextStyle(
+            fontSize: bodyTextFontSize,
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+
+    // 使用 Container 確保 PageView 有固定高度
+    return Container(
+      height: double.infinity, // 確保使用父容器提供的全部高度
+      child: PageView.builder(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: steps.length,
+        onPageChanged: (index) {
+          if (_isUpdatingStep || index == currentStepIndex) return;
+          _isUpdatingStep = true;
+          setState(() {
+            currentStepIndex = index;
+            isCurrentStepComplete = false;
+          });
+          _stepperController.jumpToStep(index);
+          _isUpdatingStep = false;
+        },
+        itemBuilder: (context, index) {
+          return _buildStepContent(
+            index,
+            horizontalPadding: horizontalPadding,
+            verticalPadding: verticalPadding,
+            itemSpacing: itemSpacing,
+            subtitleFontSize: subtitleFontSize,
+            bodyTextFontSize: bodyTextFontSize,
+          );
+        },
+      ),
+    );
+  }
+
+  // 構建步驟內容 - 確保內容可滾動且不溢出
   Widget _buildStepContent(
       int index, {
         required double horizontalPadding,
@@ -1850,7 +2171,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
-// 修改導航按鈕，禁用交互
+  // 修改導航按鈕，禁用交互
   Widget _buildNavigationButtons({
     required double buttonHeight,
     required double buttonSpacing,

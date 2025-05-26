@@ -14,6 +14,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # 國際化支援套件 - 新增這兩行
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+
   srp:
     path: ./srp
   # 網路連接狀態管理套件（升級版本以解決相依性衝突）
@@ -98,6 +103,8 @@ dev_dependencies:
 flutter:
   # 啟用 Material Design 圖示
   uses-material-design: true
+  # 啟用國際化生成功能
+  generate: true
 
   # 資源文件配置
   assets:

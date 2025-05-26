@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:whitebox/shared/models/StaticIpConfig.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
-import 'package:flutter/gestures.dart';
 
 // 定義 PPPoE 配置類
 class PPPoEConfig {
@@ -50,6 +49,8 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   PPPoEConfig _pppoeConfig = PPPoEConfig();
 
   final AppTheme _appTheme = AppTheme();
+  final ScrollController _scrollController = ScrollController();
+
   // Controllers for IP-related inputs
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _subnetController = TextEditingController();
@@ -61,9 +62,6 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   final TextEditingController _pppoeUsernameController = TextEditingController();
   final TextEditingController _pppoePasswordController = TextEditingController();
   bool _pppoePasswordVisible = false;
-
-  // Scroll controller
-  late ScrollController _scrollController;
 
   // 焦點節點
   final FocusNode _ipFocusNode = FocusNode();
@@ -131,9 +129,6 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       // 驗證所有字段，更新表單狀態
       _validateForm();
     }
-
-    // 初始化滾動控制器
-    _scrollController = ScrollController();
 
     // 設置監聽器，在輸入變化時更新表單狀態
     _setupControllerListeners();
@@ -389,70 +384,13 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     }
   }
 
-  // Get current Static IP error message
-  String? _getErrorMessage() {
-    if (_selectedConnectionType != 'Static IP') return null;
-
-    if (_staticIpConfig.ipAddress.isEmpty) {
-      return 'Please enter an IP address';
-    } else if (_isIpError) {
-      return _ipErrorText;
-    }
-
-    if (_staticIpConfig.subnetMask.isEmpty) {
-      return 'Please enter a subnet mask';
-    } else if (_isSubnetError) {
-      return _subnetErrorText;
-    }
-
-    if (_staticIpConfig.gateway.isEmpty) {
-      return 'Please enter a gateway address';
-    } else if (_isGatewayError) {
-      return _gatewayErrorText;
-    }
-
-    if (_staticIpConfig.primaryDns.isEmpty) {
-      return 'Please enter a primary DNS';
-    } else if (_isPrimaryDnsError) {
-      return _primaryDnsErrorText;
-    }
-
-    if (_isSecondaryDnsError) {
-      return _secondaryDnsErrorText;
-    }
-
-    return null;
-  }
-
-  // Get current PPPoE error message
-  String? _getPppoeErrorMessage() {
-    if (_selectedConnectionType != 'PPPoE') return null;
-
-    if (_pppoeConfig.username.isEmpty) {
-      return 'Please enter a username';
-    } else if (_isPppoeUsernameError) {
-      return _pppoeUsernameErrorText;
-    }
-
-    if (_pppoeConfig.password.isEmpty) {
-      return 'Please enter a password';
-    } else if (_isPppoePasswordError) {
-      return _pppoePasswordErrorText;
-    }
-
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     // 使用傳入的高度參數或默認值
-    double cardHeight = widget.height ??
-        (_selectedConnectionType == 'Static IP' ? screenSize.height * 0.75 :
-        _selectedConnectionType == 'PPPoE' ? screenSize.height * 0.5 :
-        screenSize.height * 0.25);
+    double cardHeight = widget.height ?? (screenSize.height * 0.5);
 
     // 鍵盤彈出時調整卡片高度
     if (bottomInset > 0) {
@@ -492,75 +430,43 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     );
   }
 
-// 分離內容構建，添加鍵盤彈出時的隱藏空間
+  // 分離內容構建，專注於可滾動性
   Widget _buildContent(double bottomInset) {
-    // 計算鍵盤彈出時的隱藏空間高度
-    double extraSpaceHeight = bottomInset > 0 ? 200.0 : 0.0;
-
-    // 使用 GestureDetector 來捕獲滑動事件
-    return GestureDetector(
-      // 防止點擊時觸發焦點損失
-      onTap: () {},
-      // 確保事件可以傳遞給子組件
-      behavior: HitTestBehavior.translucent,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(25, 10, 25, bottomInset > 0 ? 10 : 25),
-        // 使用 RawScrollbar 來提供自定義滾動條
-        child: RawScrollbar(
-          thumbColor: Colors.white.withOpacity(0.3),
-          radius: Radius.circular(10),
-          thickness: 6,
-          controller: _scrollController,
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            // 使用更靈敏的滑動物理效果
-            physics: const ClampingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // 鍵盤彈出時的隱藏空間
-                if (bottomInset > 0)
-                  SizedBox(height: extraSpaceHeight),
-
-                // 連接類型選擇
-                Text(
-                  'Connection Type',
-                  style: TextStyle(
-                    fontSize: bottomInset > 0 ? 16 : 18,
-                    fontWeight: FontWeight.normal,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _buildConnectionTypeDropdown(),
-                const SizedBox(height: 20),
-
-                // 根據選擇的連接類型顯示不同的輸入部分
-                if (_selectedConnectionType == 'Static IP')
-                  _buildStaticIpSection(bottomInset),
-
-                if (_selectedConnectionType == 'PPPoE')
-                  _buildPPPoESection(bottomInset),
-
-                // 確保有足夠的底部間距使內容可以完全滑動到視圖底部
-                SizedBox(height: bottomInset > 0 ? bottomInset * 0.5 : 120),
-              ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(25, 10, 25, bottomInset > 0 ? 10 : 25),
+      child: ListView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          // 連接類型選擇
+          Text(
+            'Connection Type',
+            style: TextStyle(
+              fontSize: bottomInset > 0 ? 16 : 18,
+              fontWeight: FontWeight.normal,
+              color: Colors.white,
             ),
           ),
-        ),
+          const SizedBox(height: 8),
+          _buildConnectionTypeDropdown(),
+          SizedBox(height: bottomInset > 0 ? 10 : 20), // 鍵盤彈出時減少間距
+
+          // 根據選擇的連接類型顯示不同的輸入部分
+          if (_selectedConnectionType == 'Static IP')
+            _buildStaticIpSection(bottomInset),
+
+          if (_selectedConnectionType == 'PPPoE')
+            _buildPPPoESection(bottomInset),
+
+          // 鍵盤彈出時的額外空間
+          if (bottomInset > 0)
+            SizedBox(height: bottomInset * 0.5),
+        ],
       ),
     );
   }
 
-// 包裝元件以允許拖動滾動
-  Widget _wrapWithDragScroll(Widget child) {
-    return Listener(
-      // 確保觸控事件可以傳播到滾動視圖
-      behavior: HitTestBehavior.translucent,
-      child: child,
-    );
-  }
-// 建立靜態IP相關欄位區域
+  // 建立靜態IP相關欄位區域
   Widget _buildStaticIpSection(double bottomInset) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -626,17 +532,11 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
           errorText: _isPrimaryDnsError ? _primaryDnsErrorText : null,
           bottomInset: bottomInset,
         ),
-
-        // 顯示表單錯誤訊息
-        if (_getErrorMessage() != null && !_isFormComplete) ...[
-          SizedBox(height: bottomInset > 0 ? 10 : 20),
-          _buildErrorContainer(_getErrorMessage()!),
-        ],
       ],
     );
   }
 
-// 建立PPPoE相關欄位區域
+  // 建立PPPoE相關欄位區域
   Widget _buildPPPoESection(double bottomInset) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,15 +569,10 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
           errorText: _isPppoePasswordError ? _pppoePasswordErrorText : null,
           bottomInset: bottomInset,
         ),
-
-        // 顯示表單錯誤訊息
-        if (_getPppoeErrorMessage() != null && !_isFormComplete) ...[
-          SizedBox(height: bottomInset > 0 ? 10 : 20),
-          _buildErrorContainer(_getPppoeErrorMessage()!),
-        ],
       ],
     );
   }
+
   // ========== 以下為輔助方法 ==========
 
   // 構建連接類型下拉選擇框
@@ -783,22 +678,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     );
   }
 
-  // 構建錯誤容器
-  Widget _buildErrorContainer(String errorText) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      color: const Color(0xFFFF00E5).withOpacity(0.1),
-      child: Text(
-        errorText,
-        style: const TextStyle(
-          color: Color(0xFFFF00E5),
-          fontSize: 14,
-        ),
-      ),
-    );
-  }
-// 構建 PPPoE 文本輸入框
+  // 構建 PPPoE 文本輸入框
   Widget _buildPppoeTextField({
     required TextEditingController controller,
     required bool isError,
@@ -1022,15 +902,4 @@ class _IpAddressInputFormatter extends TextInputFormatter {
       selection: TextSelection.collapsed(offset: text.length),
     );
   }
-}
-// 自定義可拖動滾動行為
-class DragScrollBehavior extends MaterialScrollBehavior {
-  @override
-  Set<PointerDeviceKind> get dragDevices => {
-    PointerDeviceKind.touch,
-    PointerDeviceKind.mouse,
-    PointerDeviceKind.trackpad,
-    PointerDeviceKind.stylus,
-    PointerDeviceKind.invertedStylus,
-  };
 }

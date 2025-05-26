@@ -34,7 +34,12 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final AppTheme _appTheme = AppTheme();
-  final ScrollController _scrollController = ScrollController(); // 添加滾動控制器
+  final ScrollController _scrollController = ScrollController();
+
+  // 焦點節點
+  final FocusNode _ssidFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
+
   String _selectedSecurityOption = ''; // Initial empty value, will be set to first option
   bool _passwordVisible = false;
   bool _showPasswordField = true;
@@ -47,7 +52,6 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
   String _ssidErrorText = '';
   String _passwordErrorText = '';
 
-  // 在 _SetSSIDComponentState 類的 initState 方法中
   @override
   void initState() {
     super.initState();
@@ -86,6 +90,10 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
       _notifyFormChanged();
     });
 
+    // 添加焦點監聽
+    _ssidFocusNode.addListener(_handleSsidFocus);
+    _passwordFocusNode.addListener(_handlePasswordFocus);
+
     // 使用 addPostFrameCallback 確保UI已經構建完成
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // 再次確認密碼是否正確設置
@@ -105,12 +113,50 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
 
   @override
   void dispose() {
+    _ssidFocusNode.removeListener(_handleSsidFocus);
+    _passwordFocusNode.removeListener(_handlePasswordFocus);
+    _ssidFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _scrollController.dispose();
     _ssidController.removeListener(_notifyFormChanged);
     _passwordController.removeListener(_notifyFormChanged);
     _ssidController.dispose();
     _passwordController.dispose();
-    _scrollController.dispose(); // 處理滾動控制器
     super.dispose();
+  }
+
+  // 處理SSID輸入框獲得焦點
+  void _handleSsidFocus() {
+    if (_ssidFocusNode.hasFocus) {
+      // 延遲執行，確保鍵盤已完全彈出
+      Future.delayed(Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          // 滾動到合適的位置
+          _scrollController.animateTo(
+            0.0, // SSID在頂部，不需要太多滾動
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  // 處理密碼輸入框獲得焦點
+  void _handlePasswordFocus() {
+    if (_passwordFocusNode.hasFocus) {
+      // 延遲執行，確保鍵盤已完全彈出
+      Future.delayed(Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          // 滾動到合適的位置，這個值需要根據您的UI調整
+          _scrollController.animateTo(
+            150.0, // 密碼欄位位置
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
   }
 
   void _updatePasswordVisibility() {
@@ -206,43 +252,22 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     return true;
   }
 
-  // Get error message for display in warning panel
-  String? _getErrorMessage() {
-    if (_ssidController.text.isEmpty) {
-      return 'Please enter an SSID';
-    } else if (_isSsidError) {
-      return _ssidErrorText;
-    }
-
-    if (_showPasswordField) {
-      if (_passwordController.text.isEmpty) {
-        return 'Please enter a password';
-      } else if (_isPasswordError) {
-        return _passwordErrorText;
-      }
-    }
-
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final String? errorMessage = _getErrorMessage();
 
     // 使用傳入的高度參數或默認值
-    double cardHeight = widget.height ?? (_showPasswordField ? screenSize.height * 0.5 : screenSize.height * 0.35);
+    double cardHeight = widget.height ?? (screenSize.height * 0.5);
 
     // 鍵盤彈出時調整卡片高度
     if (bottomInset > 0) {
       // 根據鍵盤高度調整卡片高度
-      cardHeight = screenSize.height - bottomInset - 190; // 保留上方空間，這個值需要根據您的UI調整
+      cardHeight = screenSize.height - bottomInset - 190; // 保留上方空間
       // 確保最小高度
       cardHeight = cardHeight < 300 ? 300 : cardHeight;
     }
 
-    // 使用 buildStandardCard 替代原始的 Container
     return _appTheme.whiteBoxTheme.buildStandardCard(
       width: screenSize.width * 0.9,
       height: cardHeight,
@@ -266,7 +291,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
 
           // 可滾動的內容區域
           Expanded(
-            child: _buildContent(bottomInset, errorMessage),
+            child: _buildContent(bottomInset),
           ),
         ],
       ),
@@ -274,7 +299,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
   }
 
   // 分離內容構建，專注於可滾動性
-  Widget _buildContent(double bottomInset, String? errorMessage) {
+  Widget _buildContent(double bottomInset) {
     return Padding(
       padding: EdgeInsets.fromLTRB(25, 10, 25, bottomInset > 0 ? 10 : 25),
       child: ListView(
@@ -288,6 +313,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
             child: _buildTextField(
               controller: _ssidController,
               isError: _isSsidError,
+              focusNode: _ssidFocusNode,
             ),
             errorText: _isSsidError ? _ssidErrorText : null,
             bottomInset: bottomInset,
@@ -315,16 +341,11 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
                 controller: _passwordController,
                 isVisible: _passwordVisible,
                 isError: _isPasswordError,
+                focusNode: _passwordFocusNode,
               ),
               errorText: _isPasswordError ? _passwordErrorText : null,
               bottomInset: bottomInset,
             ),
-          ],
-
-          // 顯示表單錯誤訊息
-          if (errorMessage != null && !_validateForm()) ...[
-            SizedBox(height: bottomInset > 0 ? 10 : 20),
-            _buildErrorContainer(errorMessage),
           ],
 
           // 鍵盤彈出時的額外空間
@@ -335,9 +356,9 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     );
   }
 
-// ========== 以下為輔助方法 ==========
+  // ========== 以下為輔助方法 ==========
 
-// 構建標籤和輸入字段
+  // 構建標籤和輸入字段
   Widget _buildLabelAndField({
     required String label,
     required bool isError,
@@ -373,10 +394,11 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     );
   }
 
-// 構建基本文本輸入框
+  // 構建基本文本輸入框
   Widget _buildTextField({
     required TextEditingController controller,
     required bool isError,
+    FocusNode? focusNode,
     bool obscureText = false,
   }) {
     return SizedBox(
@@ -384,6 +406,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
       height: AppDimensions.inputHeight,
       child: TextFormField(
         controller: controller,
+        focusNode: focusNode,
         obscureText: obscureText,
         decoration: InputDecoration(
           filled: true,
@@ -416,11 +439,12 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     );
   }
 
-// 構建密碼輸入框
+  // 構建密碼輸入框
   Widget _buildPasswordField({
     required TextEditingController controller,
     required bool isVisible,
     required bool isError,
+    FocusNode? focusNode,
   }) {
     return SizedBox(
       width: double.infinity,
@@ -429,6 +453,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
         children: [
           TextFormField(
             controller: controller,
+            focusNode: focusNode,
             obscureText: !isVisible,
             decoration: InputDecoration(
               filled: true,
@@ -482,7 +507,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     );
   }
 
-// 構建安全選項下拉選單
+  // 構建安全選項下拉選單
   Widget _buildSecurityOptionDropdown() {
     return SizedBox(
       width: double.infinity,
@@ -540,22 +565,6 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
               child: Text(value),
             );
           }).toList(),
-        ),
-      ),
-    );
-  }
-
-// 構建錯誤容器
-  Widget _buildErrorContainer(String errorText) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      color: const Color(0xFFFF00E5).withOpacity(0.1),
-      child: Text(
-        errorText,
-        style: const TextStyle(
-          color: Color(0xFFFF00E5),
-          fontSize: 14,
         ),
       ),
     );
