@@ -15,7 +15,9 @@ class InitializationPage extends StatefulWidget {
   State<InitializationPage> createState() => _InitializationPageState();
 }
 
-class _InitializationPageState extends State<InitializationPage> {
+class _InitializationPageState extends State<InitializationPage>
+    with WidgetsBindingObserver {  // 添加 WidgetsBindingObserver mixin
+
   List<WiFiAccessPoint> discoveredDevices = [];
   bool isScanning = false;
   String? scanError;
@@ -26,8 +28,67 @@ class _InitializationPageState extends State<InitializationPage> {
   // 創建 AppTheme 實例
   final AppTheme _appTheme = AppTheme();
 
+  @override
+  void initState() {
+    super.initState();
+
+    // 註冊生命週期觀察者
+    WidgetsBinding.instance.addObserver(this);
+
+    // 頁面初次載入時自動掃描
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startAutoScan();
+    });
+  }
+
+  @override
+  void dispose() {
+    // 移除生命週期觀察者
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+      // App 從背景恢復到前景時自動掃描
+        print('App resumed - 開始自動掃描');
+        _startAutoScan();
+        break;
+      case AppLifecycleState.paused:
+        print('App paused');
+        break;
+      case AppLifecycleState.detached:
+        print('App detached');
+        break;
+      case AppLifecycleState.inactive:
+        print('App inactive');
+        break;
+      case AppLifecycleState.hidden:
+        print('App hidden');
+        break;
+    }
+  }
+
+  // 自動掃描方法
+  void _startAutoScan() {
+    // 確保不會在已經掃描時重複掃描
+    if (!isScanning && mounted) {
+      print('開始自動 WiFi 掃描');
+      setState(() {
+        isScanning = true;
+      });
+      _scannerController.startScan();
+    }
+  }
+
   // 處理掃描完成
   void _handleScanComplete(List<WiFiAccessPoint> devices, String? error) {
+    if (!mounted) return; // 確保 widget 還在樹中
+
     setState(() {
       discoveredDevices = devices;
       scanError = error;
@@ -39,6 +100,8 @@ class _InitializationPageState extends State<InitializationPage> {
         SnackBar(content: Text(error)),
       );
     }
+
+    print('WiFi 掃描完成 - 發現 ${devices.length} 個裝置');
   }
 
   // 建立使用圖片的功能按鈕
@@ -52,22 +115,22 @@ class _InitializationPageState extends State<InitializationPage> {
     return GestureDetector(
       onTap: onPressed,
       child: _appTheme.whiteBoxTheme.buildStandardCard(
-        width: width, // 使用比例計算的寬度
-        height: height, // 使用比例計算的高度
+        width: width,
+        height: height,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
               imagePath,
-              width: height * 0.45, // 圖片寬度為按鈕高度的45%
-              height: height * 0.45, // 圖片高度為按鈕高度的45%
+              width: height * 0.45,
+              height: height * 0.45,
               color: Colors.white,
             ),
-            SizedBox(height: height * 0.02), // 間距為按鈕高度的2%
+            SizedBox(height: height * 0.02),
             Text(
               label,
               style: TextStyle(
-                fontSize: height * 0.1, // 字體大小為按鈕高度的10%
+                fontSize: height * 0.1,
                 color: Colors.white,
               ),
               textAlign: TextAlign.center,
@@ -104,10 +167,13 @@ class _InitializationPageState extends State<InitializationPage> {
       final blankState = systemInfo['blank_state'];
 
       if (blankState == "0") {
-        // blank_state 為 0，開啟 LoginPage
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
+          MaterialPageRoute(
+            builder: (context) => LoginPage(
+              onBackPressed: () => Navigator.of(context).pop(), // 新增這行
+            ),
+          ),
         );
       } else {
         // blank_state 為 1 或其他值，開啟原來的 WifiSettingFlowPage
@@ -125,8 +191,6 @@ class _InitializationPageState extends State<InitializationPage> {
 
       // 失敗時只印出 log，不顯示任何訊息，維持在當前頁面
       print('獲取系統資訊失敗: $e');
-
-      // 不做任何導航，維持在當前頁面
     }
   }
 
@@ -170,12 +234,17 @@ class _InitializationPageState extends State<InitializationPage> {
       final blankState = systemInfo['blank_state'];
 
       if (blankState == "0") {
-        // blank_state 為 0，開啟 LoginPage
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
+          MaterialPageRoute(
+            builder: (context) => LoginPage(
+              onBackPressed: () {
+                Navigator.of(context).pop(); // 返回到 InitializationPage
+              },
+            ),
+          ),
         );
-      } else {
+      }else {
         // blank_state 為 1 或其他值，開啟原來的 WifiSettingFlowPage
         Navigator.push(
           context,
@@ -191,8 +260,6 @@ class _InitializationPageState extends State<InitializationPage> {
 
       // 失敗時只印出 log，不顯示任何訊息，維持在當前頁面
       print('獲取系統資訊失敗: $e');
-
-      // 不做任何導航，維持在當前頁面
     }
   }
 
@@ -204,23 +271,23 @@ class _InitializationPageState extends State<InitializationPage> {
     final screenHeight = screenSize.height;
 
     // 計算各元素尺寸與位置
-    final buttonWidth = screenWidth * 0.25; // 按鈕寬度為螢幕寬度的25%
-    final buttonHeight = buttonWidth; // 按鈕為正方形
-    final buttonSpacing = screenWidth * 0.08; // 按鈕間距為螢幕寬度的8%
+    final buttonWidth = screenWidth * 0.25;
+    final buttonHeight = buttonWidth;
+    final buttonSpacing = screenWidth * 0.08;
 
     // 頂部按鈕距離頂部的比例
-    final topButtonsTopPosition = screenHeight * 0.12; // 大約佔螢幕高度的12%
-    final topButtonsLeftPosition = screenWidth * 0.05; // 左側邊距為螢幕寬度的5%
+    final topButtonsTopPosition = screenHeight * 0.12;
+    final topButtonsLeftPosition = screenWidth * 0.05;
 
     // WiFi列表區域的位置與尺寸
-    final wifiListTopPosition = screenHeight * 0.28; // 大約佔螢幕高度的28%
-    final wifiListHeight = screenHeight * 0.45; // 高度為螢幕高度的50%
-    final wifiListWidth = screenWidth * 0.9; // 寬度為螢幕寬度的90%
+    final wifiListTopPosition = screenHeight * 0.28;
+    final wifiListHeight = screenHeight * 0.45;
+    final wifiListWidth = screenWidth * 0.9;
 
     // 底部搜尋按鈕的位置與尺寸
-    final searchButtonHeight = screenHeight * 0.065; // 高度為螢幕高度的6.5%
-    final searchButtonBottomPosition = screenHeight * 0.06; // 距離底部為螢幕高度的6%
-    final searchButtonHorizontalMargin = screenWidth * 0.1; // 水平邊距為螢幕寬度的10%
+    final searchButtonHeight = screenHeight * 0.065;
+    final searchButtonBottomPosition = screenHeight * 0.06;
+    final searchButtonHorizontalMargin = screenWidth * 0.1;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -235,7 +302,7 @@ class _InitializationPageState extends State<InitializationPage> {
               // WiFi 裝置列表區域
               Positioned(
                 top: wifiListTopPosition,
-                left: (screenWidth - wifiListWidth) / 2, // 居中
+                left: (screenWidth - wifiListWidth) / 2,
                 child: SizedBox(
                   width: wifiListWidth,
                   height: wifiListHeight,
@@ -264,7 +331,7 @@ class _InitializationPageState extends State<InitializationPage> {
                       height: buttonHeight,
                     ),
 
-                    SizedBox(width: buttonSpacing), // 按鈕間距
+                    SizedBox(width: buttonSpacing),
 
                     // 手動新增按鈕
                     _buildImageActionButton(
@@ -301,10 +368,10 @@ class _InitializationPageState extends State<InitializationPage> {
         _scannerController.startScan();
       },
       child: Container(
-        height: height, // 使用比例計算的高度
+        height: height,
         decoration: BoxDecoration(
           color: const Color(0xFF9747FF),
-          borderRadius: BorderRadius.circular(height * 0.08), // 圓角為高度的8%
+          borderRadius: BorderRadius.circular(height * 0.08),
         ),
         child: Center(
           child: Row(
@@ -313,7 +380,7 @@ class _InitializationPageState extends State<InitializationPage> {
               Text(
                 isScanning ? 'Scanning...' : 'Search',
                 style: TextStyle(
-                  fontSize: height * 0.4, // 字體大小為按鈕高度的40%
+                  fontSize: height * 0.4,
                   color: Colors.white,
                 ),
               ),

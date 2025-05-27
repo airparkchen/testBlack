@@ -14,11 +14,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # 國際化支援套件 - 新增這兩行
-  flutter_localizations:
-    sdk: flutter
-  intl: any
-
   srp:
     path: ./srp
   # 網路連接狀態管理套件（升級版本以解決相依性衝突）
@@ -30,7 +25,7 @@ dependencies:
   # WiFi 掃描功能
   wifi_scan: ^0.4.1+2
   wifi_iot: ^0.3.18
-  # app_settings: ^4.3.1
+  app_settings: ^5.1.1
   # HTTP 請求處理
   http: ^1.2.0
   # 網頁視圖
@@ -38,7 +33,7 @@ dependencies:
   # 加密相關功能
   crypto: ^3.0.3
   # 網路資訊獲取
-  network_info_plus: ^4.0.2
+  network_info_plus: ^5.0.0
   # 檔案路徑管理
   path_provider: ^2.1.1
   # 進階密碼學庫
@@ -85,6 +80,8 @@ dependencies:
   permission_handler: ^11.3.1
   url_launcher: ^6.2.4
 
+
+
 # 啟動頁面配置
 flutter_native_splash:
   color: "#FFFFFF"  # 背景顏色
@@ -103,8 +100,6 @@ dev_dependencies:
 flutter:
   # 啟用 Material Design 圖示
   uses-material-design: true
-  # 啟用國際化生成功能
-  generate: true
 
   # 資源文件配置
   assets:

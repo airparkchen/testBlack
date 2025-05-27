@@ -6,6 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:io';
+import 'package:app_settings/app_settings.dart';
 
 // WiFi掃描元件回調函數類型
 typedef OnWifiScanComplete = void Function(List<WiFiAccessPoint> devices, String? error);
@@ -260,7 +261,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
             ElevatedButton(
               onPressed: () async {
                 Navigator.of(context).pop();
-                await openAppSettings();
+                await AppSettings.openAppSettingsPanel(AppSettingsPanelType.wifi);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF9747FF),

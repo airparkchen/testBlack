@@ -27,7 +27,7 @@ class WifiSettingFlowPage extends StatefulWidget {
 
   const WifiSettingFlowPage({
     super.key,
-    this.bypassAllRestrictions = true, // 預設為 false，啟用所有限制
+    this.bypassAllRestrictions = false, // 預設為 false，啟用所有限制
   });
 
   @override
@@ -731,22 +731,22 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         await Future.delayed(const Duration(seconds: 220)); // 保持220秒等待時間
         print('Settings applied and wait completed');
 
-        print('Step 6: Reconnecting to Wi-Fi with new SSID and password...');
-        setState(() {
-          _updateStatus("Connecting to Wi-Fi...");
-          isConnecting = true;
-        });
-        await _reconnectToWifi();
+        // print('Step 6: Reconnecting to Wi-Fi with new SSID and password...');
+        // setState(() {
+        //   _updateStatus("Connecting to Wi-Fi...");
+        //   isConnecting = true;
+        // });
+        // await _reconnectToWifi();
       } else {
         // 繞過模式下，快速完成
         print('繞過限制模式：跳過設定提交和等待');
         await Future.delayed(const Duration(seconds: 2)); // 只等待2秒
       }
 
-      // 導航到 LoginPage
+      // 導航到 InitializationPage
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginPage()),
+          MaterialPageRoute(builder: (context) => const InitializationPage()),
               (route) => false,
         );
       }
