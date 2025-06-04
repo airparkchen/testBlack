@@ -706,6 +706,11 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     try {
       if (!_shouldBypassRestrictions) {
         // 正常模式下執行所有步驟
+
+        // print('Step 0: Start setting...');
+        // await WifiApiService.configStart();
+        // await Future.delayed(const Duration(seconds: 2));
+
         print('Step 1: Submitting network settings...');
         await _submitWanSettings();
         await Future.delayed(const Duration(seconds: 2));

@@ -2,6 +2,7 @@
 // 簡化後的 WiFi API 服務，引入資料夾內的功能
 
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:srp/client.dart' as client;
@@ -62,12 +63,15 @@ class SrpLoginResult {
 
 /// WiFi API 服務類 - 簡化版
 class WifiApiService {
-  // API 相關設定
-  static String baseUrl = 'http://192.168.1.1';
+  // API 相關設定 - 修改為 HTTPS
+  static String baseUrl = 'https://192.168.1.1';
   static String apiVersion = '/api/v1';
 
   // JWT Token 儲存
   static String? _jwtToken;
+
+  // HTTPS 設定
+  static bool bypassCertificateVerification = true; // 繞過憑證驗證
 
 // 在 WifiApiService 類中修改端點映射
   static final Map<String, String> _endpoints = {
@@ -80,6 +84,8 @@ class WifiApiService {
     'wizardStart': '/api/v1/wizard/start',
     'wizardFinish': '/api/v1/wizard/finish',
     'wizardChangePassword': '/api/v1/user/change_password',
+    // 根據 Swagger UI 更新 mesh_topology API 端點
+    'meshTopology': '/api/v1/system/mesh_topology',
   };
 
 // 確保動態方法映射正確
@@ -94,7 +100,10 @@ class WifiApiService {
     'updateWirelessBasic': (data) => _put(_endpoints['wirelessBasic'] ?? '', data),
     'updateWanEth': (data) => _put(_endpoints['wanEth'] ?? '', data),
     'updateWizardChangePassword': (data) => _put(_endpoints['wizardChangePassword'] ?? '', data),
+    // 添加 mesh topology 相關方法
+    'getMeshTopology': () => _get(_endpoints['meshTopology'] ?? ''),
   };
+
   /// 設置 JWT Token
   static void setJwtToken(String token) {
     _jwtToken = token;
@@ -103,6 +112,20 @@ class WifiApiService {
   /// 獲取 JWT Token
   static String? getJwtToken() {
     return _jwtToken;
+  }
+
+  /// 創建支援 HTTPS 的 HttpClient
+  static HttpClient _createHttpClient() {
+    HttpClient client = HttpClient();
+
+    if (bypassCertificateVerification) {
+      client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+        print('繞過 SSL 憑證驗證 for $host:$port');
+        return true; // 允許所有憑證
+      };
+    }
+
+    return client;
   }
 
   /// 獲取標準請求標頭
@@ -119,7 +142,7 @@ class WifiApiService {
     return headers;
   }
 
-  /// 發送 GET 請求（安全版本）
+  /// 發送 GET 請求（HTTPS 版本）
   static Future<Map<String, dynamic>> _get(String endpoint) async {
     try {
       if (endpoint.isEmpty) {
@@ -127,34 +150,51 @@ class WifiApiService {
         return {'error': '端點為空'};
       }
 
-      print('發送 GET 請求到 $endpoint');
+      print('發送 HTTPS GET 請求到 $endpoint');
 
-      final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: _getHeaders(),
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('Request timeout (10 seconds)');
-        },
-      );
+      final client = _createHttpClient();
 
-      print('GET 請求響應狀態碼: ${response.statusCode}');
+      try {
+        final request = await client.getUrl(Uri.parse('$baseUrl$endpoint'));
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          if (response.body.isEmpty) return {};
-          return json.decode(response.body);
-        } catch (e) {
-          print('解析 GET 響應JSON時出錯: $e');
-          return {'error': '解析JSON失敗'};
+        // 添加 headers
+        final headers = _getHeaders();
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+
+        final response = await request.close().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout (10 seconds)');
+          },
+        );
+
+        print('HTTPS GET 請求響應狀態碼: ${response.statusCode}');
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final responseBody = await response.transform(utf8.decoder).join();
+
+          if (responseBody.isNotEmpty) {
+            try {
+              return json.decode(responseBody);
+            } catch (e) {
+              print('解析 HTTPS GET 響應JSON時出錯: $e');
+              return {'error': '解析JSON失敗'};
+            }
+          } else {
+            return {};
+          }
+        } else {
+          print('HTTPS GET 請求失敗: ${response.statusCode}');
+          final errorBody = await response.transform(utf8.decoder).join();
+          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
         }
-      } else {
-        print('GET 請求失敗: ${response.statusCode}');
-        return {'error': '請求失敗，狀態碼: ${response.statusCode}'};
+      } finally {
+        client.close();
       }
     } catch (e) {
-      print('GET 請求錯誤: $e');
+      print('HTTPS GET 請求錯誤: $e');
 
       // 針對 timeout 錯誤提供特別的處理
       if (e.toString().contains('請求超時') || e.toString().contains('timeout')) {
@@ -165,7 +205,7 @@ class WifiApiService {
     }
   }
 
-  /// 發送 POST 請求（增強版）
+  /// 發送 POST 請求（HTTPS 版本）
   static Future<Map<String, dynamic>> _post(String endpoint, Map<String, dynamic> data) async {
     try {
       if (endpoint.isEmpty) {
@@ -173,63 +213,74 @@ class WifiApiService {
         return {'error': '端點為空'};
       }
 
-      final headers = _getHeaders();
+      print('發送 HTTPS POST 請求到 $endpoint，數據: ${json.encode(data)}');
 
-      // 檢查 JWT 令牌是否存在
-      if (!headers.containsKey('Authorization')) {
-        print('警告: 發送 POST 請求到 $endpoint 時沒有提供認證令牌');
-      }
+      final client = _createHttpClient();
 
-      print('發送 POST 請求到 $endpoint，數據: ${json.encode(data)}');
-      print('請求標頭: $headers');
+      try {
+        final request = await client.postUrl(Uri.parse('$baseUrl$endpoint'));
 
-      final response = await http.post(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: headers,
-        body: json.encode(data),
-      );
+        // 添加 headers
+        final headers = _getHeaders();
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
 
-      print('POST 請求響應狀態碼: ${response.statusCode}');
+        // 添加請求體
+        if (data.isNotEmpty) {
+          request.add(utf8.encode(json.encode(data)));
+        }
 
-      // 對於 4xx 錯誤，檢查是否有響應體提供更多信息
-      if (response.statusCode >= 400 && response.statusCode < 500) {
-        String errorBody = '無響應體';
-        try {
-          if (response.body.isNotEmpty) {
-            errorBody = response.body;
-            print('POST 請求錯誤響應體: $errorBody');
+        final response = await request.close().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout (10 seconds)');
+          },
+        );
+
+        print('HTTPS POST 請求響應狀態碼: ${response.statusCode}');
+
+        // 對於 4xx 錯誤，檢查是否有響應體提供更多信息
+        if (response.statusCode >= 400 && response.statusCode < 500) {
+          final errorBody = await response.transform(utf8.decoder).join();
+          print('HTTPS POST 請求錯誤響應體: $errorBody');
+
+          if (response.statusCode == 401 || response.statusCode == 403) {
+            print('認證錯誤: JWT 令牌可能已失效');
+            return {'error': '認證錯誤', 'needReAuthentication': true};
           }
-        } catch (e) {
-          print('解析錯誤響應時出錯: $e');
+
+          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'errorBody': errorBody};
         }
 
-        if (response.statusCode == 401 || response.statusCode == 403) {
-          print('認證錯誤: JWT 令牌可能已失效');
-          return {'error': '認證錯誤', 'needReAuthentication': true};
-        }
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final responseBody = await response.transform(utf8.decoder).join();
 
-        return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'errorBody': errorBody};
-      }
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          if (response.body.isEmpty) return {};
-          return json.decode(response.body);
-        } catch (e) {
-          print('解析 POST 響應JSON時出錯: $e');
-          return {'error': '解析JSON失敗'};
+          if (responseBody.isNotEmpty) {
+            try {
+              return json.decode(responseBody);
+            } catch (e) {
+              print('解析 HTTPS POST 響應JSON時出錯: $e');
+              return {'error': '解析JSON失敗'};
+            }
+          } else {
+            return {};
+          }
+        } else {
+          print('HTTPS POST 請求失敗: ${response.statusCode}');
+          final errorBody = await response.transform(utf8.decoder).join();
+          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
         }
-      } else {
-        print('POST 請求失敗: ${response.statusCode}');
-        return {'error': '請求失敗，狀態碼: ${response.statusCode}'};
+      } finally {
+        client.close();
       }
     } catch (e) {
-      print('POST 請求錯誤: $e');
+      print('HTTPS POST 請求錯誤: $e');
       return {'error': '$e'};
     }
   }
 
-  /// 發送 PUT 請求（增強版）
+  /// 發送 PUT 請求（HTTPS 版本）
   static Future<Map<String, dynamic>> _put(String endpoint, Map<String, dynamic> data) async {
     try {
       if (endpoint.isEmpty) {
@@ -237,58 +288,69 @@ class WifiApiService {
         return {'error': '端點為空'};
       }
 
-      final headers = _getHeaders();
+      print('發送 HTTPS PUT 請求到 $endpoint，數據: ${json.encode(data)}');
 
-      // 檢查 JWT 令牌是否存在
-      if (!headers.containsKey('Authorization')) {
-        print('警告: 發送 PUT 請求到 $endpoint 時沒有提供認證令牌');
-      }
+      final client = _createHttpClient();
 
-      print('發送 PUT 請求到 $endpoint，數據: ${json.encode(data)}');
-      print('請求標頭: $headers');
+      try {
+        final request = await client.putUrl(Uri.parse('$baseUrl$endpoint'));
 
-      final response = await http.put(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: headers,
-        body: json.encode(data),
-      );
+        // 添加 headers
+        final headers = _getHeaders();
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
 
-      print('PUT 請求響應狀態碼: ${response.statusCode}');
+        // 添加請求體
+        if (data.isNotEmpty) {
+          request.add(utf8.encode(json.encode(data)));
+        }
 
-      // 對於 4xx 錯誤，檢查是否有響應體提供更多信息
-      if (response.statusCode >= 400 && response.statusCode < 500) {
-        String errorBody = '無響應體';
-        try {
-          if (response.body.isNotEmpty) {
-            errorBody = response.body;
-            print('PUT 請求錯誤響應體: $errorBody');
+        final response = await request.close().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout (10 seconds)');
+          },
+        );
+
+        print('HTTPS PUT 請求響應狀態碼: ${response.statusCode}');
+
+        // 對於 4xx 錯誤，檢查是否有響應體提供更多信息
+        if (response.statusCode >= 400 && response.statusCode < 500) {
+          final errorBody = await response.transform(utf8.decoder).join();
+          print('HTTPS PUT 請求錯誤響應體: $errorBody');
+
+          if (response.statusCode == 401 || response.statusCode == 403) {
+            print('認證錯誤: JWT 令牌可能已失效');
+            return {'error': '認證錯誤', 'needReAuthentication': true};
           }
-        } catch (e) {
-          print('解析錯誤響應時出錯: $e');
+
+          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'errorBody': errorBody};
         }
 
-        if (response.statusCode == 401 || response.statusCode == 403) {
-          print('認證錯誤: JWT 令牌可能已失效');
-          return {'error': '認證錯誤', 'needReAuthentication': true};
-        }
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final responseBody = await response.transform(utf8.decoder).join();
 
-        return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'errorBody': errorBody};
-      }
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          if (response.body.isEmpty) return {};
-          return json.decode(response.body);
-        } catch (e) {
-          print('解析 PUT 響應JSON時出錯: $e');
-          return {'error': '解析JSON失敗'};
+          if (responseBody.isNotEmpty) {
+            try {
+              return json.decode(responseBody);
+            } catch (e) {
+              print('解析 HTTPS PUT 響應JSON時出錯: $e');
+              return {'error': '解析JSON失敗'};
+            }
+          } else {
+            return {};
+          }
+        } else {
+          print('HTTPS PUT 請求失敗: ${response.statusCode}');
+          final errorBody = await response.transform(utf8.decoder).join();
+          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
         }
-      } else {
-        print('PUT 請求失敗: ${response.statusCode}');
-        return {'error': '請求失敗，狀態碼: ${response.statusCode}'};
+      } finally {
+        client.close();
       }
     } catch (e) {
-      print('PUT 請求錯誤: $e');
+      print('HTTPS PUT 請求錯誤: $e');
       return {'error': '$e'};
     }
   }
@@ -356,6 +418,140 @@ class WifiApiService {
   /// 更新以太網廣域網路設定
   static Future<Map<String, dynamic>> updateWanEth(Map<String, dynamic> config) async {
     return await _put(_endpoints['wanEth']!, config);
+  }
+
+  /// 獲取 Mesh 網路拓撲資訊（HTTPS 版本）
+  static Future<dynamic> getMeshTopology() async {
+    print('正在使用 HTTPS 獲取 Mesh 網路拓撲資訊...');
+    try {
+      // 直接使用 HttpClient 來避免類型轉換問題
+      final client = _createHttpClient();
+
+      try {
+        final request = await client.getUrl(Uri.parse('$baseUrl${_endpoints['meshTopology']}'));
+
+        // 添加 headers
+        final headers = _getHeaders();
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+
+        final response = await request.close().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout (10 seconds)');
+          },
+        );
+
+        print('HTTPS GET 請求響應狀態碼: ${response.statusCode}');
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final responseBody = await response.transform(utf8.decoder).join();
+
+          if (responseBody.isNotEmpty) {
+            try {
+              // 解析 JSON，可能是 List 或 Map
+              final jsonData = json.decode(responseBody);
+
+              // 改善日誌輸出 - 分段顯示大型 JSON
+              print('=== Mesh 拓撲 API 成功響應 ===');
+              _printLargeJson('Mesh 拓撲完整響應', jsonData);
+
+              return jsonData;
+            } catch (e) {
+              print('解析 HTTPS JSON 時出錯: $e');
+              print('原始響應體長度: ${responseBody.length}');
+              _printInChunks('原始響應體', responseBody);
+              return {'error': '解析JSON失敗', 'raw_response': responseBody};
+            }
+          } else {
+            print('HTTPS 響應體為空');
+            return {'message': '響應體為空'};
+          }
+        } else {
+          print('HTTPS GET 請求失敗: ${response.statusCode}');
+          final errorBody = await response.transform(utf8.decoder).join();
+          print('錯誤響應體: $errorBody');
+          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
+        }
+      } finally {
+        client.close();
+      }
+    } catch (e) {
+      print('獲取 Mesh 拓撲 HTTPS 時發生錯誤: $e');
+      return {'error': '獲取 Mesh 拓撲 HTTPS 失敗: $e'};
+    }
+  }
+
+  /// 分段輸出大型 JSON 數據
+  static void _printLargeJson(String title, dynamic data) {
+    try {
+      final jsonString = JsonEncoder.withIndent('  ').convert(data);
+      print('=== $title (開始) ===');
+      _printInChunks('JSON內容', jsonString);
+      print('=== $title (結束) ===');
+
+      // 額外分析 Mesh 數據結構
+      if (data is List && data.isNotEmpty) {
+        print('\n--- Mesh 拓撲數據分析 ---');
+        print('📊 總共 ${data.length} 個主要節點');
+
+        for (int i = 0; i < data.length; i++) {
+          final node = data[i];
+          if (node is Map) {
+            print('\n🔸 節點 ${i + 1}:');
+            print('  - MAC: ${node['macAddr'] ?? 'N/A'}');
+            print('  - IP: ${node['ipAddress'] ?? 'N/A'}');
+            print('  - 類型: ${node['type'] ?? 'N/A'}');
+            print('  - 設備名稱: ${node['devName'] ?? 'N/A'}');
+
+            if (node.containsKey('connectedDevices') && node['connectedDevices'] is List) {
+              final devices = node['connectedDevices'] as List;
+              print('  - 連接設備數: ${devices.length}');
+
+              for (int j = 0; j < devices.length; j++) {
+                final device = devices[j];
+                if (device is Map) {
+                  print('    🔹 設備 ${j + 1}: ${device['devName'] ?? device['macAddr'] ?? 'Unknown'}');
+                  print('      └ IP: ${device['ipAddress'] ?? 'N/A'}');
+                  print('      └ 連接方式: ${device['connectionType'] ?? 'N/A'}');
+                  if (device['rssi'] != null && device['rssi'] != 0) {
+                    print('      └ 信號強度: ${device['rssi']} dBm');
+                  }
+                }
+              }
+            }
+          }
+        }
+        print('--- 數據分析結束 ---\n');
+      }
+    } catch (e) {
+      print('無法格式化 JSON: $e');
+      print('原始數據類型: ${data.runtimeType}');
+      print('原始數據: $data');
+    }
+  }
+
+  /// 分段輸出長字符串
+  static void _printInChunks(String title, String content) {
+    const int chunkSize = 800; // 每段 800 字符
+    final int totalLength = content.length;
+    final int totalChunks = (totalLength / chunkSize).ceil();
+
+    if (totalLength <= chunkSize) {
+      print('$title: $content');
+      return;
+    }
+
+    print('$title (總長度: $totalLength, 分為 $totalChunks 段):');
+
+    for (int i = 0; i < totalChunks; i++) {
+      final int start = i * chunkSize;
+      final int end = (start + chunkSize < totalLength) ? start + chunkSize : totalLength;
+      final String chunk = content.substring(start, end);
+
+      print('[$title-段落${i + 1}/$totalChunks]: $chunk');
+    }
   }
 
   /// 開始設定
@@ -471,27 +667,36 @@ class WifiApiService {
     }
   }
 
-  /// 新增：快速連接測試方法
+  /// 新增：快速連接測試方法（HTTPS 版本）
   static Future<bool> _isApiReachable() async {
     try {
-      print('正在測試 API 連接...');
+      print('正在測試 HTTPS API 連接...');
 
-      // 設置較短的超時時間進行快速測試
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/v1/system/info'),
-        headers: _getHeaders(),
-      ).timeout(
-        const Duration(seconds: 3), // 3秒超時
-        onTimeout: () {
-          throw Exception('連接超時');
-        },
-      );
+      final client = _createHttpClient();
 
-      print('API 連接測試完成，狀態碼: ${response.statusCode}');
-      return response.statusCode >= 200 && response.statusCode < 500; // 包括4xx錯誤，因為至少表示服務可達
+      try {
+        final request = await client.getUrl(Uri.parse('$baseUrl/api/v1/system/info'));
 
+        // 添加 headers
+        final headers = _getHeaders();
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+
+        final response = await request.close().timeout(
+          const Duration(seconds: 3), // 3秒超時
+          onTimeout: () {
+            throw Exception('連接超時');
+          },
+        );
+
+        print('HTTPS API 連接測試完成，狀態碼: ${response.statusCode}');
+        return response.statusCode >= 200 && response.statusCode < 500; // 包括4xx錯誤，因為至少表示服務可達
+      } finally {
+        client.close();
+      }
     } catch (e) {
-      print('API 連接測試失敗: $e');
+      print('HTTPS API 連接測試失敗: $e');
       return false;
     }
   }
@@ -789,7 +994,7 @@ class WifiApiService {
     }
   }
 
-  /// 完成精靈配置（帶安全檢查）
+  /// 完成精靈配置（增強日誌版本）
   static Future<Map<String, dynamic>> wizardFinish() async {
     try {
       final endpoint = _endpoints['wizardFinish'];
@@ -800,54 +1005,102 @@ class WifiApiService {
         return {'status_code': 'error', 'message': 'Endpoint not defined'};
       }
 
+      print('=== 開始 wizardFinish HTTPS 請求 ===');
       print('完成精靈配置流程，調用 POST $endpoint');
 
-      final response = await http.post(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: _getHeaders(),
-        body: json.encode({}),
-      );
+      final client = _createHttpClient();
 
-      print('wizardFinish 請求響應狀態碼: ${response.statusCode}');
+      try {
+        final request = await client.postUrl(Uri.parse('$baseUrl$endpoint'));
 
-      if (response.body.isNotEmpty) {
-        print('wizardFinish 請求響應體: ${response.body}');
-      } else {
-        print('wizardFinish 請求響應體為空');
-      }
+        // 添加 headers
+        final headers = _getHeaders();
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+        print('請求標頭: $headers');
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          return response.body.isNotEmpty
-              ? json.decode(response.body)
-              : {'status_code': 'success', 'message': 'No response body'};
-        } catch (e) {
-          print('解析 wizardFinish 響應JSON時出錯: $e');
-          return {'status_code': 'error', 'message': 'Failed to parse response'};
+        // 發送空的請求體
+        request.add(utf8.encode(json.encode({})));
+
+        final response = await request.close();
+
+        print('wizardFinish HTTPS 請求響應狀態碼: ${response.statusCode}');
+
+        final responseBody = await response.transform(utf8.decoder).join();
+
+        if (responseBody.isNotEmpty) {
+          print('=== wizardFinish 完整響應體 ===');
+          print(responseBody);
+
+          try {
+            final jsonData = json.decode(responseBody);
+            print('=== wizardFinish 解析後的 JSON ===');
+            print(json.encode(jsonData));
+
+            if (response.statusCode >= 200 && response.statusCode < 300) {
+              print('✅ wizardFinish 成功完成');
+              return jsonData;
+            } else {
+              print('❌ wizardFinish 請求失敗，狀態碼: ${response.statusCode}');
+              return {
+                'status_code': 'error',
+                'message': 'Request failed with status: ${response.statusCode}',
+                'response_data': jsonData
+              };
+            }
+          } catch (e) {
+            print('wizardFinish 響應 JSON 解析失敗: $e');
+            print('原始響應體: $responseBody');
+
+            if (response.statusCode >= 200 && response.statusCode < 300) {
+              return {
+                'status_code': 'success',
+                'message': 'Success but non-JSON response',
+                'raw_response': responseBody
+              };
+            } else {
+              return {
+                'status_code': 'error',
+                'message': 'Failed to parse response JSON',
+                'raw_response': responseBody
+              };
+            }
+          }
+        } else {
+          print('wizardFinish 請求響應體為空');
+
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            print('✅ wizardFinish 成功完成（空響應體）');
+            return {'status_code': 'success', 'message': 'Success with empty response'};
+          } else if (response.statusCode == 500) {
+            // 如果返回 500，可能是設備正在重啟
+            print('⚠️ wizardFinish 返回 500，這可能是正常的（設備正在重啟）');
+            return {
+              'status_code': 'reboot',
+              'message': 'Device is applying settings and may reboot',
+              'isRebootExpected': true
+            };
+          } else {
+            print('❌ wizardFinish 請求失敗，狀態碼: ${response.statusCode}');
+            return {
+              'status_code': 'error',
+              'message': 'Request failed with status: ${response.statusCode}'
+            };
+          }
         }
-      } else if (response.statusCode == 500) {
-        // 如果返回 500，可能是設備正在重啟
-        print('wizardFinish 返回 500，這可能是正常的（設備正在重啟）');
-        return {
-          'status_code': 'reboot',
-          'message': 'Device is applying settings and may reboot',
-          'isRebootExpected': true
-        };
-      } else {
-        print('wizardFinish 請求失敗，狀態碼: ${response.statusCode}');
-        return {
-          'status_code': 'error',
-          'message': 'Request failed with status: ${response.statusCode}'
-        };
+      } finally {
+        client.close();
       }
     } catch (e) {
-      print('執行 wizardFinish 時發生錯誤: $e');
+      print('=== wizardFinish 執行時發生異常 ===');
+      print('異常詳情: $e');
 
       // 如果是連接異常，可能是設備正在重啟
       if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection refused') ||
           e.toString().contains('Connection reset')) {
-        print('連接異常，可能是設備正在重啟');
+        print('🔄 連接異常，可能是設備正在重啟');
         return {
           'status_code': 'reboot',
           'message': 'Device appears to be rebooting',
@@ -858,6 +1111,7 @@ class WifiApiService {
       return {'status_code': 'error', 'message': 'Exception: $e'};
     }
   }
+
   /// 使用初始密碼登入
   static Future<Map<String, dynamic>> loginWithInitialPassword({
     String? providedSSID,

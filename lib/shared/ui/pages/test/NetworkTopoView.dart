@@ -1,3 +1,5 @@
+// lib/shared/ui/pages/test/NetworkTopoView.dart - 完整修改版本
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
@@ -5,7 +7,6 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
-// import 'package:whitebox/shared/ui/pages/test/DeviceDetailPage.dart';
 
 class NetworkTopoView extends StatefulWidget {
   // 是否顯示測試控制器
@@ -23,13 +24,18 @@ class NetworkTopoView extends StatefulWidget {
   // 新增：是否啟用點擊互動功能（預設啟用）
   final bool enableInteractions;
 
+  // ==================== 新增參數 ====================
+  // 新增：是否顯示底部導航欄（預設顯示）
+  final bool showBottomNavigation;
+
   const NetworkTopoView({
     Key? key,
     this.showDeviceCountController = false, // 預設不顯示測試控制器
     this.defaultDeviceCount = 0, // 預設顯示4個設備
     this.externalDevices, // 允許外部傳入設備列表
     this.externalDeviceConnections, // 允許外部傳入連接數據
-    this.enableInteractions = false, // 新增：預設啟用點擊互動功能 開關
+    this.enableInteractions = true, // 新增：預設啟用點擊互動功能 開關
+    this.showBottomNavigation = true, // 新增：預設顯示底部導航欄
   }) : super(key: key);
 
   @override
@@ -186,14 +192,17 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     }
   }
 
-  // 處理底部選項卡切換 - 新增互動檢查
+  // ==================== 修改：簡化底部選項卡切換處理 ====================
   void _handleBottomTabChanged(int index) {
     // 如果禁用互動功能，直接返回不執行任何操作
     if (!widget.enableInteractions) return;
 
+    // 只更新狀態，不進行頁面導航（導航由外部容器處理）
     setState(() {
       _selectedBottomTab = index;
     });
+
+    print('NetworkTopo 底部選項卡切換到：$index');
   }
 
   @override
@@ -233,8 +242,13 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
             if (_viewMode == 'topology')
               _buildSpeedArea(),
 
-            // 底部導航欄
-            _buildBottomNavBar(),
+            // ==================== 修改：根據參數決定是否顯示底部導航欄 ====================
+            if (widget.showBottomNavigation)
+              _buildBottomNavBar(),
+
+            // 如果不顯示底部導航欄，添加一些底部空間
+            if (!widget.showBottomNavigation)
+              SizedBox(height: MediaQuery.of(context).size.height * 0.08),
           ],
         ),
       ),
@@ -325,9 +339,6 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
       },
     );
   }
-
-  // 其餘方法保持不變...
-  // 以下是原本的方法，為了節省空間，只顯示修改的部分
 
   // 構建裝置數量控制器
   Widget _buildDeviceCountController() {

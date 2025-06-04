@@ -14,6 +14,7 @@ import 'package:whitebox/shared/ui/pages/test/SrpLoginModifiedTestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/NetworkTopoView.dart';
 import 'package:whitebox/shared/ui/pages/test/theme_test_page.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
+import 'package:whitebox/shared/ui/pages/home/DashboardPage.dart';
 
 class BackgroundSettings {
   static String currentBackground = AppBackgrounds.mainBackground;

@@ -76,16 +76,23 @@ class LoginProcess {
     return match?.group(1);
   }
 
-  // 獲取 wizard.html 以取得 CSRF token
+  // 獲取 wizard.html 以取得 CSRF token - 修改版
   Future<void> getCsrfFromWizard() async {
+    final client = createUnsafeClient(); // 使用 HTTPS 安全客戶端
+
     final String wizPage = '$baseUrl/wizard.html';
     print("print get from : ${Uri.parse(wizPage)}");
-    final response = await http.get(Uri.parse(wizPage));
-    if (response.statusCode == 200) {
-      PrintUtil.printMap(
-          'HEADER', response.headers.map((k, v) => MapEntry(k, v)));
-      print("_token is getting from wizard.html");
-      _token = getCSRFToken(response.body);
+
+    try {
+      final response = await client.get(Uri.parse(wizPage));
+      if (response.statusCode == 200) {
+        PrintUtil.printMap(
+            'HEADER', response.headers.map((k, v) => MapEntry(k, v)));
+        print("_token is getting from wizard.html");
+        _token = getCSRFToken(response.body);
+      }
+    } finally {
+      client.close();
     }
   }
 
@@ -119,14 +126,21 @@ class LoginProcess {
 
   static int rCount = 1;
 
-  // 獲取 login.html 以取得 header 中的 sessionID
+  // 獲取 login.html 以取得 header 中的 sessionID - 修改版
   Future<LoginResult> loginStep1() async {
+    final client = createUnsafeClient(); // 使用 HTTPS 安全客戶端
+
     final String loginPath = '$baseUrl/login.html';
     print("print get : ${Uri.parse(loginPath)}");
-    final response = await http.get(Uri.parse(loginPath));
-    PrintUtil.printMap(
-        ' [STEP1] HEADER', response.headers.map((k, v) => MapEntry(k, v)));
-    return preCheck(response);
+
+    try {
+      final response = await client.get(Uri.parse(loginPath));
+      PrintUtil.printMap(
+          ' [STEP1] HEADER', response.headers.map((k, v) => MapEntry(k, v)));
+      return preCheck(response);
+    } finally {
+      client.close();
+    }
   }
 
   // 向伺服器發送公鑰
@@ -172,14 +186,16 @@ class LoginProcess {
     }
   }
 
-  // 向伺服器發送證明
+  // 向伺服器發送證明 - 修改版
   Future<LoginResult> loginStep3(Map<String, String> headers,
       Map<String, dynamic> data) async {
+    final client = createUnsafeClient(); // 使用 HTTPS 安全客戶端
+
     try {
       print("嘗試發送證明到: $baseUrl/api/v1/user/login");
       print("請求數據: ${json.encode(data)}");
 
-      final response = await http.post(
+      final response = await client.post(
         Uri.parse('$baseUrl/api/v1/user/login'),
         headers: headers,
         body: json.encode(data),
@@ -233,11 +249,15 @@ class LoginProcess {
           session: emptySession,
           msg: "發送證明請求失敗: $e"
       );
+    } finally {
+      client.close();
     }
   }
 
-  // 使用JWT令牌測試API
+  // 使用JWT令牌測試API - 修改版
   Future<dynamic> testApiWithJwt(String jwt, String endpoint) async {
+    final client = createUnsafeClient(); // 使用 HTTPS 安全客戶端
+
     try {
       final headers = {
         'Content-Type': 'application/json',
@@ -247,7 +267,7 @@ class LoginProcess {
       print("使用 JWT 測試 API: $endpoint");
       print("Authorization: Bearer $jwt");
 
-      final response = await http.get(
+      final response = await client.get(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
       );
@@ -277,18 +297,22 @@ class LoginProcess {
     } catch (e) {
       print("API 測試錯誤: $e");
       return {"status": "error", "message": e.toString()};
+    } finally {
+      client.close();
     }
   }
 
-  // 測試網絡接口
+  // 測試網絡接口 - 修改版
   Future<void> loginStep4(String jwt) async {
+    final client = createUnsafeClient(); // 使用 HTTPS 安全客戶端
+
     try {
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $jwt'
       };
 
-      final response = await http.get(
+      final response = await client.get(
         Uri.parse('$baseUrl/api/v1/wireless/basic'),
         headers: headers,
       );
@@ -304,11 +328,16 @@ class LoginProcess {
       }
     } catch (e) {
       print("Error in loginStep4: $e");
+    } finally {
+      client.close();
     }
   }
 
-  // 獲取儀表板
+
+  // 獲取儀表板 - 修改版
   Future<dynamic> getDashboard(Map<String, String> headers) async {
+    final client = createUnsafeClient(); // 使用 HTTPS 安全客戶端
+
     try {
       print("嘗試獲取儀表板...");
 
@@ -316,7 +345,7 @@ class LoginProcess {
       final url = '$baseUrl/dashboard.html?csrftoken=$_token';
       print("嘗試URL: $url");
 
-      final response = await http.get(
+      final response = await client.get(
           Uri.parse(url),
           headers: headers
       );
@@ -327,7 +356,7 @@ class LoginProcess {
       } else {
         // 如果失敗，嘗試POST方法
         print("GET儀表板請求返回狀態碼: ${response.statusCode}，嘗試POST方法");
-        final postResponse = await http.post(
+        final postResponse = await client.post(
             Uri.parse(url),
             headers: headers
         );
@@ -343,9 +372,10 @@ class LoginProcess {
     } catch (e) {
       print("獲取儀表板失敗: $e");
       throw Exception('獲取儀表板失敗: $e');
+    } finally {
+      client.close();
     }
   }
-
   // 啟動 SRP 登入流程
   Future<LoginResult> startSRPLoginProcess() async {
     try {

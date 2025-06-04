@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
-import 'package:whitebox/shared/ui/pages/test/NetworkTopoView.dart';
+import 'package:whitebox/shared/ui/pages/home/DashboardPage.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onLoginSuccess;
@@ -149,6 +149,60 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // 測試 Mesh Topology API
+  Future<void> _testMeshTopologyAPI() async {
+    try {
+      print('=== 開始測試 Mesh Topology HTTPS API ===');
+
+      // 獲取 Mesh 網路拓撲資訊
+      final meshResult = await WifiApiService.getMeshTopology();
+
+      print('=== Mesh Topology HTTPS API 測試結果 ===');
+
+      // 檢查響應類型並相應處理
+      if (meshResult is List) {
+        print('✅ 響應是 List 類型，包含 ${meshResult.length} 個元素');
+
+        // 不再重複印出完整內容，因為 getMeshTopology 已經詳細輸出了
+        print('📊 數據概覽:');
+        for (int i = 0; i < meshResult.length; i++) {
+          if (meshResult[i] is Map) {
+            final node = meshResult[i] as Map;
+            print('  節點 ${i + 1}: ${node['type'] ?? 'unknown'} - ${node['macAddr'] ?? 'no-mac'}');
+          }
+        }
+      } else if (meshResult is Map) {
+        if (meshResult.containsKey('error')) {
+          print('❌ HTTPS API 調用錯誤: ${meshResult['error']}');
+        } else {
+          print('✅ HTTPS API 調用成功!');
+
+          // 如果響應包含特定欄位，則進一步解析
+          if (meshResult.containsKey('nodes')) {
+            print('🔍 發現節點資訊: ${meshResult['nodes']}');
+          }
+
+          if (meshResult.containsKey('topology')) {
+            print('🔍 發現拓撲資訊: ${meshResult['topology']}');
+          }
+
+          if (meshResult.containsKey('connections')) {
+            print('🔍 發現連接資訊: ${meshResult['connections']}');
+          }
+        }
+      } else {
+        print('⚠️ 響應類型未知: ${meshResult.runtimeType}');
+      }
+
+      print('=== Mesh Topology HTTPS API 測試完成 ===');
+
+    } catch (e) {
+      print('=== Mesh Topology HTTPS API 測試異常 ===');
+      print('異常詳情: $e');
+      print('=== 異常測試結束 ===');
+    }
+  }
+
   void _handleLogin() async {
     if (!_isFormValid) {
       _validatePassword();
@@ -200,10 +254,17 @@ class _LoginPageState extends State<LoginPage> {
           _isLoggingIn = false;
         });
 
+        // 在導航到 NetworkTopoView 之前測試 Mesh Topology API
+        print('登入成功，準備測試 Mesh Topology API...');
+        await _testMeshTopologyAPI();
+
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => const NetworkTopoView(),
+              builder: (context) => const DashboardPage(
+                showBottomNavigation: true,
+                initialNavigationIndex: 1, // 1 = NetworkTopo 頁面
+              ),
             ),
           );
         }
@@ -233,6 +294,7 @@ class _LoginPageState extends State<LoginPage> {
       });
     }
   }
+
   Widget _buildNavigationButtons({
     required double buttonHeight,
     required double buttonSpacing,
@@ -309,6 +371,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
