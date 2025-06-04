@@ -205,50 +205,69 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     print('NetworkTopo 底部選項卡切換到：$index');
   }
 
+
+// 修正版本：同時調整拓撲區域以配合 Stack 佈局
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // 確保 Scaffold 是透明的
+      backgroundColor: Colors.transparent,
       body: Container(
-        // 設置背景圖片
-        decoration: BackgroundDecorator.imageBackground(
-          imagePath: AppBackgrounds.mainBackground, // 使用預設背景圖片
-        ),
-        child: Column(
+        decoration: widget.showBottomNavigation
+            ? BackgroundDecorator.imageBackground(
+          imagePath: AppBackgrounds.mainBackground,
+        )
+            : null,
+        child: Stack(
           children: [
-            // 裝置數量控制器 - 根據標誌決定是否顯示
-            if (widget.showDeviceCountController)
-              _buildDeviceCountController(),
+            // ==================== 主要內容 Column ====================
+            Column(
+              children: [
+                // 裝置數量控制器
+                if (widget.showDeviceCountController)
+                  _buildDeviceCountController(),
 
-            // 視圖切換選項卡 (與AppBar分開)
-            SizedBox(height: screenSize.height * 0.08),
-            _buildTabBar(),
+                // ==================== 調整：給 TabBar 預留空間 ====================
+                SizedBox(height: widget.showBottomNavigation
+                    ? screenSize.height * 0.12   // 增加空間給 TabBar
+                    : screenSize.height * 0.10), // 增加空間給 TabBar
 
-            // 主要內容區域
-            Expanded(
-              flex: 5,
-              child: _viewMode == 'topology'
-                  ? _buildTopologyView()
-                  : _buildListView(),
+                // 主要內容區域 - 保持設定
+                Expanded(
+                  flex: _viewMode == 'topology' ? 3 : 5,
+                  child: _viewMode == 'topology'
+                      ? _buildTopologyView()
+                      : _buildListView(),
+                ),
+
+                // 速度區域
+                if (_viewMode == 'topology')
+                  Container(
+                    height: 180,
+                    padding: const EdgeInsets.only(top: 10, bottom: 10),
+                    child: _buildSpeedArea(),
+                  ),
+
+                // 底部導航
+                if (widget.showBottomNavigation)
+                  _buildBottomNavBar(),
+                if (!widget.showBottomNavigation)
+                  SizedBox(height: screenSize.height *
+                      (widget.showBottomNavigation ? 0.08 : 0.02)),
+              ],
             ),
 
-            // 調整間距 - 只在拓撲視圖模式下減少間距
-            if (_viewMode == 'topology')
-              const SizedBox(height: 5), // 這裡設置一個較小的間距，讓速度區域更靠近topology
-
-            // 速度區域 (Speed Area) - 只在拓撲視圖模式下顯示
-            if (_viewMode == 'topology')
-              _buildSpeedArea(),
-
-            // ==================== 修改：根據參數決定是否顯示底部導航欄 ====================
-            if (widget.showBottomNavigation)
-              _buildBottomNavBar(),
-
-            // 如果不顯示底部導航欄，添加一些底部空間
-            if (!widget.showBottomNavigation)
-              SizedBox(height: MediaQuery.of(context).size.height * 0.08),
+            // ==================== TabBar 絕對定位 ====================
+            Positioned(
+              top: widget.showBottomNavigation
+                  ? screenSize.height * 0.085  // 調整到適當位置
+                  : screenSize.height * 0.07,   // 調整到適當位置
+              left: 0,
+              right: 0,
+              child: _buildTabBar(),
+            ),
           ],
         ),
       ),
@@ -425,7 +444,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   // 構建選項卡
   Widget _buildTabBar() {
     return Container(
-      margin: const EdgeInsetsDirectional.only(start: 60, end: 60, top: 10, bottom: 5),
+      margin: const EdgeInsetsDirectional.only(start: 60, end: 60, top: 0, bottom: 0),
       height: 30,
       child: CustomPaint(
         painter: GradientBorderPainter(),
@@ -731,10 +750,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Container(
-      margin: const EdgeInsets.only(left: 3, right: 3, top: 0, bottom: 20),
+      margin: const EdgeInsets.only(left: 3, right: 3), // 移除 top 和 bottom margin
       child: _appTheme.whiteBoxTheme.buildStandardCard(
         width: screenWidth - 36,
-        height: 160,
+        height: 150, // 稍微減少高度，從160改為150
         child: Stack(
           clipBehavior: Clip.none,
           children: [
