@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/components/basic/DashboardComponent.dart';
 import 'package:whitebox/shared/ui/pages/test/NetworkTopoView.dart';
+// 在 DashboardPage.dart 頂部添加
+import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
+import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 
 class DashboardPage extends StatefulWidget {
   // ==================== 配置參數 ====================
@@ -42,7 +45,6 @@ class DashboardPage extends StatefulWidget {
   @override
   State<DashboardPage> createState() => _DashboardPageState();
 }
-
 class _DashboardPageState extends State<DashboardPage>
     with TickerProviderStateMixin {
 
@@ -74,6 +76,17 @@ class _DashboardPageState extends State<DashboardPage>
 
   // 導航動畫控制器
   late AnimationController _navigationAnimationController;
+
+  // ==================== 設備詳情相關變數（新增） ====================
+
+  // 選中的設備（用於顯示詳情頁）
+  NetworkDevice? _selectedDeviceForDetail;
+
+  // 是否顯示設備詳情頁
+  bool _showDeviceDetail = false;
+
+  // 選中設備是否為網關
+  bool _selectedDeviceIsGateway = false;
 
   // ==================== Dashboard 狀態變數 ====================
 
@@ -230,6 +243,28 @@ class _DashboardPageState extends State<DashboardPage>
     await _loadDashboardData();
   }
 
+  // ==================== 設備詳情事件處理（新增） ====================
+
+  /// 處理設備選擇（顯示設備詳情）
+  void _handleDeviceSelected(NetworkDevice device) {
+    print('設備被選中，顯示詳情：${device.name}');
+    setState(() {
+      _selectedDeviceForDetail = device;
+      _selectedDeviceIsGateway = device.id == 'router-001' || device.name.contains('Controller');
+      _showDeviceDetail = true;
+    });
+  }
+
+  /// 處理設備詳情頁返回
+  void _handleDeviceDetailBack() {
+    print('返回設備列表');
+    setState(() {
+      _showDeviceDetail = false;
+      _selectedDeviceForDetail = null;
+      _selectedDeviceIsGateway = false;
+    });
+  }
+
   // ==================== 導航事件處理方法 ====================
 
   /// 處理分頁變更
@@ -252,6 +287,11 @@ class _DashboardPageState extends State<DashboardPage>
   /// 處理底部導航切換
   void _handleBottomTabChanged(int index) {
     if (index == _selectedBottomTab) return;
+
+    // 如果正在顯示設備詳情，先返回列表
+    if (_showDeviceDetail) {
+      _handleDeviceDetailBack();
+    }
 
     setState(() {
       _selectedBottomTab = index;
@@ -279,6 +319,11 @@ class _DashboardPageState extends State<DashboardPage>
       setState(() {
         _selectedBottomTab = index;
       });
+    }
+
+    // 如果切換到非 NetworkTopo 頁面，隱藏設備詳情
+    if (index != 1 && _showDeviceDetail) {
+      _handleDeviceDetailBack();
     }
   }
 
@@ -331,7 +376,7 @@ class _DashboardPageState extends State<DashboardPage>
               // 頁面 0: Dashboard
               _buildDashboardContent(),
 
-              // 頁面 1: NetworkTopo
+              // 頁面 1: NetworkTopo（可能顯示設備詳情）
               _buildNetworkTopoPage(),
 
               // 頁面 2: Settings
@@ -397,18 +442,29 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  /// 構建 NetworkTopo 頁面
+  /// 構建 NetworkTopo 頁面（修改：支援設備詳情）
   Widget _buildNetworkTopoPage() {
-    return Container(
-      // 移除背景，使用透明背景避免衝突
-      color: Colors.transparent,
-      child: NetworkTopoView(
-        showDeviceCountController: false,
-        defaultDeviceCount: 4,
-        enableInteractions: true,
-        showBottomNavigation: false, // 不顯示自己的底部導航
-      ),
-    );
+    // 如果正在顯示設備詳情
+    if (_showDeviceDetail && _selectedDeviceForDetail != null) {
+      return DeviceDetailPage(
+        selectedDevice: _selectedDeviceForDetail!,
+        isGateway: _selectedDeviceIsGateway,
+        showBottomNavigation: false, // 不顯示自己的背景和導航
+        onBack: _handleDeviceDetailBack, // 返回回調
+      );
+    } else {
+      // 正常的 NetworkTopo 頁面
+      return Container(
+        color: Colors.transparent,
+        child: NetworkTopoView(
+          showDeviceCountController: false,
+          defaultDeviceCount: 4,
+          enableInteractions: true,
+          showBottomNavigation: false,
+          onDeviceSelected: _handleDeviceSelected, // 👈 傳遞設備選擇回調
+        ),
+      );
+    }
   }
 
   /// 構建設定頁面
@@ -445,6 +501,8 @@ class _DashboardPageState extends State<DashboardPage>
       ),
     );
   }
+
+  // ==================== 底部導航相關方法（保持原有） ====================
 
   /// 構建底部導航欄
   Widget _buildBottomNavBar() {
@@ -640,6 +698,7 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 }
+// 在 DashboardPage.dart 檔案的最底部添加這些類別（在最後的 } 之前）
 
 // ==================== 保持原有的三個 Dashboard 元件 ====================
 
@@ -677,7 +736,7 @@ class DashboardTitleComponent extends StatelessWidget {
             'Dashboard',
             style: TextStyle(
               fontSize: fontSize,
-              fontWeight: FontWeight.normal, // 移除粗體
+              fontWeight: FontWeight.normal,
               color: Colors.white,
             ),
           ),
@@ -1084,7 +1143,7 @@ class _DashboardContentComponentState extends State<DashboardContentComponent> {
   }
 }
 
-// ==================== 複製必要的 Painter 類別 ====================
+// ==================== Painter 類別 ====================
 
 /// 漸變環形繪製器
 class GradientRingPainter extends CustomPainter {
@@ -1149,4 +1208,26 @@ class BottomNavBarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ==================== 資料類別 ====================
+
+class EthernetPageData {
+  final String pageTitle;
+  final List<EthernetConnection> connections;
+
+  EthernetPageData({
+    required this.pageTitle,
+    required this.connections,
+  });
+}
+
+class EthernetConnection {
+  final String speed;
+  final String status;
+
+  EthernetConnection({
+    required this.speed,
+    required this.status,
+  });
 }

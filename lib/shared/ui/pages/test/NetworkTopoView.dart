@@ -19,6 +19,7 @@ class NetworkTopoView extends StatefulWidget {
   final List<DeviceConnection>? externalDeviceConnections;
   final bool enableInteractions;
   final bool showBottomNavigation;
+  final Function(NetworkDevice)? onDeviceSelected;
 
   const NetworkTopoView({
     Key? key,
@@ -28,6 +29,7 @@ class NetworkTopoView extends StatefulWidget {
     this.externalDeviceConnections,
     this.enableInteractions = true,
     this.showBottomNavigation = true,
+    this.onDeviceSelected,
   }) : super(key: key);
 
   @override
@@ -138,6 +140,14 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     if (!widget.enableInteractions) return;
     print('設備被選中: ${device.name}');
     // 這裡可以加入設備詳情頁面導航
+    // 👈 如果有外部回調，使用外部回調（優先）
+    if (widget.onDeviceSelected != null) {
+      widget.onDeviceSelected!(device);
+    } else {
+      // 👈 如果沒有外部回調，使用原本的邏輯（可以加入設備詳情頁面導航）
+      print('沒有外部回調，執行預設行為');
+      // 這裡可以加入原本的 Navigator.push 邏輯
+    }
   }
 
   void _handleViewModeChanged(String mode) {
