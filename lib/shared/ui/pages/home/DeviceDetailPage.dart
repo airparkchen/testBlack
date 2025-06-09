@@ -120,9 +120,11 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   Widget _buildTopArea() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      height: 56,
       child: Stack(
+        clipBehavior: Clip.none, // 👈 允許內容溢出容器邊界
         children: [
-          // 返回按鈕（固定在左側）
+          // 返回按鈕（較低層級）
           Positioned(
             left: 0,
             top: 0,
@@ -137,6 +139,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
               },
               child: Container(
                 padding: const EdgeInsets.all(8),
+                color: Colors.transparent,
                 child: Icon(
                   Icons.arrow_back_ios,
                   color: Colors.white,
@@ -146,24 +149,36 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
             ),
           ),
 
-          // RSSI 顯示（水平居中）
-          Center(
-            child: Container(
-              width: 200, // 👈 固定寬度，與 NetworkTopo 頁面的膠囊 bar 相同
-              height: 22, // 👈 固定高度，與 NetworkTopo 頁面相同
-              decoration: BoxDecoration(
-                color: const Color(0xFF64FF00), // 亮綠色
-                borderRadius: BorderRadius.circular(15), // 👈 高度的一半，確保圓角
-              ),
-              child: Center( // 👈 確保文字完全居中
-                child: Text(
-                  'RSSI : ${widget.selectedDevice.additionalInfo['rssi'] ?? '-48,-32'}',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 12, // 👈 調整字體大小以配合固定寬度
-                    fontWeight: FontWeight.bold,
+          // RSSI 顯示（最高層級）
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 5, // RSSI bar位置
+            child: Center(
+              child: Container(
+                width: 175,
+                height: 30,   //調整RSSI bar 大小
+                decoration: BoxDecoration(
+                  color: const Color(0xFF64FF00),
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [ // 👈 添加陰影增加層次感
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    'RSSI : ${widget.selectedDevice.additionalInfo['rssi'] ?? '-48,-32'}',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      // fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center, // 👈 文字置中對齊
                 ),
               ),
             ),
@@ -198,8 +213,8 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   /// 建構設備圖標（白色圓圈 + 透明背景 + 圖標 + 右下角數字標籤）
   /// 建構設備圖標（白色圓圈 + 透明背景 + 圖標 + 右下角數字標籤）
   Widget _buildDeviceIcon() {
-    final iconSize = widget.isGateway ? 80.0 : 70.0; // icon 本身的大小
-    final containerSize = widget.isGateway ? 120.0 : 100.0;  //外圈半徑
+    final iconSize = widget.isGateway ? 60.0 : 50.0; // icon 本身的大小
+    final containerSize = widget.isGateway ? 100.0 : 80.0;  //外圈半徑
     final clientCount = _clientDevices.length;
 
     return Container(
@@ -271,7 +286,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                     clientCount.toString(),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 12,  //小圓圈數字大小
+                      fontSize: 18,  //小圓圈數字大小
                       fontWeight: FontWeight.bold,  //小圓圈數字粗細
                     ),
                   ),
@@ -284,44 +299,48 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   }
 
   /// 建構設備資訊文字
+  /// 建構設備資訊文字
   Widget _buildDeviceInfo() {
     final deviceName = widget.isGateway ? 'Controller' : widget.selectedDevice.name;
     final clientCount = _clientDevices.length;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // NAME 標籤
-        Text(
-          'NAME',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 14,
-            fontWeight: FontWeight.normal,
+    return Transform.translate(
+      offset: const Offset(0, 0), // 👈 向上移動文字，調整這個數值
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // NAME 標籤
+          Text(
+            'NAME',
+            style: TextStyle(
+              color: Colors.white.withOpacity(1.0),
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
+          const SizedBox(height: 4),
 
-        // 設備名稱 + MAC
-        Text(
-          '$deviceName ${widget.selectedDevice.mac}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+          // 設備名稱 + MAC
+          Text(
+            '$deviceName ${widget.selectedDevice.mac}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.normal,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 0),
 
-        // Clients 數量
-        Text(
-          'Clients: $clientCount',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
+          // Clients 數量
+          Text(
+            'Clients: $clientCount',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -336,8 +355,8 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           child: ClipRect(
             child: Padding(
               padding: const EdgeInsets.only(
-                top: 20,    // 上限調整
-                bottom: 100, // 下限調整（避免被底部導航遮擋）
+                top: 0,    // 上限調整
+                bottom: 0, // 下限調整（避免被底部導航遮擋）
               ),
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -381,32 +400,28 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   }
 
   /// 建構客戶端圖標 + 連線時間
+  /// 建構客戶端圖標 + 連線時間
   Widget _buildClientIcon(ClientDevice client) {
     return Container(
       width: 60,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 圖標
+          // 圖標 - 移除背景方框
           Container(
-            width: 40,
+            width: 40, // 👈 調整圖標容器大小
             height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
-            ),
             child: Center(
               child: Image.asset(
                 _getClientIconPath(client.clientType),
-                width: 24,
-                height: 24,
+                width: 40, // 👈 調整圖標本身大小
+                height: 40,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Icon(
                     _getClientFallbackIcon(client.clientType),
                     color: Colors.white.withOpacity(0.8),
-                    size: 20,
+                    size: 40, // 👈 調整後備圖標大小
                   );
                 },
               ),
@@ -430,51 +445,55 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   }
 
   /// 建構客戶端資訊
+  /// 建構客戶端資訊
   Widget _buildClientInfo(ClientDevice client) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // 設備名稱
-        Text(
-          client.name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+    return Transform.translate(
+      offset: const Offset(0, -10), // 👈 向上移動客戶端文字，調整這個數值
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 設備名稱
+          Text(
+            client.name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
+          const SizedBox(height: 1),
 
-        // 網路類型
-        Text(
-          client.deviceType,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 13,
+          // 網路類型
+          Text(
+            client.deviceType,
+            style: TextStyle(
+              color: Colors.white.withOpacity(1.0),
+              fontSize: 12,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
+          const SizedBox(height: 1),
 
-        // MAC 地址
-        Text(
-          'MAC : ${client.mac}',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 13,
+          // MAC 地址
+          Text(
+            'MAC : ${client.mac}',
+            style: TextStyle(
+              color: Colors.white.withOpacity(1.0),
+              fontSize: 12,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
+          const SizedBox(height: 1),
 
-        // IP 地址
-        Text(
-          'IP : ${client.ip}',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 13,
+          // IP 地址
+          Text(
+            'IP : ${client.ip}',
+            style: TextStyle(
+              color: Colors.white.withOpacity(1.0),
+              fontSize: 12,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -482,11 +501,11 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   String _getClientIconPath(ClientType type) {
     switch (type) {
       case ClientType.tv:
-        return 'assets/images/icon/tv.png';
+        return 'assets/images/icon/TV.png';
       case ClientType.xbox:
-        return 'assets/images/icon/xbox.png';
+        return 'assets/images/icon/Xbox.png';
       case ClientType.iphone:
-        return 'assets/images/icon/iphone.png';
+        return 'assets/images/icon/iPhone.png';
       case ClientType.laptop:
         return 'assets/images/icon/laptop.png';
       default:

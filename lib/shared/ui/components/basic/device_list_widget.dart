@@ -154,59 +154,50 @@ class DeviceListWidget extends StatelessWidget {
   }
 
   /// 建構設備圖標
+  /// 建構設備圖標
   Widget _buildDeviceIcon(DeviceListItem deviceItem) {
     if (deviceItem.isGateway) {
-      // Gateway 圖標 - 較大，參考 NetworkTopologyComponent
+      // Gateway 圖標 - 移除背景方框
       return Container(
-        width: 60,
+        width: 60, // 👈 調整圖標容器大小
         height: 60,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
-        ),
         child: Center(
           child: Image.asset(
             'assets/images/icon/router.png',
-            width: 40,
-            height: 40,
+            width: 60, // 👈 調整圖標本身大小
+            height: 60,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
               return Icon(
                 Icons.router,
                 color: Colors.white,
-                size: 25,
+                size: 25, // 👈 調整後備圖標大小
               );
             },
           ),
         ),
       );
     } else {
-      // Agent/Mesh 圖標 - 較小，使用 mesh.png
+      // Agent/Mesh 圖標 - 移除背景方框
       return Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
-        ),
+        width: 60, // 👈 調整圖標容器大小
+        height: 60,
         child: Center(
           child: ColorFiltered(
             colorFilter: ColorFilter.mode(
-              Colors.white.withOpacity(1.0),  // 調整圖標顏色飽和度
+              Colors.white.withOpacity(1.0),
               BlendMode.srcIn,
             ),
             child: Image.asset(
               'assets/images/icon/mesh.png',
-              width: 30,
-              height: 30,
+              width: 45, // 👈 調整圖標本身大小
+              height: 45,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return Icon(
                   Icons.lan,
-                  color: Colors.white.withOpacity(0.8),
-                  size: 20,
+                  color: Colors.white.withOpacity(1.0),
+                  size: 20, // 👈 調整後備圖標大小
                 );
               },
             ),
@@ -215,7 +206,6 @@ class DeviceListWidget extends StatelessWidget {
       );
     }
   }
-
   /// 建構設備資訊
   Widget _buildDeviceInfo(DeviceListItem deviceItem) {
     final device = deviceItem.device;
@@ -225,14 +215,14 @@ class DeviceListWidget extends StatelessWidget {
       // Gateway 資訊顯示 - 保持原樣
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center, // 👈 Gateway 保持 center
+        mainAxisAlignment: MainAxisAlignment.start, // 👈 Gateway 保持 center
         children: [
           Text(
             '${device.name} ${device.mac}',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              fontWeight: FontWeight.normal,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -241,8 +231,8 @@ class DeviceListWidget extends StatelessWidget {
           Text(
             'Clients: ${device.additionalInfo['clients']}',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 14,
+              color: Colors.white.withOpacity(1.0),
+              fontSize: 12,
             ),
           ),
         ],
@@ -259,7 +249,7 @@ class DeviceListWidget extends StatelessWidget {
               device.name,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
@@ -269,8 +259,8 @@ class DeviceListWidget extends StatelessWidget {
             Text(
               'IP Address: ${device.ip}',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 13,
+                color: Colors.white.withOpacity(1.0),
+                fontSize: 12,
               ),
             ),
             const SizedBox(height: 1),

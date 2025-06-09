@@ -344,6 +344,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   }
 
   /// 建構 TabBar
+  /// 建構 TabBar
   Widget _buildTabBar() {
     return Container(
       margin: NetworkTopoConfig.tabBarMargin,
@@ -368,14 +369,15 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
                 child: _buildTabCapsule(),
               ),
 
-              // 文字按鈕層
+              // 點擊區域層（修改這裡）
               Row(
                 children: [
-                  // Topology 選項卡
+                  // Topology 選項卡 - 整個區域可點擊
                   Expanded(
                     child: GestureDetector(
                       onTap: widget.enableInteractions ? () => _handleViewModeChanged('topology') : null,
                       child: Container(
+                        color: Colors.transparent, // 👈 確保整個區域可點擊
                         alignment: Alignment.center,
                         child: Text(
                           'Topology',
@@ -391,11 +393,12 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
                     ),
                   ),
 
-                  // List 選項卡
+                  // List 選項卡 - 整個區域可點擊
                   Expanded(
                     child: GestureDetector(
                       onTap: widget.enableInteractions ? () => _handleViewModeChanged('list') : null,
                       child: Container(
+                        color: Colors.transparent, // 👈 確保整個區域可點擊
                         alignment: Alignment.center,
                         child: Text(
                           'List',
@@ -418,7 +421,6 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
       ),
     );
   }
-
   /// 建構底部導航欄
   Widget _buildBottomNavBar() {
     final screenWidth = MediaQuery.of(context).size.width;
