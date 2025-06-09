@@ -150,7 +150,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           Center(
             child: Container(
               width: 200, // 👈 固定寬度，與 NetworkTopo 頁面的膠囊 bar 相同
-              height: 30, // 👈 固定高度，與 NetworkTopo 頁面相同
+              height: 22, // 👈 固定高度，與 NetworkTopo 頁面相同
               decoration: BoxDecoration(
                 color: const Color(0xFF64FF00), // 亮綠色
                 borderRadius: BorderRadius.circular(15), // 👈 高度的一半，確保圓角
