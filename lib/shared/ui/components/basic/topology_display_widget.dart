@@ -12,7 +12,7 @@ import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
 class TopologyDisplayWidget extends StatefulWidget {
   final List<NetworkDevice> devices;
   final List<DeviceConnection> connections;
-  final String gatewayName;
+  final String gatewayName; // 👈 直接接收 gatewayName 參數
   final bool enableInteractions;
   final Function(NetworkDevice)? onDeviceSelected;
   final AnimationController animationController;

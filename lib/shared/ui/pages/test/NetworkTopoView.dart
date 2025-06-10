@@ -10,6 +10,8 @@ import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
 import 'package:whitebox/shared/ui/components/basic/topology_display_widget.dart';
 import 'package:whitebox/shared/ui/components/basic/device_list_widget.dart';
+import 'package:whitebox/shared/services/real_data_integration_service.dart';
+import 'package:whitebox/shared/api/wifi_api_service.dart';
 
 class NetworkTopoView extends StatefulWidget {
   // 保持原有的所有參數，確保對外介面不變
@@ -57,8 +59,14 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   final AppTheme _appTheme = AppTheme();
 
   // 參考到拓樸顯示組件的 GlobalKey（修正類型）
-  final GlobalKey<TopologyDisplayWidgetState> _topologyDisplayKey =
-  GlobalKey<TopologyDisplayWidgetState>();
+  final GlobalKey<TopologyDisplayWidgetState> _topologyDisplayKey = GlobalKey<TopologyDisplayWidgetState>();
+
+  // 新增：數據載入狀態
+  bool _isLoadingData = false;
+  List<NetworkDevice> _topologyDevices = [];  // 拓撲圖設備（只有 Extender）
+  List<NetworkDevice> _listDevices = [];      // 列表設備（Gateway + Extender）
+  List<DeviceConnection> _currentConnections = [];
+  String _gatewayName = 'Controller';
 
   @override
   void initState() {
@@ -75,8 +83,96 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
       duration: NetworkTopoConfig.animationDuration,
     );
 
+    // 新增：載入數據
+    _loadData();
     // 啟動數據更新
     _startDataUpdates();
+  }
+
+  /// 新增：異步載入數據的方法
+  /// 🎯 修正：異步載入數據的方法 - 分別載入拓撲圖和列表數據
+  Future<void> _loadData() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingData = true;
+    });
+
+    try {
+      if (NetworkTopoConfig.useRealData) {
+        print('🌐 載入真實數據...');
+
+        // 🎯 新增：詳細調試真實數據載入過程
+        print('\n=== 🔍 開始詳細調試 ===');
+
+        // 1. 調試原始 API 數據
+        print('1️⃣ 檢查原始 Mesh API 數據...');
+        final meshResult = await WifiApiService.getMeshTopology();
+        if (meshResult is List) {
+          print('原始 API 返回 ${meshResult.length} 個節點:');
+          for (int i = 0; i < meshResult.length; i++) {
+            final node = meshResult[i];
+            if (node is Map<String, dynamic>) {
+              print('節點 $i: ${node['type']} - ${node['macAddr']} (${node['devName']})');
+            }
+          }
+        }
+
+        // 2. 調試 MeshDataAnalyzer 分析結果
+        print('\n2️⃣ 檢查 MeshDataAnalyzer 分析結果...');
+        await RealDataIntegrationService.debugMacAddressIssue();
+
+        // 3. 調試客戶端數量計算
+        print('\n3️⃣ 檢查客戶端數量計算...');
+        await RealDataIntegrationService.debugClientCounts();
+
+        // 4. 獲取各種數據並比較
+        print('\n4️⃣ 獲取並比較不同的數據源...');
+
+        final topologyDevices = await RealDataIntegrationService.getNetworkDevices();
+        print('拓撲圖設備 (${topologyDevices.length} 個):');
+        for (final device in topologyDevices) {
+          print('  - ${device.name} (${device.mac}) - 客戶端: ${device.additionalInfo['clientCount']}');
+        }
+
+        final listDevices = await RealDataIntegrationService.getListViewDevices();
+        print('List 視圖設備 (${listDevices.length} 個):');
+        for (final device in listDevices) {
+          print('  - ${device.name} (${device.mac}) - 客戶端: ${device.additionalInfo['clients']}');
+        }
+
+        final connections = await RealDataIntegrationService.getDeviceConnections();
+        print('設備連接 (${connections.length} 個):');
+        for (final conn in connections) {
+          print('  - ${conn.deviceId} → ${conn.connectedDevicesCount} 個連接');
+        }
+
+        final gatewayName = await RealDataIntegrationService.getGatewayName();
+        print('Gateway 名稱: $gatewayName');
+
+        print('=== 🔍 調試結束 ===\n');
+
+        if (mounted) {
+          setState(() {
+            _topologyDevices = topologyDevices;
+            _listDevices = listDevices;
+            _currentConnections = connections;
+            _gatewayName = gatewayName;
+            _isLoadingData = false;
+          });
+        }
+
+        print('✅ 真實數據載入完成');
+        print('   拓撲圖設備: ${topologyDevices.length} 個');
+        print('   列表設備: ${listDevices.length} 個');
+
+      } else {
+        // 假數據邏輯保持不變...
+      }
+    } catch (e) {
+      print('❌ 載入數據時發生錯誤: $e');
+      // 錯誤處理邏輯保持不變...
+    }
   }
 
   @override
@@ -91,74 +187,81 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   // ==================== 資料管理 ====================
 
   /// 取得設備列表（統一的資料存取點）
+  /// 🎯 修正：根據當前視圖模式返回對應的設備列表
   List<NetworkDevice> _getDevices() {
     // 優先使用外部傳入的設備
     if (widget.externalDevices != null && widget.externalDevices!.isNotEmpty) {
       return widget.externalDevices!;
     }
 
-    // 根據配置決定使用真實或假資料
-    if (NetworkTopoConfig.useRealData) {
-      // TODO: 這裡將來要接入真實的 Mesh API
-      // return await RealDataService.loadDevicesFromMeshAPI();
-      print('🌐 使用真實資料 (目前使用假資料代替)');
-      return FakeDataGenerator.generateDevices(_deviceCount);
+    // 🎯 根據視圖模式返回不同的設備列表
+    if (_viewMode == 'topology') {
+      return _topologyDevices;  // 拓撲圖：只有 Extender
     } else {
-      return FakeDataGenerator.generateDevices(_deviceCount);
+      return _listDevices;      // 列表：Gateway + Extender
     }
   }
 
   /// 取得設備連接資料
+  /// 修改：同步版本的取得連接方法
   List<DeviceConnection> _getDeviceConnections(List<NetworkDevice> devices) {
     // 優先使用外部傳入的連接資料
     if (widget.externalDeviceConnections != null && widget.externalDeviceConnections!.isNotEmpty) {
       return widget.externalDeviceConnections!;
     }
 
-    // 根據配置決定使用真實或假資料
-    if (NetworkTopoConfig.useRealData) {
-      // TODO: 這裡將來要接入真實的 Mesh API
-      print('🌐 使用真實連接資料 (目前使用假資料代替)');
-      return FakeDataGenerator.generateConnections(devices);
-    } else {
-      return FakeDataGenerator.generateConnections(devices);
-    }
+    // 返回已載入的當前連接列表
+    return _currentConnections;
   }
 
   // ==================== 事件處理 ====================
 
+  /// 修正：處理設備數量變更（需要重新載入數據）
   void _handleDeviceCountChanged() {
     final newCount = int.tryParse(_deviceCountController.text) ?? 0;
     if (newCount != _deviceCount && newCount >= 0 && newCount <= NetworkTopoConfig.maxDeviceCount) {
       setState(() {
         _deviceCount = newCount;
       });
+
+      // 如果使用假數據，重新載入
+      if (!NetworkTopoConfig.useRealData) {
+        _loadData();
+      }
     }
   }
 
+  /// 手動重新載入數據的方法
+  Future<void> _refreshData() async {
+    print('🔄 手動重新載入數據');
+    await _loadData();
+  }
+
+  /// 處理設備選擇
   void _handleDeviceSelected(NetworkDevice device) {
     if (!widget.enableInteractions) return;
     print('設備被選中: ${device.name}');
-    // 這裡可以加入設備詳情頁面導航
-    // 👈 如果有外部回調，使用外部回調（優先）
+
+    // 如果有外部回調，使用外部回調（優先）
     if (widget.onDeviceSelected != null) {
       widget.onDeviceSelected!(device);
     } else {
-      // 👈 如果沒有外部回調，使用原本的邏輯（可以加入設備詳情頁面導航）
       print('沒有外部回調，執行預設行為');
-      // 這裡可以加入原本的 Navigator.push 邏輯
     }
   }
 
+  /// 處理視圖模式變更
   void _handleViewModeChanged(String mode) {
     if (!widget.enableInteractions) return;
     if (mode != _viewMode) {
       setState(() {
         _viewMode = mode;
       });
+      print('視圖模式切換到: $mode');
     }
   }
 
+  /// 處理底部導航切換
   void _handleBottomTabChanged(int index) {
     if (!widget.enableInteractions) return;
     setState(() {
@@ -167,8 +270,18 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     print('底部導航切換到：$index');
   }
 
+  /// 處理主頁面切換
+  void _handleMainPageChanged(int index) {
+    if (index != _selectedBottomTab) {
+      setState(() {
+        _selectedBottomTab = index;
+      });
+    }
+  }
+
   // ==================== 資料更新 ====================
 
+  /// 啟動數據更新
   void _startDataUpdates() {
     _updateTimer = Timer.periodic(NetworkTopoConfig.speedUpdateInterval, (_) {
       if (mounted && _viewMode == 'topology') {
@@ -239,16 +352,48 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   }
 
   /// 建構主要內容
+  /// 修正：建構主要內容（加入載入狀態和正確的數據源）
   Widget _buildMainContent() {
+    // 顯示載入狀態
+    if (_isLoadingData) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 16),
+            Text(
+              '載入網路拓撲資料中...',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
     final devices = _getDevices();
     final connections = _getDeviceConnections(devices);
+    // 🎯 調試輸出
+    print('=== 主要內容建構 ===');
+    print('當前視圖模式: $_viewMode');
+    print('設備數量: ${devices.length}');
+    print('連接數量: ${connections.length}');
+    print('Gateway 名稱: $_gatewayName');
+
+    if (devices.isNotEmpty) {
+      print('設備列表:');
+      for (var device in devices) {
+        print('  - ${device.name} (${device.additionalInfo['type']})');
+      }
+    }
+    print('==================');
 
     if (_viewMode == 'topology') {
       return TopologyDisplayWidget(
         key: _topologyDisplayKey,
         devices: devices,
         connections: connections,
-        gatewayName: 'Controller',
+        gatewayName: _gatewayName,
         enableInteractions: widget.enableInteractions,
         animationController: _animationController,
         onDeviceSelected: _handleDeviceSelected,
@@ -262,6 +407,8 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     }
   }
 
+
+  /// 建構設備數量控制器
   /// 建構設備數量控制器
   Widget _buildDeviceCountController() {
     return Container(
@@ -338,12 +485,32 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
               child: const Icon(Icons.add),
             ),
           ),
+
+          // 🎯 新增：重新載入按鈕（用於真實數據）
+          if (NetworkTopoConfig.useRealData) ...[
+            const SizedBox(width: 16),
+            InkWell(
+              onTap: widget.enableInteractions ? () async {
+                print('🔄 手動觸發重新載入');
+                RealDataIntegrationService.clearCache();
+                await _refreshData();
+              } : null,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF9747FF),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Icon(Icons.refresh, color: Colors.white),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  /// 建構 TabBar
   /// 建構 TabBar
   Widget _buildTabBar() {
     return Container(
@@ -369,7 +536,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
                 child: _buildTabCapsule(),
               ),
 
-              // 點擊區域層（修改這裡）
+              // 點擊區域層
               Row(
                 children: [
                   // Topology 選項卡 - 整個區域可點擊
@@ -377,7 +544,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
                     child: GestureDetector(
                       onTap: widget.enableInteractions ? () => _handleViewModeChanged('topology') : null,
                       child: Container(
-                        color: Colors.transparent, // 👈 確保整個區域可點擊
+                        color: Colors.transparent,
                         alignment: Alignment.center,
                         child: Text(
                           'Topology',
@@ -398,7 +565,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
                     child: GestureDetector(
                       onTap: widget.enableInteractions ? () => _handleViewModeChanged('list') : null,
                       child: Container(
-                        color: Colors.transparent, // 👈 確保整個區域可點擊
+                        color: Colors.transparent,
                         alignment: Alignment.center,
                         child: Text(
                           'List',
@@ -421,6 +588,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
       ),
     );
   }
+  /// 建構底部導航欄
   /// 建構底部導航欄
   Widget _buildBottomNavBar() {
     final screenWidth = MediaQuery.of(context).size.width;

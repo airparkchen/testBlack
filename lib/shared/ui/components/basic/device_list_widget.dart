@@ -1,4 +1,4 @@
-// lib/shared/ui/components/basic/device_list_widget.dart
+// lib/shared/ui/components/basic/device_list_widget.dart - 修正版本
 
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
@@ -6,8 +6,8 @@ import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 
-
-/// 設備列表組件 - 修改為卡片樣式
+/// 設備列表組件 - 修正版本
+/// 🎯 關鍵修正：直接使用傳入的設備列表，不再自行添加 Gateway
 class DeviceListWidget extends StatelessWidget {
   final List<NetworkDevice> devices;
   final bool enableInteractions;
@@ -24,51 +24,48 @@ class DeviceListWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppTheme appTheme = AppTheme();
 
-    // 準備完整的設備列表（包括網關）
-    List<DeviceListItem> allDevices = _prepareDeviceList();
+    // 🎯 修正：直接使用傳入的設備列表，不再重複處理
+    print('=== DeviceListWidget Debug ===');
+    print('傳入設備數量: ${devices.length}');
+    for (var device in devices) {
+      print('設備: ${device.name} (${device.id})');
+      print('  MAC: ${device.mac}');
+      print('  類型: ${device.additionalInfo['type']}');
+      print('  客戶端數: ${device.additionalInfo['clients']}');
+    }
+    print('============================');
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 使用父容器提供的實際可用空間
         final double availableHeight = constraints.maxHeight;
 
         return Container(
           width: constraints.maxWidth,
           height: availableHeight,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: ClipRect(   //定義裁剪邊界
-            child: Padding(  //縮小可視區域
+          child: ClipRect(
+            child: Padding(
               padding: const EdgeInsets.only(
-                top: 50,    // 👈 控制上限（消失線距離頂部多遠）
-                bottom: 0, // 👈 控制下限（消失線距離底部多遠）
-              ), // 控制裁剪區域的邊界 (消失線)
-              child: ListView.separated(   //列表
+                top: 50,
+                bottom: 0,
+              ),
+              child: ListView.separated(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: allDevices.length,
+                itemCount: devices.length, // 🎯 直接使用傳入的設備數量
                 separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
-                  final deviceItem = allDevices[index];
+                  final device = devices[index];
+                  final isGateway = device.additionalInfo['type'] == 'gateway';
 
                   return appTheme.whiteBoxTheme.buildStandardCard(
                     width: double.infinity,
-                    height: deviceItem.isGateway ? 100 : 95,
+                    height: isGateway ? 100 : 95,
                     child: InkWell(
-                      // onTap: enableInteractions ? () {
-                      //   // 導航到設備詳情頁面
-                      //   Navigator.of(context).push(
-                      //     MaterialPageRoute(
-                      //       builder: (context) => DeviceDetailPage(
-                      //         selectedDevice: deviceItem.device,
-                      //         isGateway: deviceItem.isGateway,
-                      //         // connectedClients: [], // 可選：如果有預先載入的客戶端資料
-                      //       ),
-                      //     ),
-                      //   );
-                      // } : null,
                       onTap: enableInteractions ? () {
-                        // 👈 修改：直接使用回調，不再使用 Navigator
-                        onDeviceSelected?.call(deviceItem.device);
+                        // 🎯 修正：傳遞正確的設備資訊到詳情頁面
+                        print('點擊設備: ${device.name} (${device.additionalInfo['type']})');
+                        onDeviceSelected?.call(device);
                       } : null,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusS),
                       child: Padding(
@@ -76,13 +73,13 @@ class DeviceListWidget extends StatelessWidget {
                         child: Row(
                           children: [
                             // 左側圖標區域
-                            _buildDeviceIcon(deviceItem),
+                            _buildDeviceIcon(device, isGateway),
 
                             const SizedBox(width: 16),
 
                             // 右側資訊區域
                             Expanded(
-                              child: _buildDeviceInfo(deviceItem),
+                              child: _buildDeviceInfo(device, isGateway),
                             ),
                           ],
                         ),
@@ -98,89 +95,33 @@ class DeviceListWidget extends StatelessWidget {
     );
   }
 
-  /// 準備設備列表（網關 + 客戶端設備）
-  List<DeviceListItem> _prepareDeviceList() {
-    List<DeviceListItem> allDevices = [];
-
-    // 添加網關設備到列表最前方
-    allDevices.add(DeviceListItem(
-      device: NetworkDevice(
-        name: 'Controller',
-        id: 'router-001',
-        mac: '48:21:0B:4A:46:CF',
-        ip: '192.168.1.1',
-        connectionType: ConnectionType.wired,
-        additionalInfo: {
-          'type': 'router',
-          'status': 'online',
-          'clients': devices.length,
-          'rssi': '',
-        },
-      ),
-      isGateway: true,
-    ));
-
-    // 添加客戶端設備
-    for (var device in devices) {
-      allDevices.add(DeviceListItem(
-        device: NetworkDevice(
-          name: _getAgentName(device),
-          id: device.id,
-          mac: device.mac,
-          ip: device.ip,
-          connectionType: device.connectionType,
-          additionalInfo: {
-            'type': 'mesh_agent',
-            'status': device.additionalInfo['status'] ?? 'online',
-            'clients': 2,
-            'rssi': '-25, -39',
-          },
-        ),
-        isGateway: false,
-      ));
-    }
-
-    return allDevices;
-  }
-
-  /// 根據設備生成 Agent 名稱
-  String _getAgentName(NetworkDevice device) {
-    // 第一個設備顯示 MAC，其他只顯示 Agent
-    if (devices.indexOf(device) == 0) {
-      return 'Agent(MAC) ${device.mac}';
-    } else {
-      return 'Agent ${device.mac}';
-    }
-  }
-
-  /// 建構設備圖標
-  /// 建構設備圖標
-  Widget _buildDeviceIcon(DeviceListItem deviceItem) {
-    if (deviceItem.isGateway) {
-      // Gateway 圖標 - 移除背景方框
+  /// 🎯 修正：建構設備圖標
+  Widget _buildDeviceIcon(NetworkDevice device, bool isGateway) {
+    if (isGateway) {
+      // Gateway 圖標
       return Container(
-        width: 60, // 👈 調整圖標容器大小
+        width: 60,
         height: 60,
         child: Center(
           child: Image.asset(
             'assets/images/icon/router.png',
-            width: 60, // 👈 調整圖標本身大小
+            width: 60,
             height: 60,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
               return Icon(
                 Icons.router,
                 color: Colors.white,
-                size: 25, // 👈 調整後備圖標大小
+                size: 25,
               );
             },
           ),
         ),
       );
     } else {
-      // Agent/Mesh 圖標 - 移除背景方框
+      // Extender 圖標
       return Container(
-        width: 60, // 👈 調整圖標容器大小
+        width: 60,
         height: 60,
         child: Center(
           child: ColorFiltered(
@@ -190,14 +131,14 @@ class DeviceListWidget extends StatelessWidget {
             ),
             child: Image.asset(
               'assets/images/icon/mesh.png',
-              width: 45, // 👈 調整圖標本身大小
+              width: 45,
               height: 45,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return Icon(
                   Icons.lan,
                   color: Colors.white.withOpacity(1.0),
-                  size: 20, // 👈 調整後備圖標大小
+                  size: 20,
                 );
               },
             ),
@@ -206,16 +147,18 @@ class DeviceListWidget extends StatelessWidget {
       );
     }
   }
-  /// 建構設備資訊
-  Widget _buildDeviceInfo(DeviceListItem deviceItem) {
-    final device = deviceItem.device;
-    final isGateway = deviceItem.isGateway;
+
+  /// 🎯 修正：建構設備資訊
+  Widget _buildDeviceInfo(NetworkDevice device, bool isGateway) {
+    // 🎯 從 additionalInfo 中正確獲取客戶端數量
+    final String clientsStr = device.additionalInfo['clients']?.toString() ?? '0';
+    final int clientCount = int.tryParse(clientsStr) ?? 0;
 
     if (isGateway) {
-      // Gateway 資訊顯示 - 保持原樣
+      // Gateway 資訊顯示
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start, // 👈 Gateway 保持 center
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           Text(
             '${device.name} ${device.mac}',
@@ -229,7 +172,7 @@ class DeviceListWidget extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Clients: ${device.additionalInfo['clients']}',
+            'Clients: $clientCount', // 🎯 使用正確的客戶端數量
             style: TextStyle(
               color: Colors.white.withOpacity(1.0),
               fontSize: 12,
@@ -238,9 +181,9 @@ class DeviceListWidget extends StatelessWidget {
         ],
       );
     } else {
-      // Agent 資訊顯示 - 使用 Transform 讓文字群組向上移動
+      // Extender 資訊顯示
       return Transform.translate(
-        offset: const Offset(0, -8), // 👈 讓整個文字群組向上移動 8 pixels
+        offset: const Offset(0, -8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -273,7 +216,7 @@ class DeviceListWidget extends StatelessWidget {
             ),
             const SizedBox(height: 1),
             Text(
-              'Clients: ${device.additionalInfo['clients']}',
+              'Clients: $clientCount', // 🎯 使用正確的客戶端數量
               style: TextStyle(
                 color: Colors.white.withOpacity(0.8),
                 fontSize: 13,
@@ -284,15 +227,4 @@ class DeviceListWidget extends StatelessWidget {
       );
     }
   }
-}
-
-/// 設備列表項目類
-class DeviceListItem {
-  final NetworkDevice device;
-  final bool isGateway;
-
-  DeviceListItem({
-    required this.device,
-    required this.isGateway,
-  });
 }

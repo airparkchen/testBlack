@@ -7,7 +7,7 @@ class NetworkTopoConfig {
   // ==================== 資料源控制 ====================
 
   /// 是否使用真實資料（false = 假資料，true = 真實 Mesh API 資料）
-  static bool useRealData = false;
+  static bool useRealData = true;
 
   // ==================== 版面常數 ====================
 

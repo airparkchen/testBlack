@@ -1,8 +1,10 @@
-// lib/shared/ui/pages/home/DeviceDetailPage.dart
+// lib/shared/ui/pages/home/DeviceDetailPage.dart - 修正版本
 
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
+import 'package:whitebox/shared/services/real_data_integration_service.dart';
+import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 
 /// 設備詳情頁面
 class DeviceDetailPage extends StatefulWidget {
@@ -14,7 +16,7 @@ class DeviceDetailPage extends StatefulWidget {
 
   /// 連接的客戶端列表（將來從 Mesh API 取得）
   final List<ClientDevice>? connectedClients;
-  final bool showBottomNavigation;  // 👈 添加這個參數
+  final bool showBottomNavigation;
   final VoidCallback? onBack;
 
   const DeviceDetailPage({
@@ -22,7 +24,7 @@ class DeviceDetailPage extends StatefulWidget {
     required this.selectedDevice,
     this.isGateway = false,
     this.connectedClients,
-    this.showBottomNavigation = true,  // 👈 添加預設值
+    this.showBottomNavigation = true,
     this.onBack,
   }) : super(key: key);
 
@@ -33,8 +35,11 @@ class DeviceDetailPage extends StatefulWidget {
 class _DeviceDetailPageState extends State<DeviceDetailPage> {
   final AppTheme _appTheme = AppTheme();
 
-  // 假資料 - 將來會被 Mesh API 資料替代
-  late List<ClientDevice> _clientDevices;
+  // 修改：設為可變的列表，初始為空
+  List<ClientDevice> _clientDevices = [];
+
+  // 新增：載入狀態
+  bool _isLoadingClients = true;
 
   @override
   void initState() {
@@ -42,15 +47,52 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     _loadClientDevices();
   }
 
-  /// 載入客戶端設備資料（預留 API 接口）
-  void _loadClientDevices() {
-    // TODO: 將來替換為 Mesh API 呼叫
-    // final apiData = await MeshApiService.getConnectedClients(widget.selectedDevice.id);
+  /// 修改：異步載入客戶端設備資料
+  Future<void> _loadClientDevices() async {
+    if (!mounted) return;
 
-    _clientDevices = widget.connectedClients ?? _generateFakeClientData();
+    setState(() {
+      _isLoadingClients = true;
+    });
+
+    try {
+      List<ClientDevice> clientDevices;
+
+      if (NetworkTopoConfig.useRealData) {
+        // 使用真實數據
+        final deviceId = _generateDeviceId(widget.selectedDevice.mac);
+        clientDevices = await RealDataIntegrationService.getClientDevicesForParent(deviceId);
+        print('✅ 載入真實客戶端數據: ${clientDevices.length} 個設備');
+      } else {
+        // 使用假數據
+        clientDevices = widget.connectedClients ?? _generateFakeClientData();
+        print('🎭 使用假客戶端數據: ${clientDevices.length} 個設備');
+      }
+
+      if (mounted) {
+        setState(() {
+          _clientDevices = clientDevices;
+          _isLoadingClients = false;
+        });
+      }
+    } catch (e) {
+      print('❌ 載入客戶端設備時發生錯誤: $e');
+      if (mounted) {
+        setState(() {
+          // 發生錯誤時使用假數據
+          _clientDevices = _generateFakeClientData();
+          _isLoadingClients = false;
+        });
+      }
+    }
   }
 
-  /// 生成假資料（開發用）
+  /// 新增：生成設備 ID 的方法
+  String _generateDeviceId(String macAddress) {
+    return 'device-${macAddress.replaceAll(':', '').toLowerCase()}';
+  }
+
+  /// 生成假資料（開發用） - 保留原始方法
   List<ClientDevice> _generateFakeClientData() {
     return [
       ClientDevice(
@@ -122,7 +164,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       height: 56,
       child: Stack(
-        clipBehavior: Clip.none, // 👈 允許內容溢出容器邊界
+        clipBehavior: Clip.none,
         children: [
           // 返回按鈕（較低層級）
           Positioned(
@@ -153,15 +195,15 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           Positioned(
             left: 0,
             right: 0,
-            top: 5, // RSSI bar位置
+            top: 5,
             child: Center(
               child: Container(
                 width: 175,
-                height: 30,   //調整RSSI bar 大小
+                height: 30,
                 decoration: BoxDecoration(
                   color: const Color(0xFF64FF00),
                   borderRadius: BorderRadius.circular(15),
-                  boxShadow: [ // 👈 添加陰影增加層次感
+                  boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.2),
                       blurRadius: 4,
@@ -175,7 +217,6 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                     style: const TextStyle(
                       color: Colors.black,
                       fontSize: 16,
-                      // fontWeight: FontWeight.bold,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -191,7 +232,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   /// 建構設備主要資訊區域
   Widget _buildDeviceInfoArea() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),   //整體文字卡片 位置調整
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -209,12 +250,10 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     );
   }
 
-  /// 建構設備圖標（白色圓圈 + 透明背景 + 圖標）
-  /// 建構設備圖標（白色圓圈 + 透明背景 + 圖標 + 右下角數字標籤）
   /// 建構設備圖標（白色圓圈 + 透明背景 + 圖標 + 右下角數字標籤）
   Widget _buildDeviceIcon() {
-    final iconSize = widget.isGateway ? 60.0 : 50.0; // icon 本身的大小
-    final containerSize = widget.isGateway ? 100.0 : 80.0;  //外圈半徑
+    final iconSize = widget.isGateway ? 60.0 : 50.0;
+    final containerSize = widget.isGateway ? 100.0 : 80.0;
     final clientCount = _clientDevices.length;
 
     return Container(
@@ -228,7 +267,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
             height: containerSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),  //外圈邊框粗細
+              border: Border.all(color: Colors.white, width: 2),
               color: Colors.transparent,
             ),
             child: Center(
@@ -268,26 +307,26 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
             ),
           ),
 
-          // 右下角紫色數字標籤（參考 NetworkTopologyComponent） 小圓圈位置
+          // 右下角紫色數字標籤
           if (clientCount > 0)
             Positioned(
-              right: containerSize * 0.01,  // 距離右邊 10%
-              bottom: containerSize * 0.05, // 距離底部 10%
+              right: containerSize * 0.01,
+              bottom: containerSize * 0.05,
               child: Container(
-                width: 30,    //小圓圈大小
+                width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: Color(0xFF9747FF), // 紫色背景
+                  color: Color(0xFF9747FF),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1),  //小圓圈邊框粗細
+                  border: Border.all(color: Colors.white, width: 1),
                 ),
                 child: Center(
                   child: Text(
                     clientCount.toString(),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18,  //小圓圈數字大小
-                      fontWeight: FontWeight.bold,  //小圓圈數字粗細
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -299,13 +338,12 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   }
 
   /// 建構設備資訊文字
-  /// 建構設備資訊文字
   Widget _buildDeviceInfo() {
     final deviceName = widget.isGateway ? 'Controller' : widget.selectedDevice.name;
     final clientCount = _clientDevices.length;
 
     return Transform.translate(
-      offset: const Offset(0, 0), // 👈 向上移動文字，調整這個數值
+      offset: const Offset(0, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -344,7 +382,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     );
   }
 
-  /// 建構客戶端列表區域
+  /// 修改：建構客戶端列表區域（加入載入狀態）
   Widget _buildClientListArea() {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -354,11 +392,29 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: ClipRect(
             child: Padding(
-              padding: const EdgeInsets.only(
-                top: 0,    // 上限調整
-                bottom: 0, // 下限調整（避免被底部導航遮擋）
-              ),
-              child: ListView.separated(
+              padding: const EdgeInsets.only(top: 0, bottom: 0),
+              child: _isLoadingClients
+                  ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text(
+                      '載入客戶端設備中...',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ],
+                ),
+              )
+                  : _clientDevices.isEmpty
+                  ? const Center(
+                child: Text(
+                  '沒有連接的設備',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              )
+                  : ListView.separated(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 physics: const AlwaysScrollableScrollPhysics(),
                 itemCount: _clientDevices.length,
@@ -400,28 +456,27 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   }
 
   /// 建構客戶端圖標 + 連線時間
-  /// 建構客戶端圖標 + 連線時間
   Widget _buildClientIcon(ClientDevice client) {
     return Container(
       width: 60,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 圖標 - 移除背景方框
+          // 圖標
           Container(
-            width: 40, // 👈 調整圖標容器大小
+            width: 40,
             height: 40,
             child: Center(
               child: Image.asset(
                 _getClientIconPath(client.clientType),
-                width: 40, // 👈 調整圖標本身大小
+                width: 40,
                 height: 40,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Icon(
                     _getClientFallbackIcon(client.clientType),
                     color: Colors.white.withOpacity(0.8),
-                    size: 40, // 👈 調整後備圖標大小
+                    size: 40,
                   );
                 },
               ),
@@ -445,10 +500,9 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   }
 
   /// 建構客戶端資訊
-  /// 建構客戶端資訊
   Widget _buildClientInfo(ClientDevice client) {
     return Transform.translate(
-      offset: const Offset(0, -10), // 👈 向上移動客戶端文字，調整這個數值
+      offset: const Offset(0, -10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -509,7 +563,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       case ClientType.laptop:
         return 'assets/images/icon/laptop.png';
       default:
-        return 'assets/images/icon/device.png'; // 預設圖標
+        return 'assets/images/icon/device.png';
     }
   }
 
@@ -596,7 +650,7 @@ class ClientDevice {
       case 'computer':
         return ClientType.laptop;
       default:
-        return ClientType.laptop; // 預設類型
+        return ClientType.laptop;
     }
   }
 }
