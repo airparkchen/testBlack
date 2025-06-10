@@ -8,6 +8,7 @@ import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart'
 import 'package:whitebox/shared/ui/pages/initialization/WifiSettingFlowPage.dart';
 import 'package:whitebox/shared/ui/pages/initialization/LoginPage.dart';
 import 'package:whitebox/shared/ui/pages/test/TestPage.dart';
+import 'package:whitebox/shared/ui/pages/test/MeshTopologyTestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/TestPasswordPage.dart';
 import 'package:whitebox/shared/ui/pages/test/SrpLoginTestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/SrpLoginModifiedTestPage.dart';
@@ -69,7 +70,7 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {
         return AppBackgroundWrapper(child: child ?? Container());
       },
-      home: const InitializationPage(),
+      home: const MeshTopologyTestPage(),
     );
   }
 }
