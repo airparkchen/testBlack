@@ -1,9 +1,11 @@
 // lib/shared/ui/pages/home/Topo/real_data_service.dart
 
-import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
+import 'package:whitebox/shared/services/mesh_data_analyzer.dart';
+import 'package:whitebox/shared/models/mesh_data_models.dart';
+import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
+// 🎯 修正：統一使用 home 目錄下的 DeviceDetailPage
 import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
-import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 
 /// 真實資料服務類 - 負責從 Mesh API 獲取並轉換資料
 class RealDataService {

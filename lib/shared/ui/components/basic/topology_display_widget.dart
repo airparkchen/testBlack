@@ -75,16 +75,16 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
         children: [
           // 資料來源指示器（開發用）
           if (NetworkTopoConfig.useRealData)
-            _buildDataSourceIndicator(),
+            // _buildDataSourceIndicator(),    //顯示資料來源 Real Data / Fake Data
 
           // 主要拓樸圖
           Expanded(
             child: Center(
               child: NetworkTopologyComponent(
-                gatewayName: widget.gatewayName,
+                gatewayName: widget.gatewayName, // 🎯 使用傳入的正確 Gateway 名稱
                 devices: widget.devices,
-                deviceConnections: widget.connections,
-                totalConnectedDevices: widget.devices.length,
+                deviceConnections: widget.connections, // 🎯 傳遞連接資料
+                totalConnectedDevices: _calculateTotalConnectedDevices(), // 🎯 動態計算總設備數
                 height: screenSize.height * NetworkTopoConfig.topologyHeightRatio,
                 onDeviceSelected: widget.enableInteractions ? widget.onDeviceSelected : null,
               ),
@@ -95,30 +95,54 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     );
   }
 
-  /// 建構資料來源指示器
-  Widget _buildDataSourceIndicator() {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            NetworkTopoConfig.useRealData ? '🌐 Real Data' : '🎭 Mock Data',
-            style: TextStyle(color: Colors.white70, fontSize: 10),
-          ),
-          SizedBox(width: 8),
-          if (widget.enableInteractions)
-            GestureDetector(
-              onTap: () {
-                // 這裡可以加入資料來源切換邏輯
-                print('切換資料來源');
-              },
-              child: Icon(Icons.refresh, color: Colors.white70, size: 16),
-            ),
-        ],
-      ),
-    );
+  /// 🎯 新增：動態計算總連接設備數（只計算 Host）
+  int _calculateTotalConnectedDevices() {
+    if (widget.connections.isEmpty) {
+      print('⚠️ connections 為空，返回設備數量');
+      return widget.devices.length;
+    }
+
+    // 🎯 從 DeviceConnections 中找到 Gateway 的連接數
+    try {
+      final gatewayConnection = widget.connections.firstWhere(
+            (conn) => conn.deviceId.contains('00037fbadbad') || // 根據真實 MAC
+            conn.deviceId.toLowerCase().contains('gateway'),
+        orElse: () => DeviceConnection(deviceId: '', connectedDevicesCount: 0),
+      );
+
+      final totalConnected = gatewayConnection.connectedDevicesCount;
+      print('🎯 Gateway 總連接 Host 數: $totalConnected');
+      return totalConnected;
+    } catch (e) {
+      print('⚠️ 無法計算總連接數，使用預設值: $e');
+      return widget.devices.length;
+    }
   }
+
+  /// 建構資料來源指示器
+  // Widget _buildDataSourceIndicator() {
+  //   return Container(
+  //     padding: EdgeInsets.symmetric(vertical: 0),
+  //     child: Row(
+  //       mainAxisAlignment: MainAxisAlignment.center,
+  //       children: [
+  //         Text(
+  //           NetworkTopoConfig.useRealData ? '🌐 Real Data' : '🎭 Mock Data',
+  //           style: TextStyle(color: Colors.white70, fontSize: 10),
+  //         ),
+  //         SizedBox(width: 8),
+  //         if (widget.enableInteractions)
+  //           GestureDetector(
+  //             onTap: () {
+  //               // 這裡可以加入資料來源切換邏輯
+  //               print('切換資料來源');
+  //             },
+  //             child: Icon(Icons.refresh, color: Colors.white70, size: 16),
+  //           ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   /// 建構速度區域
   Widget _buildSpeedArea(Size screenSize) {

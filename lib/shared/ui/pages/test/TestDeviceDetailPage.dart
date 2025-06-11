@@ -1,4 +1,4 @@
-// lib/shared/ui/pages/home/DeviceDetailPage.dart - 修正版本
+// lib/shared/ui/pages/home/TestDeviceDetailPage.dart - 修正版本
 
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
@@ -61,31 +61,31 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     try {
       List<ClientDevice> clientDevices;
 
-      if (NetworkTopoConfig.useRealData) {
-        // 🎯 修正：使用設備 ID 而不是重新生成
-        final deviceId = widget.selectedDevice.id;
-        print('🌐 載入真實客戶端數據，設備 ID: $deviceId');
-
-        clientDevices = await RealDataIntegrationService.getClientDevicesForParent(deviceId);
-        print('✅ 載入真實客戶端數據: ${clientDevices.length} 個設備');
-      } else {
-        clientDevices = widget.connectedClients ?? _generateFakeClientData();
-        print('🎭 使用假客戶端數據: ${clientDevices.length} 個設備');
-      }
-
-      if (mounted) {
-        setState(() {
-          _clientDevices = clientDevices;
-          _isLoadingClients = false;
-        });
-
-        // 🎯 調試：輸出載入的客戶端設備
-        print('=== 載入的客戶端設備 ===');
-        for (var client in clientDevices) {
-          print('客戶端: ${client.name} (${client.mac})');
-        }
-        print('========================');
-      }
+      // if (NetworkTopoConfig.useRealData) {
+      //   // 🎯 修正：使用設備 ID 而不是重新生成
+      //   final deviceId = widget.selectedDevice.id;
+      //   print('🌐 載入真實客戶端數據，設備 ID: $deviceId');
+      //
+      //   // clientDevices = await RealDataIntegrationService.getClientDevicesForParent(deviceId);
+      //   print('✅ 載入真實客戶端數據: ${clientDevices.length} 個設備');
+      // } else {
+      //   clientDevices = widget.connectedClients ?? _generateFakeClientData();
+      //   print('🎭 使用假客戶端數據: ${clientDevices.length} 個設備');
+      // }
+      //
+      // if (mounted) {
+      //   setState(() {
+      //     _clientDevices = clientDevices;
+      //     _isLoadingClients = false;
+      //   });
+      //
+      //   // 🎯 調試：輸出載入的客戶端設備
+      //   print('=== 載入的客戶端設備 ===');
+      //   for (var client in clientDevices) {
+      //     print('客戶端: ${client.name} (${client.mac})');
+      //   }
+      //   print('========================');
+      // }
     } catch (e) {
       print('❌ 載入客戶端設備時發生錯誤: $e');
       if (mounted) {

@@ -256,7 +256,8 @@ class _LoginPageState extends State<LoginPage> {
 
         // 在導航到 NetworkTopoView 之前測試 Mesh Topology API
         print('登入成功，準備測試 Mesh Topology API...');
-        await _testMeshTopologyAPI();
+        // await _testMeshTopologyAPI();
+        print('暫時取消mesh topology測試');
 
         if (mounted) {
           Navigator.of(context).pushReplacement(

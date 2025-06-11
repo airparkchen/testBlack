@@ -1,4 +1,4 @@
-// lib/shared/ui/pages/home/DeviceDetailPage.dart - 修正版本
+// lib/shared/ui/pages/home/TestDeviceDetailPage.dart - 修正版本
 
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
@@ -339,42 +339,56 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
   /// 建構設備資訊文字
   Widget _buildDeviceInfo() {
-    final deviceName = widget.isGateway ? 'Controller' : widget.selectedDevice.name;
+    // 根據設備類型動態生成名稱
+    final bool isGatewayDevice = widget.selectedDevice.additionalInfo['type'] == 'gateway';
+
+    String deviceName;
+    if (isGatewayDevice) {
+      deviceName = 'Controller';
+    } else {
+      deviceName = widget.selectedDevice.name;
+    }
+
     final clientCount = _clientDevices.length;
 
-    return Transform.translate(
-      offset: const Offset(0, 0),
+    return Expanded( // 🎯 使用 Expanded 防止溢出
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // NAME 標籤
           Text(
             'NAME',
             style: TextStyle(
               color: Colors.white.withOpacity(1.0),
-              fontSize: 14,
+              fontSize: 12, // 🎯 減小字體
               fontWeight: FontWeight.bold,
+              height: 1.3,
             ),
           ),
           const SizedBox(height: 4),
 
-          // 設備名稱 + MAC
+          // 設備名稱 + MAC - 防止溢出
           Text(
-            '$deviceName ${widget.selectedDevice.mac}',
+            '$deviceName ${_formatMacAddress(widget.selectedDevice.mac)}',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 11, // 🎯 減小字體
               fontWeight: FontWeight.normal,
+              height: 1.3,
             ),
+            maxLines: 2, // 🎯 允許兩行
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 0),
+          const SizedBox(height: 4),
 
-          // Clients 數量
+          // 客戶端數量
           Text(
             'Clients: $clientCount',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 11, // 🎯 減小字體
+              height: 1.3,
             ),
           ),
         ],
@@ -435,64 +449,74 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   Widget _buildClientCard(ClientDevice client) {
     return _appTheme.whiteBoxTheme.buildStandardCard(
       width: double.infinity,
-      height: 100,
+      height: 120,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // 左側：圖標 + 連線時間
-            _buildClientIcon(client),
+        child: IntrinsicHeight( // 🎯 新增這行
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch, // 🎯 確保是 stretch
+            children: [
+              // 左側：圖標 + 連線時間 - 使用約束置中
+              _buildClientIcon(client),
 
-            const SizedBox(width: 16),
+              const SizedBox(width: 16),
 
-            // 右側：客戶端資訊
-            Expanded(
-              child: _buildClientInfo(client),
-            ),
-          ],
+              // 右側：客戶端資訊 - 使用 Expanded 防止溢出
+              Expanded(
+                child: _buildClientInfo(client),
+              ),
+            ],
+          ), // 🎯 新增這行關閉 IntrinsicHeight
         ),
       ),
     );
   }
 
   /// 建構客戶端圖標 + 連線時間
+  /// 🎯 修正：建構客戶端圖標，使用約束方法完美置中
   Widget _buildClientIcon(ClientDevice client) {
-    return Container(
-      width: 60,
+    return SizedBox(
+      width: 60, // 🎯 固定寬度
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center, // 🎯 垂直置中
+        crossAxisAlignment: CrossAxisAlignment.center, // 🎯 水平置中
         children: [
-          // 圖標
+          // 圖標容器 - 使用約束確保完美置中
           Container(
-            width: 40,
-            height: 40,
-            child: Center(
-              child: Image.asset(
-                _getClientIconPath(client.clientType),
-                width: 40,
-                height: 40,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    _getClientFallbackIcon(client.clientType),
-                    color: Colors.white.withOpacity(0.8),
-                    size: 40,
-                  );
-                },
-              ),
+            width: 50, // 🎯 固定圖標容器大小
+            height: 50,
+            alignment: Alignment.center, // 🎯 容器內容置中
+            child: Image.asset(
+              _getClientIconPath(client.clientType),
+              width: 50,
+              height: 50,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  _getClientFallbackIcon(client.clientType),
+                  color: Colors.white.withOpacity(0.8),
+                  size: 30,
+                );
+              },
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 8), // 🎯 固定間距
 
-          // 連線時間
-          Text(
-            client.connectionTime,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 10,
+          // 連線時間 - 約束寬度防止溢出
+          SizedBox(
+            width: 60, // 🎯 約束文字寬度
+            child: Text(
+              client.connectionTime,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 9,
+                height: 1.2, // 🎯 設定行高確保一致性
+              ),
+              textAlign: TextAlign.center, // 🎯 文字置中
+              maxLines: 2, // 🎯 允許兩行以防文字過長
+              overflow: TextOverflow.ellipsis,
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -501,55 +525,198 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
   /// 建構客戶端資訊
   Widget _buildClientInfo(ClientDevice client) {
-    return Transform.translate(
-      offset: const Offset(0, -10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // 設備名稱
-          Text(
-            client.name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.start, // 🎯 改為頂部對齊
+      children: [
+        // 設備名稱 - 防止溢出
+        Text(
+          client.name,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            height: 1.3,
           ),
-          const SizedBox(height: 1),
+          maxLines: 1, // 🎯 限制行數
+          overflow: TextOverflow.ellipsis, // 🎯 超出顯示省略號
+        ),
+        const SizedBox(height: 4),
 
-          // 網路類型
-          Text(
-            client.deviceType,
-            style: TextStyle(
-              color: Colors.white.withOpacity(1.0),
-              fontSize: 12,
-            ),
+        // 網路類型 - 使用 SSID_頻段 格式
+        Text(
+          _formatConnectionDisplay(client), // 🎯 使用新的格式化方法
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.9),
+            fontSize: 12,
+            height: 1.3,
           ),
-          const SizedBox(height: 1),
+          maxLines: 1, // 🎯 限制行數
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
 
-          // MAC 地址
-          Text(
-            'MAC : ${client.mac}',
-            style: TextStyle(
-              color: Colors.white.withOpacity(1.0),
-              fontSize: 12,
-            ),
+        // MAC 地址 - 使用較小字體
+        Text(
+          'MAC: ${_formatMacAddress(client.mac)}',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 11, // 🎯 減小字體
+            height: 1.3,
           ),
-          const SizedBox(height: 1),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
 
-          // IP 地址
-          Text(
-            'IP : ${client.ip}',
-            style: TextStyle(
-              color: Colors.white.withOpacity(1.0),
-              fontSize: 12,
-            ),
+        // IP 地址
+        Text(
+          'IP: ${client.ip}',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 11, // 🎯 減小字體
+            height: 1.3,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+
+        // 🎯 如果有額外資訊，顯示 Wi-Fi 標準
+        if (client.additionalInfo?['wirelessStandard'] != null &&
+            client.additionalInfo!['wirelessStandard'].toString().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          // Text(
+          //   _formatWifiStandard(client.additionalInfo!['wirelessStandard'].toString()),
+          //   style: TextStyle(
+          //     color: Colors.white.withOpacity(0.7),
+          //     fontSize: 10, // 🎯 最小字體
+          //   ),
+          //   maxLines: 1,
+          //   overflow: TextOverflow.ellipsis,
+          // ),
         ],
-      ),
+      ],
     );
   }
+
+  /// 🎯 修正：格式化連接類型為 SSID_頻段 格式
+  String _formatConnectionType(String connectionType) {
+    // 先嘗試從 additionalInfo 中獲取 SSID 和頻段資訊
+    // 這個方法會在 _buildClientCard 中傳入 client 物件時使用
+    return connectionType; // 這裡先保持原樣，在下面新增專門方法
+  }
+
+  /// 🎯 新增：專門格式化連接顯示為 SSID_頻段 格式
+  String _formatConnectionDisplay(ClientDevice client) {
+    try {
+      // 1. 獲取 SSID（從 additionalInfo 或 connectionType 中提取）
+      String ssid = '';
+      if (client.additionalInfo?['ssid'] != null &&
+          client.additionalInfo!['ssid'].toString().isNotEmpty) {
+        ssid = client.additionalInfo!['ssid'].toString();
+      } else {
+        // 從 deviceType 中提取 SSID，例如 "WiFi 5GHz 連接 (SSID: Parker_test)"
+        final ssidMatch = RegExp(r'SSID:\s*([^)]+)').firstMatch(client.deviceType);
+        if (ssidMatch != null) {
+          ssid = ssidMatch.group(1)?.trim() ?? '';
+        }
+      }
+
+      // 2. 獲取頻段資訊
+      String frequency = '';
+
+      // 從 radio 欄位獲取頻段（優先）
+      if (client.additionalInfo?['radio'] != null) {
+        final radio = client.additionalInfo!['radio'].toString();
+        if (radio.contains('6G')) {
+          frequency = '6G';
+        } else if (radio.contains('5G')) {
+          frequency = '5G';
+        } else if (radio.contains('2.4G')) {
+          frequency = '2.4G';
+        }
+      }
+
+      // 如果 radio 沒有資訊，從 deviceType 中提取
+      if (frequency.isEmpty) {
+        if (client.deviceType.contains('6GHz')) {
+          frequency = '6G'; // Wi-Fi 6E (802.11ax)
+        } else if (client.deviceType.contains('5GHz')) {
+          frequency = '5G'; // Wi-Fi 5 (802.11ac) 或 Wi-Fi 6 (802.11ax)
+        } else if (client.deviceType.contains('2.4GHz')) {
+          frequency = '2.4G'; // Wi-Fi 4 (802.11n) 或更早
+        }
+      }
+
+      // 3. 特殊情況：Ethernet 連接
+      if (client.deviceType.contains('Ethernet') || client.deviceType.contains('ethernet')) {
+        return 'Ethernet'; // 有線連接直接顯示 Ethernet
+      }
+
+      // 4. 組合 SSID_頻段 格式
+      if (ssid.isNotEmpty && frequency.isNotEmpty) {
+        return '${ssid}_${frequency}'; // 例如：ParkerTest_5G
+      } else if (ssid.isNotEmpty) {
+        return ssid; // 只有 SSID
+      } else if (frequency.isNotEmpty) {
+        return '${frequency} WiFi'; // 只有頻段
+      }
+
+      // 5. 備用方案：簡化原始 deviceType
+      String fallback = client.deviceType;
+      if (fallback.contains('SSID:')) {
+        fallback = fallback.split('(SSID:')[0].trim();
+      }
+
+      if (fallback.length > 15) {
+        fallback = fallback.substring(0, 12) + '...';
+      }
+
+      return fallback.isNotEmpty ? fallback : 'WiFi';
+
+    } catch (e) {
+      print('⚠️ 格式化連接顯示時發生錯誤: $e');
+      return 'WiFi'; // 錯誤時的預設值
+    }
+  }
+
+  /// 🎯 新增：格式化 MAC 地址，截短顯示
+  String _formatMacAddress(String mac) {
+    if (mac.length <= 12) return mac;
+
+    // 顯示前 3 組和後 2 組，中間用 ... 代替
+    // 例如：a2:08:5f:...:a2:d7
+    final parts = mac.split(':');
+    if (parts.length >= 5) {
+      return '${parts[0]}:${parts[1]}:${parts[2]}:...${parts[parts.length-2]}:${parts[parts.length-1]}';
+    }
+
+    return mac;
+  }
+
+  /// 🎯 修正：格式化 Wi-Fi 標準顯示（程式備註保留商用名稱）
+  // String _formatWifiStandard(String standard) {
+  //   // Wi-Fi 標準對應表（商用名稱）
+  //   final Map<String, String> standardMap = {
+  //     'ax': 'Wi-Fi 6',    // 802.11ax - Wi-Fi 6/6E (2019年)
+  //     'ac': 'Wi-Fi 5',    // 802.11ac - Wi-Fi 5 (2013年)
+  //     'n': 'Wi-Fi 4',     // 802.11n - Wi-Fi 4 (2009年)
+  //     'g': 'Wi-Fi 3',     // 802.11g - Wi-Fi 3 (2003年)
+  //     'a': 'Wi-Fi 2',     // 802.11a - Wi-Fi 2 (1999年)
+  //     'b': 'Wi-Fi 1',     // 802.11b - Wi-Fi 1 (1999年)
+  //   };
+  //
+  //   final cleanStandard = standard.toLowerCase().trim();
+  //
+  //   // 返回對應的商用名稱，例如：Wi-Fi 6 (ax)、Wi-Fi 5 (ac)
+  //   final commercialName = standardMap[cleanStandard];
+  //   if (commercialName != null) {
+  //     return '$commercialName ($cleanStandard)'; // 例如："Wi-Fi 6 (ax)"
+  //   }
+  //
+  //   return 'Wi-Fi $standard'; // 未知標準的備用顯示
+  // }
+
 
   /// 根據客戶端類型取得圖標路徑
   String _getClientIconPath(ClientType type) {

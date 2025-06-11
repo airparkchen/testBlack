@@ -90,7 +90,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   }
 
   /// 新增：異步載入數據的方法
-  /// 🎯 修正：異步載入數據的方法 - 分別載入拓撲圖和列表數據
+  /// 🎯 修正：異步載入數據的方法 - 加強調試和資料流追蹤
   Future<void> _loadData() async {
     if (!mounted) return;
 
@@ -102,55 +102,36 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
       if (NetworkTopoConfig.useRealData) {
         print('🌐 載入真實數據...');
 
-        // 🎯 新增：詳細調試真實數據載入過程
-        print('\n=== 🔍 開始詳細調試 ===');
+        // 🎯 呼叫統一的資料統計報告
+        await RealDataIntegrationService.printCompleteDataStatistics();
 
-        // 1. 調試原始 API 數據
-        print('1️⃣ 檢查原始 Mesh API 數據...');
-        final meshResult = await WifiApiService.getMeshTopology();
-        if (meshResult is List) {
-          print('原始 API 返回 ${meshResult.length} 個節點:');
-          for (int i = 0; i < meshResult.length; i++) {
-            final node = meshResult[i];
-            if (node is Map<String, dynamic>) {
-              print('節點 $i: ${node['type']} - ${node['macAddr']} (${node['devName']})');
-            }
-          }
-        }
-
-        // 2. 調試 MeshDataAnalyzer 分析結果
-        print('\n2️⃣ 檢查 MeshDataAnalyzer 分析結果...');
-        await RealDataIntegrationService.debugMacAddressIssue();
-
-        // 3. 調試客戶端數量計算
-        print('\n3️⃣ 檢查客戶端數量計算...');
-        await RealDataIntegrationService.debugClientCounts();
-
-        // 4. 獲取各種數據並比較
-        print('\n4️⃣ 獲取並比較不同的數據源...');
-
+        // 分別獲取不同用途的資料
         final topologyDevices = await RealDataIntegrationService.getNetworkDevices();
-        print('拓撲圖設備 (${topologyDevices.length} 個):');
-        for (final device in topologyDevices) {
-          print('  - ${device.name} (${device.mac}) - 客戶端: ${device.additionalInfo['clientCount']}');
-        }
-
         final listDevices = await RealDataIntegrationService.getListViewDevices();
-        print('List 視圖設備 (${listDevices.length} 個):');
-        for (final device in listDevices) {
-          print('  - ${device.name} (${device.mac}) - 客戶端: ${device.additionalInfo['clients']}');
-        }
-
         final connections = await RealDataIntegrationService.getDeviceConnections();
-        print('設備連接 (${connections.length} 個):');
-        for (final conn in connections) {
-          print('  - ${conn.deviceId} → ${conn.connectedDevicesCount} 個連接');
+        final gatewayName = await RealDataIntegrationService.getGatewayName();
+
+        // 🎯 詳細的資料流調試
+        print('\n=== 🎯 NetworkTopoView 資料載入詳情 ===');
+        print('拓樸圖設備 (${topologyDevices.length} 個 Extender):');
+        for (final device in topologyDevices) {
+          print('  📍 ${device.name} (${device.mac})');
+          print('      └─ Host 數量: ${device.additionalInfo['clients']}');
         }
 
-        final gatewayName = await RealDataIntegrationService.getGatewayName();
-        print('Gateway 名稱: $gatewayName');
+        print('\nList 視圖設備 (${listDevices.length} 個):');
+        for (final device in listDevices) {
+          print('  📍 ${device.name} (${device.mac}) [${device.additionalInfo['type']}]');
+          print('      └─ Host 數量: ${device.additionalInfo['clients']}');
+        }
 
-        print('=== 🔍 調試結束 ===\n');
+        print('\n設備連接資料 (${connections.length} 個):');
+        for (final conn in connections) {
+          print('  🔗 ${conn.deviceId} → ${conn.connectedDevicesCount} 個 Host');
+        }
+
+        print('\nGateway 名稱: $gatewayName');
+        print('=== NetworkTopoView 資料載入完成 ===\n');
 
         if (mounted) {
           setState(() {
@@ -163,18 +144,48 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
         }
 
         print('✅ 真實數據載入完成');
-        print('   拓撲圖設備: ${topologyDevices.length} 個');
-        print('   列表設備: ${listDevices.length} 個');
 
       } else {
-        // 假數據邏輯保持不變...
+        // 假數據邏輯保持不變
+        final devices = FakeDataGenerator.generateDevices(_deviceCount);
+        final connections = FakeDataGenerator.generateConnections(devices);
+
+        if (mounted) {
+          setState(() {
+            _topologyDevices = devices;
+            _listDevices = [
+              // 為假數據添加 Gateway
+              NetworkDevice(
+                name: 'Controller',
+                id: 'gateway',
+                mac: '48:21:0B:4A:46:CF',
+                ip: '192.168.1.1',
+                connectionType: ConnectionType.wired,
+                additionalInfo: {
+                  'type': 'gateway',
+                  'status': 'online',
+                  'clients': '2',
+                },
+              ),
+              ...devices,
+            ];
+            _currentConnections = connections;
+            _gatewayName = 'Controller';
+            _isLoadingData = false;
+          });
+        }
+
+        print('✅ 假數據載入完成');
       }
     } catch (e) {
       print('❌ 載入數據時發生錯誤: $e');
-      // 錯誤處理邏輯保持不變...
+      if (mounted) {
+        setState(() {
+          _isLoadingData = false;
+        });
+      }
     }
   }
-
   @override
   void dispose() {
     _deviceCountController.removeListener(_handleDeviceCountChanged);

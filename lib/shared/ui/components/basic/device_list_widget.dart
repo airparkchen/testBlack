@@ -98,55 +98,74 @@ class DeviceListWidget extends StatelessWidget {
   /// 🎯 修正：建構設備圖標
   Widget _buildDeviceIcon(NetworkDevice device, bool isGateway) {
     if (isGateway) {
-      // Gateway 圖標
-      return Container(
+      // Gateway 圖標 - 約束置中
+      return SizedBox(
         width: 60,
-        height: 60,
-        child: Center(
-          child: Image.asset(
-            'assets/images/icon/router.png',
-            width: 60,
-            height: 60,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return Icon(
-                Icons.router,
-                color: Colors.white,
-                size: 25,
-              );
-            },
-          ),
+        height: 80, // 🎯 配合卡片高度調整
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center, // 🎯 垂直置中
+          crossAxisAlignment: CrossAxisAlignment.center, // 🎯 水平置中
+          children: [
+            Container(
+              width: 60, // 🎯 固定圖標容器大小
+              height: 60,
+              alignment: Alignment.center, // 🎯 容器內容置中
+              child: Image.asset(
+                'assets/images/icon/router.png',
+                width: 60,
+                height: 60,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.router,
+                    color: Colors.white,
+                    size: 40, // 🎯 調整後備圖標大小
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       );
     } else {
-      // Extender 圖標
-      return Container(
+      // Extender 圖標 - 約束置中
+      return SizedBox(
         width: 60,
-        height: 60,
-        child: Center(
-          child: ColorFiltered(
-            colorFilter: ColorFilter.mode(
-              Colors.white.withOpacity(1.0),
-              BlendMode.srcIn,
+        height: 80, // 🎯 配合卡片高度調整
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center, // 🎯 垂直置中
+          crossAxisAlignment: CrossAxisAlignment.center, // 🎯 水平置中
+          children: [
+            Container(
+              width: 50, // 🎯 固定圖標容器大小
+              height: 50,
+              alignment: Alignment.center, // 🎯 容器內容置中
+              child: ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  Colors.white.withOpacity(1.0),
+                  BlendMode.srcIn,
+                ),
+                child: Image.asset(
+                  'assets/images/icon/mesh.png',
+                  width: 60, // 🎯 調整圖標大小
+                  height: 60,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.lan,
+                      color: Colors.white.withOpacity(1.0),
+                      size: 30, // 🎯 調整後備圖標大小
+                    );
+                  },
+                ),
+              ),
             ),
-            child: Image.asset(
-              'assets/images/icon/mesh.png',
-              width: 45,
-              height: 45,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(
-                  Icons.lan,
-                  color: Colors.white.withOpacity(1.0),
-                  size: 20,
-                );
-              },
-            ),
-          ),
+          ],
         ),
       );
     }
   }
+
 
   /// 🎯 修正：建構設備資訊
   Widget _buildDeviceInfo(NetworkDevice device, bool isGateway) {
@@ -156,9 +175,11 @@ class DeviceListWidget extends StatelessWidget {
 
     if (isGateway) {
       // Gateway 資訊顯示
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
+      return SizedBox(
+          height: 80, // 🎯 配合圖標高度
+          child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             '${device.name} ${device.mac}',
@@ -166,24 +187,27 @@ class DeviceListWidget extends StatelessWidget {
               color: Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.normal,
+              height: 1.3,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             'Clients: $clientCount', // 🎯 使用正確的客戶端數量
             style: TextStyle(
               color: Colors.white.withOpacity(1.0),
               fontSize: 12,
+              height: 1.3,
             ),
           ),
         ],
-      );
+      )
+    );
     } else {
       // Extender 資訊顯示
-      return Transform.translate(
-        offset: const Offset(0, -8),
+      return SizedBox(
+        height: 80, // 🎯 配合圖標高度
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -194,16 +218,18 @@ class DeviceListWidget extends StatelessWidget {
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
+                height: 1.3,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 1),
+            const SizedBox(height: 3),
             Text(
               'IP Address: ${device.ip}',
               style: TextStyle(
                 color: Colors.white.withOpacity(1.0),
                 fontSize: 12,
+                height: 1.2,
               ),
             ),
             const SizedBox(height: 1),
@@ -211,15 +237,17 @@ class DeviceListWidget extends StatelessWidget {
               'RSSI: ${device.additionalInfo['rssi']}',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.8),
-                fontSize: 13,
+                fontSize: 11,
+                height: 1.2,
               ),
             ),
-            const SizedBox(height: 1),
+            const SizedBox(height: 2),
             Text(
               'Clients: $clientCount', // 🎯 使用正確的客戶端數量
               style: TextStyle(
                 color: Colors.white.withOpacity(0.8),
-                fontSize: 13,
+                fontSize: 11,
+                height: 1.2,
               ),
             ),
           ],

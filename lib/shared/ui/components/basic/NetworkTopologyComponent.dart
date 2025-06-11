@@ -91,9 +91,9 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   static const double kVerticalSpacing = 0.2;  // 垂直間距 (比例，0.2 = 20%)
 
   // 佈局常量 - 圓形大小
-  static const double kInternetRadius = 25.0;  // 互聯網圖標半徑
-  static const double kGatewayRadius = 35.0;   // 網關圖標半徑
-  static const double kDeviceRadius = 25.0;    // 設備圖標半徑
+  static const double kInternetRadius = 30.0;  // 互聯網圖標半徑
+  static const double kGatewayRadius = 42.0;   // 網關圖標半徑  gateway
+  static const double kDeviceRadius = 35.0;    // 設備圖標半徑
   static const double kLabelRadius = 12.0;     // 標籤圓形半徑
 
   @override
@@ -141,18 +141,44 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     );
   }
 
-  // 建構網關的獨立數字標籤
+// 修正 _buildGatewayLabel 方法，確保能正確獲取 Gateway 的連接數
   Widget _buildGatewayLabel(double containerWidth, double containerHeight) {
     final centerPosition = _calculateGatewayPosition(containerWidth, containerHeight);
-    final totalDevices = widget.totalConnectedDevices ?? widget.devices.length;
 
-    if (totalDevices <= 0) {
-      return const SizedBox.shrink(); // 返回空 Widget
+    // 🎯 修正：改為從 deviceConnections 中查找 Gateway 的連接數
+    int gatewayConnectionCount = 0;
+
+    if (widget.deviceConnections != null) {
+      // 嘗試從連接資料中找到 Gateway 的連接數
+      try {
+        // Gateway 的設備 ID 通常是 'gateway' 或以 gateway MAC 生成
+        final gatewayConnection = widget.deviceConnections!.firstWhere(
+              (conn) => conn.deviceId.contains('gateway') ||
+              conn.deviceId.contains('00037fbadbad') || // 根據 log 中的 MAC
+              conn.deviceId.toLowerCase().contains('controller'),
+          orElse: () => DeviceConnection(deviceId: '', connectedDevicesCount: 0),
+        );
+
+        gatewayConnectionCount = gatewayConnection.connectedDevicesCount;
+        print('🔍 Gateway 連接數從 DeviceConnections 獲取: $gatewayConnectionCount');
+      } catch (e) {
+        print('⚠️ 無法從 DeviceConnections 獲取 Gateway 連接數，使用預設值');
+        gatewayConnectionCount = widget.totalConnectedDevices ?? widget.devices.length;
+      }
+    } else {
+      // 如果沒有 deviceConnections，使用 totalConnectedDevices
+      gatewayConnectionCount = widget.totalConnectedDevices ?? widget.devices.length;
+    }
+
+    print('🎯 Gateway 最終顯示連接數: $gatewayConnectionCount');
+
+    if (gatewayConnectionCount <= 0) {
+      return const SizedBox.shrink();
     }
 
     return Positioned(
-      left: centerPosition.dx + (kDeviceRadius * 1) - kLabelRadius,  // 往左移一點
-      top: centerPosition.dy + (kDeviceRadius * 0.9) - kLabelRadius,   // 往上移一點
+      left: centerPosition.dx + (kDeviceRadius * 1) - kLabelRadius*1.3,
+      top: centerPosition.dy + (kDeviceRadius * 0.9) - kLabelRadius*1.1,
       child: Container(
         width: kLabelRadius * 2,
         height: kLabelRadius * 2,
@@ -162,12 +188,15 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
           border: Border.all(color: Colors.white, width: 1),
         ),
         child: Center(
-          child: Text(
-            totalDevices.toString(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+          child: Transform.translate(
+            offset: const Offset(0, -1.2),  //clients數字位置
+            child: Text(
+              gatewayConnectionCount.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -188,8 +217,8 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
 
     return Positioned(
       // 計算標籤位置：設備圓心 + 設備半徑 + 標籤偏移
-      left: centerPosition.dx + (kDeviceRadius * 0.8) - kLabelRadius,  // 往左移一點
-      top: centerPosition.dy + (kDeviceRadius * 0.8) - kLabelRadius,   // 往上移一點
+      left: centerPosition.dx + (kDeviceRadius * 0.8) - kLabelRadius*1.3,  // 往左移一點
+      top: centerPosition.dy + (kDeviceRadius * 0.8) - kLabelRadius*1.1,   // 往上移一點
       child: Container(
         width: kLabelRadius * 2,
         height: kLabelRadius * 2,
@@ -199,12 +228,15 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
           border: Border.all(color: Colors.white, width: 1), // 可選：加個白邊
         ),
         child: Center(
-          child: Text(
-            connectionCount.toString(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+          child: Transform.translate(
+            offset: const Offset(0, -1.2),
+            child: Text(
+              connectionCount.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -239,8 +271,8 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
                 height: kInternetRadius * 2,
                 child: Center(
                   child: Container(
-                    width: 16,  // 白點大小
-                    height: 16,
+                    width: 25,  // 白點大小
+                    height: 25,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -275,10 +307,9 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     );
   }
 
-  // 建構網關圖標 - 傳入實際尺寸
+// 修正 _buildGatewayIcon 方法中的點擊事件，使用正確的 Gateway 資訊
   Widget _buildGatewayIcon(double containerWidth, double containerHeight) {
     final centerPosition = _calculateGatewayPosition(containerWidth, containerHeight);
-    final totalDevices = widget.totalConnectedDevices ?? widget.devices.length;
 
     return Positioned(
       left: centerPosition.dx - kGatewayRadius,
@@ -286,15 +317,17 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
       child: GestureDetector(
         onTap: () {
           if (widget.onDeviceSelected != null) {
+            // 🎯 修正：創建正確的 Gateway 設備物件
             final gatewayDevice = NetworkDevice(
-              name: widget.gatewayName,
-              id: 'gateway',
-              mac: '48:21:0B:4A:46:CF',
+              name: widget.gatewayName, // 使用傳入的 Gateway 名稱
+              id: _getGatewayDeviceId(), // 🎯 使用正確的 Gateway ID
+              mac: _extractGatewayMacFromConnections(), // 🎯 從連接資料中提取真實 MAC
               ip: '192.168.1.1',
               connectionType: ConnectionType.wired,
               additionalInfo: {
                 'type': 'gateway',
                 'status': 'online',
+                'clients': _getGatewayConnectionCount().toString(), // 🎯 正確的客戶端數量
               },
             );
             widget.onDeviceSelected!(gatewayDevice);
@@ -310,46 +343,20 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
           child: ClipOval(
             child: Container(
               color: Colors.black.withOpacity(0),
-              child: Stack(
-                children: [
-                  Center(
-                    child: Image.asset(
-                      'assets/images/icon/router.png',
-                      width: 40,
-                      height: 40,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Icon(
-                          Icons.router,
-                          color: Colors.white,
-                          size: 25,
-                        );
-                      },
-                    ),
-                  ),
-                  // Positioned(
-                  //   right: -5,
-                  //   bottom: -5,
-                  //   child: Container(
-                  //     width: kLabelRadius * 2,
-                  //     height: kLabelRadius * 2,
-                  //     decoration: BoxDecoration(
-                  //       color: Colors.purple.withOpacity(0.7),
-                  //       shape: BoxShape.circle,
-                  //     ),
-                  //     child: Center(
-                  //       child: Text(
-                  //         totalDevices.toString(),
-                  //         style: const TextStyle(
-                  //           color: Colors.white,
-                  //           fontSize: 12,
-                  //           fontWeight: FontWeight.bold,
-                  //         ),
-                  //       ),
-                  //     ),
-                  //   ),
-                  // ),
-                ],
+              child: Center(
+                child: Image.asset(
+                  'assets/images/icon/router.png',
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.router,
+                      color: Colors.white,
+                      size: 25,
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -358,7 +365,71 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     );
   }
 
-  // 建構設備圖標 - 傳入實際尺寸
+  // 🎯 新增：輔助方法來獲取 Gateway 的正確資訊
+
+  /// 從 DeviceConnections 中提取 Gateway 的 MAC 地址
+  String _extractGatewayMacFromConnections() {
+    if (widget.deviceConnections == null) return '00:03:7f:ba:db:ad'; // 預設值
+
+    try {
+      // 查找 Gateway 的連接資料
+      final gatewayConnection = widget.deviceConnections!.firstWhere(
+            (conn) => conn.deviceId.contains('00037fbadbad'), // 根據 log 中的真實 MAC
+        orElse: () => DeviceConnection(deviceId: 'device-00037fbadbad', connectedDevicesCount: 0),
+      );
+
+      // 從 deviceId 提取 MAC 地址
+      String deviceId = gatewayConnection.deviceId;
+      if (deviceId.startsWith('device-')) {
+        String macWithoutColons = deviceId.substring(7); // 移除 'device-' 前綴
+        // 將 MAC 地址格式化為標準格式
+        if (macWithoutColons.length == 12) {
+          return macWithoutColons.replaceAllMapped(
+              RegExp(r'(.{2})'),
+                  (match) => '${match.group(1)}:'
+          ).substring(0, 17); // 移除最後一個冒號
+        }
+      }
+
+      return '00:03:7f:ba:db:ad'; // 預設值
+    } catch (e) {
+      print('⚠️ 無法提取 Gateway MAC，使用預設值: $e');
+      return '00:03:7f:ba:db:ad';
+    }
+  }
+
+  /// 獲取 Gateway 的設備 ID
+  String _getGatewayDeviceId() {
+    if (widget.deviceConnections == null) return 'device-00037fbadbad';
+
+    try {
+      final gatewayConnection = widget.deviceConnections!.firstWhere(
+            (conn) => conn.deviceId.contains('00037fbadbad'),
+        orElse: () => DeviceConnection(deviceId: 'device-00037fbadbad', connectedDevicesCount: 0),
+      );
+      return gatewayConnection.deviceId;
+    } catch (e) {
+      return 'device-00037fbadbad';
+    }
+  }
+
+  int _getGatewayConnectionCount() {
+    if (widget.deviceConnections == null) {
+      return widget.totalConnectedDevices ?? widget.devices.length;
+    }
+
+    try {
+      final gatewayConnection = widget.deviceConnections!.firstWhere(
+            (conn) => conn.deviceId.contains('00037fbadbad'),
+        orElse: () => DeviceConnection(deviceId: '', connectedDevicesCount: 0),
+      );
+      return gatewayConnection.connectedDevicesCount;
+    } catch (e) {
+      return widget.totalConnectedDevices ?? widget.devices.length;
+    }
+  }
+
+    // 建構設備圖標 - 傳入實際尺寸
   Widget _buildDeviceIcon(NetworkDevice device, double containerWidth, double containerHeight) {
     final centerPosition = _calculateDevicePosition(device, containerWidth, containerHeight);
     final connectionCount = _getDeviceConnectionCount(device.id);
@@ -402,8 +473,8 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
                       ),
                       child: Image.asset(   //裝置圖標大小
                         iconPath,
-                        width: 30,
-                        height: 30,
+                        width: 40,
+                        height: 40,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
                           return Icon(
@@ -566,7 +637,7 @@ class ConnectionLinesPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // 繪製互聯網到網關的連線
     if (showInternet && internetPosition != null) {
-      _drawConnection(canvas, internetPosition!, gatewayPosition, ConnectionType.wired);
+      _drawConnection(canvas, internetPosition!, gatewayPosition  , ConnectionType.wired);
     }
 
     // 繪製設備到網關的連線
@@ -587,14 +658,14 @@ class ConnectionLinesPainter extends CustomPainter {
     final unitX = dx / distance;
     final unitY = dy / distance;
 
-    double startRadius = 25.0; // 設備圓的半徑
-    double endRadius = 24.0;
+    double startRadius = 30.0; // 設備圓的半徑
+    double endRadius = 30.0;
 
     if (start == gatewayPosition) {
-      startRadius = 35.0; // 網關圓的半徑
+      startRadius = 42.0; // 網關圓的半徑
     }
     if (end == gatewayPosition) {
-      endRadius = 35.0;
+      endRadius = 42.0;  //gateway半徑
     }
     if (start == internetPosition) {
       startRadius = 8.0;  // 白點半徑
