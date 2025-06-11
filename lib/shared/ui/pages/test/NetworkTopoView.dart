@@ -416,7 +416,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
             CircularProgressIndicator(color: Colors.white),
             SizedBox(height: 16),
             Text(
-              '載入網路拓撲資料中...',
+              'Loading...',
               style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ],

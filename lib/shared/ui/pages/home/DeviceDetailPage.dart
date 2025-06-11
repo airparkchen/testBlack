@@ -522,7 +522,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                     CircularProgressIndicator(color: Colors.white),
                     SizedBox(height: 16),
                     Text(
-                      '載入客戶端設備中...',
+                      'Loading...',
                       style: TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ],

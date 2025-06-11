@@ -86,6 +86,7 @@ class WifiApiService {
     'wizardChangePassword': '/api/v1/user/change_password',
     // 根據 Swagger UI 更新 mesh_topology API 端點
     'meshTopology': '/api/v1/system/mesh_topology',
+
   };
 
 // 確保動態方法映射正確
