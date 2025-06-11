@@ -1,4 +1,4 @@
-// lib/shared/ui/pages/test/NetworkTopoView123.dart - 重構版本
+// lib/shared/ui/pages/test/NetworkTopoView.dart - 重構版本
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +41,7 @@ class NetworkTopoView extends StatefulWidget {
 class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProviderStateMixin {
   // ==================== 狀態變數 ====================
 
+
   // 視圖模式和導航
   String _viewMode = 'topology';
   int _selectedBottomTab = 1;
@@ -54,6 +55,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
 
   // 資料更新計時器
   Timer? _updateTimer;
+  Timer? _autoReloadTimer; //自動重新載入計時器
 
   // 主題
   final AppTheme _appTheme = AppTheme();
@@ -87,6 +89,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     _loadData();
     // 啟動數據更新
     _startDataUpdates();
+    //啟動自動重新載入
+    if (NetworkTopoConfig.enableAutoReload) {
+      _startAutoReload();
+    }
   }
 
   /// 新增：異步載入數據的方法
@@ -191,9 +197,45 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     _deviceCountController.removeListener(_handleDeviceCountChanged);
     _deviceCountController.dispose();
     _updateTimer?.cancel();
+    _autoReloadTimer?.cancel();
     _animationController.dispose();
     super.dispose();
   }
+
+  /// 啟動自動重新載入計時器
+  void _startAutoReload() {
+    _autoReloadTimer?.cancel();
+
+    print('🔄 啟動自動重新載入，間隔: ${NetworkTopoConfig.autoReloadIntervalSeconds} 秒');
+
+    _autoReloadTimer = Timer.periodic(NetworkTopoConfig.autoReloadInterval, (_) {
+      if (mounted && NetworkTopoConfig.useRealData) {
+        print('⏰ 自動重新載入觸發');
+        _forceReloadData();
+      }
+    });
+  }
+
+  /// 新增：強制重新載入數據
+  Future<void> _forceReloadData() async {
+    if (!mounted) return;
+
+    try {
+      print('🔄 執行強制重新載入...');
+
+      // 清除快取並重新載入
+      await RealDataIntegrationService.forceReload();
+
+      // 重新載入當前頁面數據
+      await _loadData();
+
+      print('✅ 自動重新載入完成');
+    } catch (e) {
+      print('❌ 自動重新載入失敗: $e');
+    }
+  }
+
+
 
   // ==================== 資料管理 ====================
 
@@ -244,8 +286,8 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
 
   /// 手動重新載入數據的方法
   Future<void> _refreshData() async {
-    print('🔄 手動重新載入數據');
-    await _loadData();
+    print('🔄 手動觸發重新載入');
+    await _forceReloadData();
   }
 
   /// 處理設備選擇

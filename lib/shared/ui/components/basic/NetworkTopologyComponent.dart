@@ -271,8 +271,8 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
                 height: kInternetRadius * 2,
                 child: Center(
                   child: Container(
-                    width: 25,  // 白點大小
-                    height: 25,
+                    width: 20,  // 白點大小
+                    height: 20,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,

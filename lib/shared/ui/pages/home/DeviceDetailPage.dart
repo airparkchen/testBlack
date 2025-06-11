@@ -158,8 +158,14 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     );
   }
 
-  /// 建構頂部區域（RSSI + 返回按鈕）
+  /// 🎯 修正：建構頂部區域 - 三段式 RSSI 顏色顯示
+// 改進的 RSSI 顯示方法
+
+  /// 🎯 修正：建構頂部區域 - 三段式 RSSI 顏色顯示
   Widget _buildTopArea() {
+    // 解析 RSSI 數據
+    final rssiData = _parseRSSIData(widget.selectedDevice.additionalInfo['rssi']);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       height: 56,
@@ -168,8 +174,8 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         children: [
           // 返回按鈕（較低層級）
           Positioned(
-            left: 0,
-            top: 0,
+            left: 5,
+            top: -9,
             bottom: 0,
             child: GestureDetector(
               onTap: () {
@@ -185,24 +191,23 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                 child: Icon(
                   Icons.arrow_back_ios,
                   color: Colors.white,
-                  size: 24,
+                  size: 26,
                 ),
               ),
             ),
           ),
 
-          // RSSI 顯示（最高層級）
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 5,
-            child: Center(
+          // 🎯 修正：三段式 RSSI 顯示
+          Align(
+            alignment: Alignment.topCenter, // 在頂部區域中心
+            child: Padding(
+              padding: const EdgeInsets.only(top: 1), // 距離頂部的偏移
               child: Container(
                 width: 175,
-                height: 30,
+                height: 35, // 🎯 現在可以自由調整高度，中心位置不變
                 decoration: BoxDecoration(
-                  color: const Color(0xFF64FF00),
-                  borderRadius: BorderRadius.circular(15),
+                  color: rssiData.color,
+                  borderRadius: BorderRadius.circular(12.5), // 🎯 圓角 = height/2
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.2),
@@ -213,10 +218,10 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                 ),
                 child: Center(
                   child: Text(
-                    'RSSI : ${widget.selectedDevice.additionalInfo['rssi'] ?? '-48,-32'}',
+                    rssiData.displayText,
                     style: const TextStyle(
                       color: Colors.black,
-                      fontSize: 16,
+                      fontSize: 14, // 🎯 對應調整字體大小
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -227,6 +232,108 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         ],
       ),
     );
+  }
+
+  /// 🎯 修正：RSSI 數據解析 - 簡化為三段式顏色和指定格式
+  RSSIDisplayData _parseRSSIData(dynamic rssiValue) {
+    try {
+      if (rssiValue == null) {
+        return RSSIDisplayData(
+          displayText: 'RSSI : N/A',
+          color: const Color(0xFFFF6D2F), // 橙色（最差）
+          quality: 'Unknown',
+          primaryValue: -100,
+        );
+      }
+
+      String rssiString = rssiValue.toString();
+      List<int> rssiValues = [];
+
+      // 解析不同格式的 RSSI
+      if (rssiString.contains(',')) {
+        // 多頻段格式："0,-22,-19"
+        rssiValues = rssiString.split(',')
+            .map((s) => int.tryParse(s.trim()) ?? 0)
+            // .where((v) => v != 0) // 過濾掉 0 值
+            .toList();
+      } else {
+        // 單一數值格式：-35
+        int singleValue = int.tryParse(rssiString) ?? 0;
+        if (singleValue != 0) {
+          rssiValues.add(singleValue);
+        }
+      }
+
+      // 如果沒有有效的 RSSI 值（例如以太網路）
+      if (rssiValues.isEmpty) {
+        return RSSIDisplayData(
+          // displayText: 'RSSI : Ethernet',
+          displayText: 'RSSI : ',
+          color: const Color(0xFF2AFFC3), // 綠色（最佳）
+          quality: 'Wired',
+          primaryValue: 0,
+        );
+      }
+
+      // 🎯 按照您的需求格式化顯示：只顯示兩個主要數值
+      String displayText;
+      if (rssiValues.length >= 2) {
+        // 取前兩個數值：RSSI : -35,-16
+        displayText = 'RSSI : ${rssiValues[0]},${rssiValues[1]},${rssiValues[2]}';
+      } else if (rssiValues.length == 1) {
+        // 只有一個數值：RSSI : -35
+        displayText = 'RSSI : ${rssiValues[0]}';
+      } else {
+        displayText = 'RSSI : N/A';
+      }
+
+      // 取最強的信號作為顏色判斷依據（數值最大的，因為 RSSI 是負數）
+      int bestRSSI = rssiValues.reduce((a, b) => a > b ? a : b);
+
+      // 🎯 三段式顏色判斷
+      Color rssiColor = _getThreeStageRSSIColor(bestRSSI);
+
+      return RSSIDisplayData(
+        displayText: displayText,
+        color: rssiColor,
+        quality: _getRSSIQualityLabel(bestRSSI),
+        primaryValue: bestRSSI,
+      );
+
+    } catch (e) {
+      print('解析 RSSI 時發生錯誤: $e');
+      return RSSIDisplayData(
+        displayText: 'RSSI : Error',
+        color: const Color(0xFFFF6D2F), // 橙色（錯誤）
+        quality: 'Error',
+        primaryValue: -100,
+      );
+    }
+  }
+
+  /// 🎯 新增：三段式 RSSI 顏色判斷
+  Color _getThreeStageRSSIColor(int rssi) {
+    if (rssi >= -60) {
+      // 優秀區段：-60 以上
+      return const Color(0xFF2AFFC3); // 您指定的綠色
+    } else if (rssi >= -75) {
+      // 中等區段：-60 to -75
+      return const Color(0xFFFFE448); // 您指定的黃色
+    } else {
+      // 較差區段：-75 以下
+      return const Color(0xFFFF6D2F); // 您指定的橙色
+    }
+  }
+
+  /// 🎯 新增：簡化的品質標籤
+  String _getRSSIQualityLabel(int rssi) {
+    if (rssi >= -60) {
+      return 'Good';
+    } else if (rssi >= -75) {
+      return 'Fair';
+    } else {
+      return 'Poor';
+    }
   }
 
   /// 建構設備主要資訊區域
@@ -682,14 +789,15 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
   /// 🎯 新增：格式化 MAC 地址，截短顯示
   String _formatMacAddress(String mac) {
-    if (mac.length <= 12) return mac;
-
-    // 顯示前 3 組和後 2 組，中間用 ... 代替
-    // 例如：a2:08:5f:...:a2:d7
-    final parts = mac.split(':');
-    if (parts.length >= 5) {
-      return '${parts[0]}:${parts[1]}:${parts[2]}:...${parts[parts.length-2]}:${parts[parts.length-1]}';
-    }
+    //MAC address截斷 顯示部份
+    // if (mac.length <= 12) return mac;
+    //
+    // // 顯示前 3 組和後 2 組，中間用 ... 代替
+    // // 例如：a2:08:5f:...:a2:d7
+    // final parts = mac.split(':');
+    // if (parts.length >= 5) {
+    //   return '${parts[0]}:${parts[1]}:${parts[2]}:...${parts[parts.length-2]}:${parts[parts.length-1]}';
+    // }
 
     return mac;
   }
@@ -820,4 +928,55 @@ class ClientDevice {
         return ClientType.laptop;
     }
   }
+}
+
+/// 🎯 新增：三段式 RSSI 顏色判斷
+Color _getThreeStageRSSIColor(int rssi) {
+  if (rssi >= -60) {
+    // 優秀區段：-60 以上
+    return const Color(0xFF2AFFC3); // 您指定的綠色
+  } else if (rssi >= -75) {
+    // 中等區段：-60 to -75
+    return const Color(0xFFFFE448); // 您指定的黃色
+  } else {
+    // 較差區段：-75 以下
+    return const Color(0xFFFF6D2F); // 您指定的橙色
+  }
+}
+
+/// 🎯 新增：簡化的品質標籤
+String _getRSSIQualityLabel(int rssi) {
+  if (rssi >= -60) {
+    return 'Good';
+  } else if (rssi >= -75) {
+    return 'Fair';
+  } else {
+    return 'Poor';
+  }
+}
+
+/// 🎯 新增：RSSI 顯示數據類
+class RSSIDisplayData {
+  final String displayText;   // 顯示文字
+  final Color color;          // 背景顏色
+  final String quality;       // 品質描述
+  final int primaryValue;     // 主要 RSSI 值
+
+  RSSIDisplayData({
+    required this.displayText,
+    required this.color,
+    required this.quality,
+    required this.primaryValue,
+  });
+}
+
+/// 🎯 新增：RSSI 品質類
+class RSSIQuality {
+  final String label;  // 品質標籤
+  final Color color;   // 對應顏色
+
+  RSSIQuality({
+    required this.label,
+    required this.color,
+  });
 }

@@ -5,21 +5,39 @@ import 'package:whitebox/shared/services/mesh_data_analyzer.dart';
 import 'package:whitebox/shared/models/mesh_data_models.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
+import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 
 /// 真實數據整合服務 - 修正版本
 /// 🎯 關鍵修正：統一資料來源，確保拓樸圖和列表使用相同的數據
 class RealDataIntegrationService {
   static final MeshDataAnalyzer _analyzer = MeshDataAnalyzer();
 
-  // 快取機制
+  // 🎯 修正：使用可配置的快取時間
   static NetworkTopologyStructure? _cachedTopologyStructure;
   static DateTime? _lastFetchTime;
-  static const Duration _cacheExpiry = Duration(seconds: 30);
+
+  /// 🎯 修正：使用配置檔案中的快取時間
+  static Duration get _cacheExpiry => NetworkTopoConfig.actualCacheDuration;
 
   /// 檢查快取是否有效
   static bool _isCacheValid() {
     if (_lastFetchTime == null) return false;
-    return DateTime.now().difference(_lastFetchTime!) < _cacheExpiry;
+
+    final timeSinceLastFetch = DateTime.now().difference(_lastFetchTime!);
+    final isValid = timeSinceLastFetch < _cacheExpiry;
+
+    // 🎯 新增：詳細的快取狀態日誌
+    print('🕒 快取檢查: 上次更新 ${timeSinceLastFetch.inSeconds} 秒前, '
+        '快取期限 ${_cacheExpiry.inSeconds} 秒, 是否有效: $isValid');
+
+    return isValid;
+  }
+
+  /// 🎯 新增：強制重新載入（忽略快取）
+  static Future<NetworkTopologyStructure?> forceReload() async {
+    print('🔄 強制重新載入 Mesh 數據...');
+    clearCache();
+    return await getTopologyStructure();
   }
 
   /// 清除快取
@@ -34,11 +52,16 @@ class RealDataIntegrationService {
     try {
       // 檢查快取
       if (_isCacheValid() && _cachedTopologyStructure != null) {
-        print('📋 使用快取的 TopologyStructure 資料');
+        final secondsSinceUpdate = DateTime.now().difference(_lastFetchTime!).inSeconds;
+        print('📋 使用快取的 TopologyStructure 資料 (${secondsSinceUpdate}s 前更新)');
         return _cachedTopologyStructure;
       }
 
-      print('🌐 開始從 Mesh API 獲取拓樸結構...');
+      print('🌐 快取已過期或不存在，開始從 Mesh API 獲取拓樸結構...');
+      print('⚙️  當前快取設定: ${_cacheExpiry.inSeconds} 秒');
+
+      // 記錄 API 呼叫時間
+      final apiStartTime = DateTime.now();
 
       // 1. 獲取原始 Mesh 數據
       final meshResult = await WifiApiService.getMeshTopology();
@@ -46,41 +69,22 @@ class RealDataIntegrationService {
       // 2. 使用分析器解析詳細設備資訊
       final detailedDevices = _analyzer.analyzeDetailedDeviceInfo(meshResult);
 
-      print('=== 🎯 統一資料源調試 ===');
-      print('分析出的設備總數: ${detailedDevices.length}');
-      for (final device in detailedDevices) {
-        print('設備: ${device.deviceType} - ${device.macAddress} (${device.deviceName})');
-      }
-
       // 3. 建立拓樸結構
       final topologyStructure = _analyzer.analyzeTopologyStructure(detailedDevices);
 
-      // 更新快取
+      // 🎯 更新快取和時間戳記
       _cachedTopologyStructure = topologyStructure;
       _lastFetchTime = DateTime.now();
 
+      final apiDuration = DateTime.now().difference(apiStartTime);
+      print('✅ Mesh API 呼叫完成，耗時: ${apiDuration.inMilliseconds}ms');
+      print('📅 下次更新時間: ${DateTime.now().add(_cacheExpiry).toString().substring(11, 19)}');
+
       if (topologyStructure != null) {
-        print('✅ 成功獲取網路拓樸結構');
+        print('✅ 成功更新網路拓樸結構');
         print('   Gateway: ${topologyStructure.gateway.macAddress}');
         print('   Extenders: ${topologyStructure.extenders.length}');
         print('   Hosts: ${topologyStructure.hostDevices.length}');
-
-        // 🎯 詳細檢查 Host 分布
-        print('=== 🎯 統一 Host 分布詳情 ===');
-        final gatewayHosts = _getDirectHostDevices(topologyStructure, topologyStructure.gateway.macAddress);
-        print('Gateway (${topologyStructure.gateway.macAddress}) 直接連接的 Host: ${gatewayHosts.length} 個');
-        for (final host in gatewayHosts) {
-          print('  - ${host.getDisplayName()} (${host.macAddress})');
-        }
-
-        for (final extender in topologyStructure.extenders) {
-          final extenderHosts = _getDirectHostDevices(topologyStructure, extender.macAddress);
-          print('Extender ${extender.deviceName} (${extender.macAddress}) 直接連接的 Host: ${extenderHosts.length} 個');
-          for (final host in extenderHosts) {
-            print('  - ${host.getDisplayName()} (${host.macAddress})');
-          }
-        }
-        print('=== 統一資料檢查結束 ===');
       }
 
       return topologyStructure;
