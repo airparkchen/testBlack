@@ -134,10 +134,10 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
       );
 
       final totalConnected = gatewayConnection.connectedDevicesCount;
-      print('🎯 Gateway 總連接 Host 數: $totalConnected');
+      // print('🎯 Gateway 總連接 Host 數: $totalConnected');
       return totalConnected;
     } catch (e) {
-      print('⚠️ 無法計算總連接數，使用預設值: $e');
+      // print('⚠️ 無法計算總連接數，使用預設值: $e');
       return widget.devices.length;
     }
   }

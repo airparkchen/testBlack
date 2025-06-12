@@ -14,6 +14,19 @@ class FakeDataGenerator {
       String name = '';
       String deviceType = '';
 
+      // 新增：parentAccessPoint 邏輯
+      String parentAccessPoint = 'gateway-mac'; // 預設連接到 Gateway
+
+      // 如果是第二個設備且有多個設備，讓它連接到第一個設備（測試 Extender 間連線）
+      if (i == 1 && deviceCount >= 2) {
+        parentAccessPoint = '48:21:0B:4A:47:9B'; // 連接到第一個設備的 MAC
+      }
+      // 如果是第三個設備且有多個設備，讓它連接到第二個設備（測試鏈式連線）
+      if (i == 2 && deviceCount >= 3) {
+        parentAccessPoint = '48:21:0B:4A:47:9C'; // 連接到第二個設備的 MAC（需要修改 MAC）
+      }
+
+
       switch (i) {
         case 0:
           name = 'TV';
@@ -38,15 +51,19 @@ class FakeDataGenerator {
 
       final isWired = (name == 'Xbox');
 
+      // 🔸 為每個設備分配不同的 MAC 地址 👇
+      String macAddress = '48:21:0B:4A:47:9${String.fromCharCode(66 + i)}'; // 生成不同的 MAC
+
       final device = NetworkDevice(
         name: name,
         id: 'device-${i + 1}',
-        mac: '48:21:0B:4A:47:9B',
+        mac: macAddress, // 🔸 使用新的 MAC 地址
         ip: '192.168.1.164',
         connectionType: isWired ? ConnectionType.wired : ConnectionType.wireless,
         additionalInfo: {
-          'type': deviceType,
+          'type': 'extender', // 🔸 修改：改為 extender 以便測試
           'status': 'online',
+          'parentAccessPoint': parentAccessPoint, // 🔸 新增：父節點資訊
         },
       );
 

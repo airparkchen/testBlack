@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'dart:math' as math;
 
 /// 裝置連接資訊類別
@@ -91,9 +92,9 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   static const double kVerticalSpacing = 0.2;  // 垂直間距 (比例，0.2 = 20%)
 
   // 佈局常量 - 圓形大小
-  static const double kInternetRadius = 30.0;  // 互聯網圖標半徑
+  static const double kInternetRadius = 30.0;  // 互聯網圖標半徑 Internet
   static const double kGatewayRadius = 42.0;   // 網關圖標半徑  gateway
-  static const double kDeviceRadius = 35.0;    // 設備圖標半徑
+  static const double kDeviceRadius = 35.0;    // 設備圖標半徑 Extender
   static const double kLabelRadius = 12.0;     // 標籤圓形半徑
 
   @override
@@ -145,7 +146,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   Widget _buildGatewayLabel(double containerWidth, double containerHeight) {
     final centerPosition = _calculateGatewayPosition(containerWidth, containerHeight);
 
-    // 🎯 修正：改為從 deviceConnections 中查找 Gateway 的連接數
+    // 修正：改為從 deviceConnections 中查找 Gateway 的連接數
     int gatewayConnectionCount = 0;
 
     if (widget.deviceConnections != null) {
@@ -160,9 +161,9 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
         );
 
         gatewayConnectionCount = gatewayConnection.connectedDevicesCount;
-        print('🔍 Gateway 連接數從 DeviceConnections 獲取: $gatewayConnectionCount');
+        // print('🔍 Gateway 連接數從 DeviceConnections 獲取: $gatewayConnectionCount');
       } catch (e) {
-        print('⚠️ 無法從 DeviceConnections 獲取 Gateway 連接數，使用預設值');
+        // print('⚠️ 無法從 DeviceConnections 獲取 Gateway 連接數，使用預設值');
         gatewayConnectionCount = widget.totalConnectedDevices ?? widget.devices.length;
       }
     } else {
@@ -170,7 +171,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
       gatewayConnectionCount = widget.totalConnectedDevices ?? widget.devices.length;
     }
 
-    print('🎯 Gateway 最終顯示連接數: $gatewayConnectionCount');
+    // print(' Gateway 最終顯示連接數: $gatewayConnectionCount');
 
     if (gatewayConnectionCount <= 0) {
       return const SizedBox.shrink();
@@ -317,17 +318,17 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
       child: GestureDetector(
         onTap: () {
           if (widget.onDeviceSelected != null) {
-            // 🎯 修正：創建正確的 Gateway 設備物件
+            // 修正：創建正確的 Gateway 設備物件
             final gatewayDevice = NetworkDevice(
               name: widget.gatewayName, // 使用傳入的 Gateway 名稱
-              id: _getGatewayDeviceId(), // 🎯 使用正確的 Gateway ID
-              mac: _extractGatewayMacFromConnections(), // 🎯 從連接資料中提取真實 MAC
+              id: _getGatewayDeviceId(), // 使用正確的 Gateway ID
+              mac: _extractGatewayMacFromConnections(), // 從連接資料中提取真實 MAC
               ip: '192.168.1.1',
               connectionType: ConnectionType.wired,
               additionalInfo: {
                 'type': 'gateway',
                 'status': 'online',
-                'clients': _getGatewayConnectionCount().toString(), // 🎯 正確的客戶端數量
+                'clients': _getGatewayConnectionCount().toString(), // 正確的客戶端數量
               },
             );
             widget.onDeviceSelected!(gatewayDevice);
@@ -365,7 +366,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     );
   }
 
-  // 🎯 新增：輔助方法來獲取 Gateway 的正確資訊
+  // 新增：輔助方法來獲取 Gateway 的正確資訊
 
   /// 從 DeviceConnections 中提取 Gateway 的 MAC 地址
   String _extractGatewayMacFromConnections() {
@@ -645,6 +646,60 @@ class ConnectionLinesPainter extends CustomPainter {
       final devicePosition = _calculateDevicePosition(device);
       _drawConnection(canvas, gatewayPosition, devicePosition, device.connectionType);
     }
+
+    // 繪製 Extender 之間的連線
+    _drawExtenderToExtenderConnections(canvas, size);
+  }
+
+  /// 繪製 Extender 之間的連接線
+  void _drawExtenderToExtenderConnections(Canvas canvas, Size size) {
+    // 檢查是否啟用 Extender 間連線功能
+    if (!NetworkTopoConfig.showExtenderConnections) {
+      return; // 如果未啟用，直接返回
+    }
+
+    try {
+      for (var device in devices) {
+        // 取得設備的父節點 MAC 地址
+        final parentMAC = device.additionalInfo['parentAccessPoint']?.toString() ?? '';
+
+        // 如果沒有父節點資訊，跳過
+        if (parentMAC.isEmpty) continue;
+
+        // 尋找父設備
+        NetworkDevice? parentDevice;
+        try {
+          parentDevice = devices.firstWhere((d) => d.mac == parentMAC);
+        } catch (e) {
+          // 找不到父設備，可能是連接到 Gateway，跳過
+          continue;
+        }
+
+        // 如果父設備是 Gateway，跳過（因為 Gateway 連線已經在上面處理了）
+        if (parentDevice.additionalInfo['type'] == 'gateway') {
+          continue;
+        }
+
+        // 如果父設備是另一個 Extender，繪製連線
+        if (parentDevice.additionalInfo['type'] == 'extender') {
+          final devicePos = calculateDevicePosition(device, containerWidth, containerHeight);
+          final parentPos = calculateDevicePosition(parentDevice, containerWidth, containerHeight);
+
+          // // 使用現有的連線繪製邏輯(虛線)
+          // _drawConnection(canvas, parentPos, devicePos, device.connectionType);
+
+          // 暫時強制使用實線連接
+          _drawConnection(canvas, parentPos, devicePos, ConnectionType.wired);
+
+          // 除錯資訊（可選，用於測試）log
+          // print('🔗 繪製 Extender 間連線: ${parentDevice.name} → ${device.name}');
+        }
+      }
+    } catch (e) {
+      // 錯誤處理，避免影響整個繪製流程
+      // print('⚠️ 繪製 Extender 間連線時發生錯誤: $e');
+    }
+
   }
 
   // 繪製連接線 連接裝置的線
@@ -658,8 +713,14 @@ class ConnectionLinesPainter extends CustomPainter {
     final unitX = dx / distance;
     final unitY = dy / distance;
 
-    double startRadius = 30.0; // 設備圓的半徑
-    double endRadius = 30.0;
+    double startRadius = 35.0; // 設備圓的半徑
+    double endRadius = 35.0;
+
+    if (type == ConnectionType.wireless) {
+      // 虛線需要更短的半徑才能碰到圓圈
+      startRadius = 32.0;  // 原本 35.0，減少 3.0
+      endRadius = 28.0;    // 原本 35.0，減少 3.0
+    }
 
     if (start == gatewayPosition) {
       startRadius = 42.0; // 網關圓的半徑
@@ -700,7 +761,7 @@ class ConnectionLinesPainter extends CustomPainter {
     const gapLength = 5.0; // 虛線間隔長度
 
     final dx = end.dx - start.dx;
-    final dy = end.dy - start.dy;
+    final dy = end.dy - start.dy ;
     final distance = math.sqrt(dx * dx + dy * dy);
 
     final iterations = (distance / (dashLength + gapLength)).floor();
