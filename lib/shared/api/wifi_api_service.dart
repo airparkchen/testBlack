@@ -86,6 +86,8 @@ class WifiApiService {
     'wizardChangePassword': '/api/v1/user/change_password',
     // 根據 Swagger UI 更新 mesh_topology API 端點
     'meshTopology': '/api/v1/system/mesh_topology',
+    // 新增 Dashboard API
+    'systemDashboard': '/api/v1/system/dashboard',
 
   };
 
@@ -103,6 +105,8 @@ class WifiApiService {
     'updateWizardChangePassword': (data) => _put(_endpoints['wizardChangePassword'] ?? '', data),
     // 添加 mesh topology 相關方法
     'getMeshTopology': () => _get(_endpoints['meshTopology'] ?? ''),
+    // 新增 Dashboard API 方法
+    'getSystemDashboard': () => _get(_endpoints['systemDashboard'] ?? ''),
   };
 
   /// 設置 JWT Token
@@ -1239,6 +1243,34 @@ class WifiApiService {
         success: false,
         message: '首次登入過程中發生錯誤: $e',
       );
+    }
+  }
+  /// 獲取系統 Dashboard 資料
+  static Future<Map<String, dynamic>> getSystemDashboard() async {
+    try {
+      print('🌐 正在獲取系統 Dashboard 資料...');
+
+      final response = await _get(_endpoints['systemDashboard']!);
+
+      if (response.containsKey('error')) {
+        print('❌ Dashboard API 錯誤: ${response['error']}');
+        return response;
+      }
+
+      print('✅ Dashboard 資料獲取成功');
+      // 印出主要資料結構供調試
+      if (response.containsKey('vaps')) {
+        print('📡 WiFi VAPs 數量: ${(response['vaps'] as List).length}');
+      }
+      if (response.containsKey('wan')) {
+        print('🌐 WAN 連接數量: ${(response['wan'] as List).length}');
+      }
+
+      return response;
+
+    } catch (e) {
+      print('❌ 獲取 Dashboard 資料時發生錯誤: $e');
+      return {'error': '獲取 Dashboard 資料失敗: $e'};
     }
   }
 }

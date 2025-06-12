@@ -1,11 +1,13 @@
-// lib/shared/ui/components/basic/DashboardComponent.dart
+// lib/shared/ui/components/basic/DashboardComponent.dart - 最小修改版本
 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
+import 'package:whitebox/shared/models/dashboard_data_models.dart';
+import 'package:whitebox/shared/services/dashboard_data_service.dart';
 
 class DashboardComponent extends StatefulWidget {
-  // ==================== 配置參數 ====================
+  // ==================== 保持原有的所有參數 ====================
 
   // 分頁相關配置
   final int totalPages;
@@ -19,7 +21,7 @@ class DashboardComponent extends StatefulWidget {
   final double? width;
   final double? height;
 
-  // 資料相關 - 模擬三頁不同的網路狀態資料
+  // 資料相關 - 保留原本的參數
   final List<EthernetPageData>? ethernetPages;
 
   // 自動切換配置（預設停用）
@@ -48,7 +50,7 @@ class DashboardComponent extends StatefulWidget {
 class _DashboardComponentState extends State<DashboardComponent>
     with TickerProviderStateMixin {
 
-  // ==================== 狀態變數 ====================
+  // ==================== 保持原有的狀態變數 ====================
 
   // 當前分頁索引
   late int _currentPageIndex;
@@ -69,7 +71,11 @@ class _DashboardComponentState extends State<DashboardComponent>
   // 捲動控制器
   final ScrollController _scrollController = ScrollController();
 
-  // ==================== 生命週期方法 ====================
+  // 新增：API 資料狀態（不影響原有架構）
+  bool _isLoadingApiData = false;
+  DashboardData? _apiData;
+
+  // ==================== 保持原有的生命週期方法 ====================
 
   @override
   void initState() {
@@ -91,6 +97,9 @@ class _DashboardComponentState extends State<DashboardComponent>
       curve: Curves.easeInOut,
     ));
 
+    // 新增：載入 API 資料（不阻塞原有流程）
+    _loadApiData();
+
     // 啟動動畫
     _fadeAnimationController.forward();
 
@@ -109,7 +118,36 @@ class _DashboardComponentState extends State<DashboardComponent>
     super.dispose();
   }
 
-  // ==================== 自動切換邏輯 ====================
+  // ==================== 新增：API 資料載入 ====================
+
+  /// 載入 API 資料（背景載入，不影響 UI）
+  Future<void> _loadApiData() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingApiData = true;
+    });
+
+    try {
+      final data = await DashboardDataService.getDashboardData();
+      if (mounted) {
+        setState(() {
+          _apiData = data;
+          _isLoadingApiData = false;
+        });
+        print('✅ API 資料載入完成');
+      }
+    } catch (e) {
+      print('❌ API 資料載入失敗: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingApiData = false;
+        });
+      }
+    }
+  }
+
+  // ==================== 保持原有的自動切換邏輯 ====================
 
   void _startAutoSwitch() {
     _autoSwitchTimer?.cancel();
@@ -135,7 +173,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     _changePage(nextIndex);
   }
 
-  // ==================== 分頁控制方法 ====================
+  // ==================== 保持原有的分頁控制方法 ====================
 
   void _changePage(int newIndex) {
     if (newIndex != _currentPageIndex && newIndex >= 0 && newIndex < widget.totalPages) {
@@ -162,14 +200,110 @@ class _DashboardComponentState extends State<DashboardComponent>
     _restartAutoSwitch();
   }
 
-  // ==================== 資料獲取方法 ====================
+  // ==================== 修改：資料獲取方法 ====================
 
+  /// 獲取分頁資料（整合 API 和原有邏輯）
   List<EthernetPageData> _getEthernetPages() {
+    // 如果有外部傳入的資料，優先使用
     if (widget.ethernetPages != null && widget.ethernetPages!.isNotEmpty) {
       return widget.ethernetPages!;
     }
 
-    // 預設模擬資料 - 三個不同狀態的分頁
+    // 如果有 API 資料，轉換並使用
+    if (_apiData != null) {
+      return _convertApiDataToEthernetPages(_apiData!);
+    }
+
+    // 備用：使用原本的預設資料
+    return _getDefaultEthernetPages();
+  }
+
+  /// 將 API 資料轉換為原有的 EthernetPageData 格式
+  List<EthernetPageData> _convertApiDataToEthernetPages(DashboardData apiData) {
+    final pages = <EthernetPageData>[];
+
+    // 第一頁：系統狀態
+    final firstPageConnections = <EthernetConnection>[];
+
+    // Model Name
+    firstPageConnections.add(EthernetConnection(
+        speed: 'Model Name',
+        status: apiData.modelName
+    ));
+
+    // Internet Status
+    firstPageConnections.add(EthernetConnection(
+        speed: 'Internet',
+        status: apiData.internetStatus.formattedConnectionType
+    ));
+    firstPageConnections.add(EthernetConnection(
+        speed: 'Status',
+        status: apiData.internetStatus.connectionStatus
+    ));
+
+    // WiFi 頻率狀態
+    for (var freq in apiData.wifiFrequencies) {
+      firstPageConnections.add(EthernetConnection(
+          speed: freq.displayFrequency,
+          status: freq.statusText
+      ));
+    }
+
+    pages.add(EthernetPageData(
+      pageTitle: "System Status",
+      connections: firstPageConnections,
+    ));
+
+    // 第二頁：WiFi SSID
+    final secondPageConnections = <EthernetConnection>[];
+
+    for (var ssid in apiData.enabledSSIDs) {
+      final freq = _getFrequencyFromSSID(ssid);
+      secondPageConnections.add(EthernetConnection(
+          speed: freq,
+          status: ssid
+      ));
+    }
+
+    if (secondPageConnections.isEmpty) {
+      secondPageConnections.add(EthernetConnection(
+          speed: 'WiFi',
+          status: 'No enabled networks'
+      ));
+    }
+
+    pages.add(EthernetPageData(
+      pageTitle: "WiFi SSID",
+      connections: secondPageConnections,
+    ));
+
+    // 第三頁：Ethernet（只顯示標題）
+    pages.add(EthernetPageData(
+      pageTitle: "Ethernet",
+      connections: [], // 空的連接列表，只顯示標題
+    ));
+
+    return pages;
+  }
+
+  /// 從 SSID 推斷頻率
+  String _getFrequencyFromSSID(String ssid) {
+    final ssidLower = ssid.toLowerCase();
+    if (ssidLower.contains('2g') || ssidLower.contains('2.4')) {
+      return 'SSID(2.4GHz)';
+    } else if (ssidLower.contains('5g')) {
+      return 'SSID(5GHz)';
+    } else if (ssidLower.contains('6g')) {
+      return 'SSID(6GHz)';
+    } else if (ssidLower.contains('mlo')) {
+      return 'SSID(MLO)';
+    } else {
+      return 'SSID';
+    }
+  }
+
+  /// 獲取預設的分頁資料（保持原有邏輯）
+  List<EthernetPageData> _getDefaultEthernetPages() {
     return [
       EthernetPageData(
         pageTitle: "Ethernet Status - Page 1",
@@ -201,7 +335,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     ];
   }
 
-  // ==================== UI 構建方法 ====================
+  // ==================== 保持原有的 UI 構建方法 ====================
 
   @override
   Widget build(BuildContext context) {
@@ -260,18 +394,21 @@ class _DashboardComponentState extends State<DashboardComponent>
                     ),
                   ),
 
-                  // 重新整理按鈕（可選）
-                  if (widget.onRefresh != null)
-                    IconButton(
-                      onPressed: widget.onRefresh,
-                      icon: Icon(
-                        Icons.refresh,
-                        color: Colors.white.withOpacity(0.8),
-                        size: bottomInset > 0 ? 20 : 24,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                  // 重新整理按鈕
+                  IconButton(
+                    onPressed: () {
+                      // 重新載入 API 資料
+                      _loadApiData();
+                      widget.onRefresh?.call();
+                    },
+                    icon: Icon(
+                      Icons.refresh,
+                      color: Colors.white.withOpacity(0.8),
+                      size: bottomInset > 0 ? 20 : 24,
                     ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
                 ],
               ),
             ),
@@ -292,7 +429,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 分頁指示器構建 ====================
+  // ==================== 保持原有的分頁指示器構建 ====================
 
   Widget _buildPageIndicators(double bottomInset) {
     // 指示器尺寸配置
@@ -326,7 +463,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 分頁內容構建 ====================
+  // ==================== 保持原有的分頁內容構建 ====================
 
   Widget _buildPageContent(EdgeInsets contentPadding, double bottomInset) {
     final ethernetPages = _getEthernetPages();
@@ -357,7 +494,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 乙太網路分頁構建 ====================
+  // ==================== 保持原有的頁面構建方法 ====================
 
   Widget _buildEthernetPage(
       EthernetPageData pageData,
@@ -370,23 +507,39 @@ class _DashboardComponentState extends State<DashboardComponent>
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          // 分頁標題區域
-          _buildSectionTitle('Ethernet', bottomInset),
+          // 分頁標題區域（保持原有樣式）
+          _buildSectionTitle(_getSectionTitle(pageData.pageTitle), bottomInset),
           SizedBox(height: bottomInset > 0 ? 15 : 20),
 
           // 連線狀態列表
-          ...pageData.connections.asMap().entries.map((entry) {
-            int index = entry.key;
-            EthernetConnection connection = entry.value;
-            bool isLastItem = index == pageData.connections.length - 1;
+          if (pageData.connections.isNotEmpty)
+            ...pageData.connections.asMap().entries.map((entry) {
+              int index = entry.key;
+              EthernetConnection connection = entry.value;
+              bool isLastItem = index == pageData.connections.length - 1;
 
-            return Column(
-              children: [
-                _buildConnectionItem(connection, bottomInset),
-                if (!isLastItem) _buildDivider(bottomInset),
-              ],
-            );
-          }).toList(),
+              return Column(
+                children: [
+                  _buildConnectionItem(connection, bottomInset),
+                  if (!isLastItem) _buildDivider(bottomInset),
+                ],
+              );
+            }).toList(),
+
+          // 如果是第三頁（Ethernet）且沒有連接資料，顯示空狀態
+          if (pageData.connections.isEmpty && pageData.pageTitle.contains("Ethernet"))
+            Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Text(
+                  'Details hidden',
+                  style: TextStyle(
+                    fontSize: bottomInset > 0 ? 14 : 16,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                ),
+              ),
+            ),
 
           // 鍵盤彈出時的額外空間
           if (bottomInset > 0)
@@ -396,7 +549,15 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 空白分頁構建 ====================
+  /// 獲取區段標題
+  String _getSectionTitle(String pageTitle) {
+    if (pageTitle.contains("System")) return "System Status";
+    if (pageTitle.contains("WiFi")) return "WiFi";
+    if (pageTitle.contains("Ethernet")) return "Ethernet";
+    return pageTitle;
+  }
+
+  // ==================== 保持原有的 UI 元件構建方法 ====================
 
   Widget _buildEmptyPage(EdgeInsets contentPadding, double bottomInset, int pageIndex) {
     return Padding(
@@ -431,8 +592,6 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== UI 元件構建方法 ====================
-
   Widget _buildSectionTitle(String title, double bottomInset) {
     return Text(
       title,
@@ -461,15 +620,27 @@ class _DashboardComponentState extends State<DashboardComponent>
             connection.status,
             style: TextStyle(
               fontSize: bottomInset > 0 ? 14 : 16,
-              color: connection.status == "Connected"
-                  ? Colors.green.shade300
-                  : Colors.red.shade300,
+              color: _getStatusColor(connection.status),
               fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// 獲取狀態顏色
+  Color _getStatusColor(String status) {
+    final statusLower = status.toLowerCase();
+    if (statusLower.contains('connect') && !statusLower.contains('disconnect')) {
+      return Colors.green.shade300;
+    } else if (statusLower.contains('on')) {
+      return Colors.green.shade300;
+    } else if (statusLower.contains('disconnect') || statusLower.contains('off')) {
+      return Colors.red.shade300;
+    } else {
+      return Colors.white;
+    }
   }
 
   Widget _buildDivider(double bottomInset) {
@@ -484,7 +655,7 @@ class _DashboardComponentState extends State<DashboardComponent>
   }
 }
 
-// ==================== 資料模型類別 ====================
+// ==================== 保持原有的資料模型類別 ====================
 
 /// 乙太網路連線資料模型
 class EthernetConnection {

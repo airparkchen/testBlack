@@ -8,6 +8,8 @@ import 'package:whitebox/shared/ui/pages/test/NetworkTopoView.dart';
 // 在 DashboardPage.dart 頂部添加
 import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
+import 'package:whitebox/shared/models/dashboard_data_models.dart';
+import 'package:whitebox/shared/services/dashboard_data_service.dart';
 
 class DashboardPage extends StatefulWidget {
   // ==================== 配置參數 ====================
