@@ -89,6 +89,8 @@ class WifiApiService {
     'meshTopology': '/api/v1/system/mesh_topology',
     // 新增 Dashboard API
     'systemDashboard': '/api/v1/system/dashboard',
+    // 新增 Throughput API
+    'systemThroughput': '/api/v1/system/throughput',
 
   };
 
@@ -108,6 +110,8 @@ class WifiApiService {
     'getMeshTopology': () => _get(_endpoints['meshTopology'] ?? ''),
     // 新增 Dashboard API 方法
     'getSystemDashboard': () => _get(_endpoints['systemDashboard'] ?? ''),
+    // 新增 Throughput API 方法
+    'getSystemThroughput': () => _get(_endpoints['systemThroughput'] ?? ''),
   };
 
   /// 設置 JWT Token
@@ -1283,6 +1287,58 @@ class WifiApiService {
     } catch (e) {
       print('❌ 獲取 Dashboard 資料時發生錯誤: $e');
       return {'error': '獲取 Dashboard 資料失敗: $e'};
+    }
+  }
+  /// 獲取系統 Throughput 數據
+  static Future<dynamic> getSystemThroughput() async {
+    print('正在使用 HTTPS 獲取 System Throughput 數據...');
+    try {
+      final client = _createHttpClient();
+
+      try {
+        final request = await client.getUrl(Uri.parse('$baseUrl${_endpoints['systemThroughput']}'));
+
+        final headers = _getHeaders();
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+
+        final response = await request.close().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout (10 seconds)');
+          },
+        );
+
+        print('HTTPS GET 請求響應狀態碼: ${response.statusCode}');
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final responseBody = await response.transform(utf8.decoder).join();
+          if (responseBody.isNotEmpty) {
+            try {
+              final jsonData = json.decode(responseBody);
+              print('✅ System Throughput API 成功響應');
+              _printLargeJson('System Throughput 完整響應', jsonData);
+              return jsonData;
+            } catch (e) {
+              print('解析 HTTPS JSON 時出錯: $e');
+              return {'error': '解析JSON失敗', 'raw_response': responseBody};
+            }
+          } else {
+            print('HTTPS 響應體為空');
+            return {'message': '響應體為空'};
+          }
+        } else {
+          print('HTTPS GET 請求失敗: ${response.statusCode}');
+          final errorBody = await response.transform(utf8.decoder).join();
+          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
+        }
+      } finally {
+        client.close();
+      }
+    } catch (e) {
+      print('獲取 System Throughput HTTPS 時發生錯誤: $e');
+      return {'error': '獲取 System Throughput HTTPS 失敗: $e'};
     }
   }
 }

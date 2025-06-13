@@ -70,7 +70,7 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {
         return AppBackgroundWrapper(child: child ?? Container());
       },
-      home: const InitializationPage(),
+      home: const EnhancedMeshTopologyTestPage(),
     );
   }
 }

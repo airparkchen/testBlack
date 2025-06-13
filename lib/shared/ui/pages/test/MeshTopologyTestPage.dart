@@ -1,4 +1,4 @@
-// lib/shared/ui/pages/test/MeshTopologyTestPage.dart
+// lib/shared/ui/pages/test/EnhancedMeshTopologyTestPage.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
@@ -9,16 +9,16 @@ import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/models/mesh_data_models.dart';
 import 'package:whitebox/shared/services/mesh_data_analyzer.dart';
 
-/// Mesh Topology API 測試頁面
-/// 專門用於測試登入後的 mesh_topology API 功能
-class MeshTopologyTestPage extends StatefulWidget {
-  const MeshTopologyTestPage({super.key});
+/// 增強版 Mesh Topology API 測試頁面
+/// 支援測試 Mesh Topology, Dashboard, Throughput API
+class EnhancedMeshTopologyTestPage extends StatefulWidget {
+  const EnhancedMeshTopologyTestPage({super.key});
 
   @override
-  State<MeshTopologyTestPage> createState() => _MeshTopologyTestPageState();
+  State<EnhancedMeshTopologyTestPage> createState() => _EnhancedMeshTopologyTestPageState();
 }
 
-class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
+class _EnhancedMeshTopologyTestPageState extends State<EnhancedMeshTopologyTestPage> {
   // ==================== 基本狀態 ====================
 
   // 日誌和狀態
@@ -40,38 +40,35 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
   bool isAuthenticated = false;
   String? jwtToken;
 
-  // ==================== Mesh 數據狀態 ====================
+  // ==================== API 數據狀態 ====================
 
-  // 原始 Mesh API 響應
+  // 原始 API 響應數據
   dynamic rawMeshData;
+  dynamic rawDashboardData;
+  dynamic rawThroughputData;
 
-  // 解析後的設備列表
+  // 解析後的設備列表（只保留 Mesh 相關）
   List<NetworkDevice> parsedDevices = [];
   List<DeviceConnection> parsedConnections = [];
-
-  // 新增：詳細設備分析結果
   List<DetailedDeviceInfo> detailedDevices = [];
-
-  // 新增：網路拓樸連接結構
   NetworkTopologyStructure? topologyStructure;
 
   // 數據刷新計時器
   Timer? _refreshTimer;
   bool isAutoRefreshEnabled = false;
 
-  // 數據統計
-  int totalNodes = 0;
-  int totalConnectedDevices = 0;
-  Map<String, int> deviceTypeCounts = {};
-
-  // 新增：過濾統計（透過分析器獲取）
-  int get filteredExtenders => _analyzer.filteredExtenders;
-  int get filteredHosts => _analyzer.filteredHosts;
+  // API 調用計數
+  Map<String, int> apiCallCounts = {
+    'mesh': 0,
+    'dashboard': 0,
+    'throughput': 0,
+  };
 
   @override
   void initState() {
     super.initState();
-    _addLog("Mesh Topology API 測試頁面已載入");
+    _addLog("增強版 Mesh API 測試頁面已載入");
+    _addLog("支援測試: Mesh Topology, Dashboard, Throughput");
     _addLog("請先完成登入以測試 API");
   }
 
@@ -149,7 +146,7 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
         setState(() {
           isAuthenticated = true;
           jwtToken = result.jwtToken;
-          _updateStatus("✅ SRP 登入成功！可以開始測試 Mesh API");
+          _updateStatus("✅ SRP 登入成功！可以開始測試 API");
         });
 
         _addLog("✅ SRP 登入成功");
@@ -158,11 +155,7 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
           WifiApiService.setJwtToken(result.jwtToken!);
         }
 
-        // 登入成功後自動獲取一次 Mesh 數據
-        _addLog("登入成功，準備獲取 Mesh 拓撲數據...");
-        await Future.delayed(const Duration(milliseconds: 500));
-        await _getMeshTopology();
-
+        _addLog("登入成功，可以開始測試各個 API 了");
       } else {
         _updateStatus("❌ SRP 登入失敗");
         _addLog("❌ SRP 登入失敗: ${result.message}");
@@ -183,13 +176,13 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
       isAuthenticated = false;
       jwtToken = null;
       rawMeshData = null;
+      rawDashboardData = null;
+      rawThroughputData = null;
       parsedDevices = [];
       parsedConnections = [];
       detailedDevices = [];
       topologyStructure = null;
-      totalNodes = 0;
-      totalConnectedDevices = 0;
-      deviceTypeCounts = {};
+      apiCallCounts = {'mesh': 0, 'dashboard': 0, 'throughput': 0};
       _updateStatus("已登出");
     });
 
@@ -200,12 +193,12 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
     _addLog("🚪 已清除身份驗證信息並登出");
   }
 
-  // ==================== Mesh API 測試功能 ====================
+  // ==================== API 測試功能 ====================
 
   /// 獲取 Mesh 拓撲數據
   Future<void> _getMeshTopology() async {
     if (!isAuthenticated) {
-      _addLog("❌ 請先登入後再測試 API");
+      _addLog("❌ 請先登入後再測試 Mesh API");
       return;
     }
 
@@ -221,23 +214,21 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
 
       setState(() {
         rawMeshData = meshResult;
-        // 重置解析數據
-        detailedDevices = [];
-        topologyStructure = null;
+        apiCallCounts['mesh'] = (apiCallCounts['mesh'] ?? 0) + 1;
       });
 
-      _addLog("✅ Mesh API 調用完成");
+      _addLog("✅ Mesh API 調用完成 (第 ${apiCallCounts['mesh']} 次)");
+
+      // 打印完整的原始數據
+      _printRawDataToConsole("MESH_TOPOLOGY", meshResult);
+
+      // 保留原有的 Mesh 分析邏輯
       _analyzeMeshData(meshResult);
-      _parseDevicesFromMeshData(meshResult);
-
-      // 新增：詳細設備分析
       _analyzeDetailedDeviceInfo(meshResult);
-
-      // 新增：拓樸結構分析
       _analyzeTopologyStructure();
+      _parseDevicesFromMeshData(meshResult); // 確保在顯示拓撲前解析數據
 
       _updateStatus("✅ Mesh 數據獲取成功");
-
     } catch (e) {
       _addLog("❌ 獲取 Mesh 拓撲時發生錯誤: $e");
       _updateStatus("❌ Mesh API 調用失敗");
@@ -248,47 +239,140 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
     }
   }
 
-  /// 詳細設備分析（使用新模組）
-  void _analyzeDetailedDeviceInfo(dynamic meshResult) {
-    _addLog("🔍 開始詳細設備分析...");
-
-    final devices = _analyzer.analyzeDetailedDeviceInfo(meshResult);
-
-    setState(() {
-      detailedDevices = devices;
-    });
-
-    _addLog("✅ 詳細設備分析完成：找到 ${devices.length} 個有效設備");
-    _addLog("🚫 過濾統計: Extender($filteredExtenders), Host($filteredHosts)");
-
-    // 輸出詳細分析結果
-    _analyzer.printDetailedDeviceAnalysis(devices);
-  }
-
-  /// 拓樸結構分析（使用新模組）
-  void _analyzeTopologyStructure() {
-    _addLog("🌐 開始拓樸結構分析...");
-
-    final topology = _analyzer.analyzeTopologyStructure(detailedDevices);
+  /// 獲取 Dashboard 數據
+  Future<void> _getDashboard() async {
+    if (!isAuthenticated) {
+      _addLog("❌ 請先登入後再測試 Dashboard API");
+      return;
+    }
 
     setState(() {
-      topologyStructure = topology;
+      isLoading = true;
+      _updateStatus("正在獲取 Dashboard 數據...");
     });
 
-    if (topology != null) {
-      _addLog("✅ 拓樸結構分析完成");
-      _analyzer.printTopologyStructure(topology);
-    } else {
-      _addLog("❌ 拓樸結構分析失敗");
+    try {
+      _addLog("📊 開始調用 getSystemDashboard API");
+
+      final dashboardResult = await WifiApiService.getSystemDashboard();
+
+      setState(() {
+        rawDashboardData = dashboardResult;
+        apiCallCounts['dashboard'] = (apiCallCounts['dashboard'] ?? 0) + 1;
+      });
+
+      _addLog("✅ Dashboard API 調用完成 (第 ${apiCallCounts['dashboard']} 次)");
+
+      // 打印完整的原始數據
+      _printRawDataToConsole("DASHBOARD", dashboardResult);
+
+      _updateStatus("✅ Dashboard 數據獲取成功");
+    } catch (e) {
+      _addLog("❌ 獲取 Dashboard 時發生錯誤: $e");
+      _updateStatus("❌ Dashboard API 調用失敗");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
-  // ==================== 原有的分析方法（保留簡化版本） ====================
+  /// 獲取 Throughput 數據
+  Future<void> _getThroughput() async {
+    if (!isAuthenticated) {
+      _addLog("❌ 請先登入後再測試 Throughput API");
+      return;
+    }
 
-  /// 分析 Mesh 數據（簡化版本）
+    setState(() {
+      isLoading = true;
+      _updateStatus("正在獲取 Throughput 數據...");
+    });
+
+    try {
+      _addLog("📈 開始調用 Throughput API");
+      _addLog("⚠️ 注意：此 API 可能需要在 WifiApiService 中實現");
+
+      // 嘗試調用 Throughput API
+      dynamic throughputResult;
+
+      try {
+        // 🎯 您需要在 WifiApiService 中添加這個方法
+        // 暫時使用可能的方法名稱嘗試
+        throughputResult = await WifiApiService.call('getSystemThroughput');
+      } catch (e) {
+        _addLog("⚠️ getSystemThroughput 方法可能不存在，錯誤: $e");
+
+        // 如果方法不存在，可以嘗試其他可能的方法名
+        try {
+          throughputResult = await WifiApiService.call('getThroughput');
+        } catch (e2) {
+          _addLog("⚠️ getThroughput 方法也不存在，錯誤: $e2");
+
+          // 如果都不存在，記錄需要實現的 API
+          _addLog("❌ 需要在 WifiApiService 中實現 Throughput API");
+          _addLog("建議添加端點: '/api/v1/system/throughput' 或類似的");
+
+          setState(() {
+            rawThroughputData = {
+              'error': 'API not implemented',
+              'message': '需要在 WifiApiService 中實現 Throughput API',
+              'suggested_endpoint': '/api/v1/system/throughput'
+            };
+          });
+
+          _printRawDataToConsole("THROUGHPUT_ERROR", rawThroughputData);
+          _updateStatus("⚠️ Throughput API 需要實現");
+          return;
+        }
+      }
+
+      setState(() {
+        rawThroughputData = throughputResult;
+        apiCallCounts['throughput'] = (apiCallCounts['throughput'] ?? 0) + 1;
+      });
+
+      _addLog("✅ Throughput API 調用完成 (第 ${apiCallCounts['throughput']} 次)");
+
+      // 打印完整的原始數據
+      _printRawDataToConsole("THROUGHPUT", throughputResult);
+
+      _updateStatus("✅ Throughput 數據獲取成功");
+    } catch (e) {
+      _addLog("❌ 獲取 Throughput 時發生錯誤: $e");
+      _updateStatus("❌ Throughput API 調用失敗");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  /// 獲取所有 API 數據
+  Future<void> _getAllApiData() async {
+    if (!isAuthenticated) {
+      _addLog("❌ 請先登入後再測試 API");
+      return;
+    }
+
+    _addLog("🚀 開始獲取所有 API 數據...");
+
+    await _getMeshTopology();
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    await _getDashboard();
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    await _getThroughput();
+
+    _addLog("✅ 所有 API 數據獲取完成");
+  }
+
+  // ==================== 原有的 Mesh 分析方法（保持不變） ====================
+
+  /// 分析 Mesh 數據（保持原有邏輯）
   void _analyzeMeshData(dynamic meshData) {
     _addLog("📊 開始基本數據分析");
-    _printRawDataToConsole(meshData);
 
     if (meshData == null) {
       _addLog("⚠️  Mesh 數據為 null");
@@ -301,11 +385,9 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
     }
 
     if (meshData is List) {
-      setState(() {
-        totalNodes = meshData.length;
-        totalConnectedDevices = 0;
-        deviceTypeCounts = {};
-      });
+      int totalNodes = meshData.length;
+      int totalConnectedDevices = 0;
+      Map<String, int> deviceTypeCounts = {};
 
       _addLog("📋 發現 ${meshData.length} 個主要節點");
 
@@ -328,36 +410,39 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
     }
   }
 
-  /// 打印原始數據到控制台（簡化版本）
-  void _printRawDataToConsole(dynamic meshData) {
-    final timestamp = DateTime.now().toString();
+  /// 詳細設備分析（使用新模組）
+  void _analyzeDetailedDeviceInfo(dynamic meshResult) {
+    _addLog("🔍 開始詳細設備分析...");
 
-    print("");
-    print("╔═══════════════════════════════════════════════════════════════════════════════════════════════════");
-    print("║ [MESH_RAW_DATA] 原始 Mesh Topology API 響應數據");
-    print("║ 時間: $timestamp");
-    print("║ 數據類型: ${meshData.runtimeType}");
-    print("╠═══════════════════════════════════════════════════════════════════════════════════════════════════");
+    final devices = _analyzer.analyzeDetailedDeviceInfo(meshResult);
 
-    try {
-      if (meshData != null) {
-        String jsonString = JsonEncoder.withIndent('  ').convert(meshData);
+    setState(() {
+      detailedDevices = devices;
+    });
 
-        // 分段輸出，避免過長
-        List<String> lines = jsonString.split('\n');
-        for (int i = 0; i < lines.length; i++) {
-          print("║ ${lines[i]}");
-        }
-      } else {
-        print("║ null");
-      }
-    } catch (e) {
-      print("║ 無法序列化為 JSON: $e");
-      print("║ 原始數據: $meshData");
+    _addLog("✅ 詳細設備分析完成：找到 ${devices.length} 個有效設備");
+    _addLog("🚫 過濾統計: Extender(${_analyzer.filteredExtenders}), Host(${_analyzer.filteredHosts})");
+
+    // 輸出詳細分析結果
+    _analyzer.printDetailedDeviceAnalysis(devices);
+  }
+
+  /// 拓樸結構分析（使用新模組）
+  void _analyzeTopologyStructure() {
+    _addLog("🌐 開始拓樸結構分析...");
+
+    final topology = _analyzer.analyzeTopologyStructure(detailedDevices);
+
+    setState(() {
+      topologyStructure = topology;
+    });
+
+    if (topology != null) {
+      _addLog("✅ 拓樸結構分析完成");
+      _analyzer.printTopologyStructure(topology);
+    } else {
+      _addLog("❌ 拓樸結構分析失敗");
     }
-
-    print("╚═══════════════════════════════════════════════════════════════════════════════════════════════════");
-    print("");
   }
 
   /// 解析設備數據（保留原有邏輯）
@@ -419,6 +504,38 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
     return ConnectionType.wireless;
   }
 
+  /// 打印原始數據到控制台
+  void _printRawDataToConsole(String apiName, dynamic apiData) {
+    final timestamp = DateTime.now().toString();
+
+    print("");
+    print("╔═══════════════════════════════════════════════════════════════════════════════════════════════════");
+    print("║ [$apiName API] 原始響應數據");
+    print("║ 時間: $timestamp");
+    print("║ 數據類型: ${apiData.runtimeType}");
+    print("╠═══════════════════════════════════════════════════════════════════════════════════════════════════");
+
+    try {
+      if (apiData != null) {
+        String jsonString = JsonEncoder.withIndent('  ').convert(apiData);
+
+        // 分段輸出，避免過長
+        List<String> lines = jsonString.split('\n');
+        for (int i = 0; i < lines.length; i++) {
+          print("║ ${lines[i]}");
+        }
+      } else {
+        print("║ null");
+      }
+    } catch (e) {
+      print("║ 無法序列化為 JSON: $e");
+      print("║ 原始數據: $apiData");
+    }
+
+    print("╚═══════════════════════════════════════════════════════════════════════════════════════════════════");
+    print("");
+  }
+
   // ==================== 自動刷新功能 ====================
 
   /// 開始自動刷新
@@ -438,8 +555,8 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
 
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (isAuthenticated && mounted) {
-        _addLog("🔄 自動刷新 Mesh 數據...");
-        _getMeshTopology();
+        _addLog("🔄 自動刷新所有 API 數據...");
+        _getAllApiData();
       } else {
         _stopAutoRefresh();
       }
@@ -457,75 +574,31 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
 
   // ==================== 數據匯出功能 ====================
 
-  /// 匯出原始數據到剪貼板
-  void _exportRawData() {
-    if (rawMeshData == null) {
+  /// 匯出所有原始數據到剪貼板
+  void _exportAllRawData() {
+    if (!isAuthenticated) {
       _addLog("❌ 沒有可匯出的數據");
       return;
     }
 
     try {
-      final jsonString = JsonEncoder.withIndent('  ').convert(rawMeshData);
-      Clipboard.setData(ClipboardData(text: jsonString));
-      _addLog("📋 原始數據已複製到剪貼板");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('原始數據已複製到剪貼板')),
-      );
-    } catch (e) {
-      _addLog("❌ 匯出數據失敗: $e");
-    }
-  }
-
-  /// 匯出詳細分析數據
-  void _exportDetailedData() {
-    if (detailedDevices.isEmpty) {
-      _addLog("❌ 沒有可匯出的詳細數據");
-      return;
-    }
-
-    try {
       final exportData = {
-        'detailedDevices': detailedDevices.map((device) => {
-          'macAddress': device.macAddress,
-          'ipAddress': device.ipAddress,
-          'deviceType': device.deviceType,
-          'deviceName': device.deviceName,
-          'clientCount': device.clientCount,
-          'connectionInfo': {
-            'method': device.connectionInfo.method,
-            'description': device.connectionInfo.description,
-            'ssid': device.connectionInfo.ssid,
-            'radio': device.connectionInfo.radio,
-          },
-          'parentAccessPoint': device.parentAccessPoint,
-          'hops': device.hops,
-          'rssiValues': device.rssiValues,
-        }).toList(),
-        'topology': topologyStructure != null ? {
-          'gateway': topologyStructure!.gateway.macAddress,
-          'totalDevices': topologyStructure!.totalDevices,
-          'totalClients': topologyStructure!.totalClients,
-          'maxHops': topologyStructure!.maxHops,
-        } : null,
-        'statistics': {
-          'totalNodes': totalNodes,
-          'totalConnectedDevices': totalConnectedDevices,
-          'deviceTypeCounts': deviceTypeCounts,
-          'filteredExtenders': filteredExtenders,
-          'filteredHosts': filteredHosts,
-        }
+        'export_timestamp': DateTime.now().toIso8601String(),
+        'api_call_counts': apiCallCounts,
+        'mesh_topology_raw': rawMeshData,
+        'dashboard_raw': rawDashboardData,
+        'throughput_raw': rawThroughputData,
       };
 
       final jsonString = JsonEncoder.withIndent('  ').convert(exportData);
       Clipboard.setData(ClipboardData(text: jsonString));
-      _addLog("📋 詳細分析數據已複製到剪貼板");
+      _addLog("📋 所有原始 API 數據已複製到剪貼板");
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('詳細分析數據已複製到剪貼板')),
+        const SnackBar(content: Text('所有原始 API 數據已複製到剪貼板')),
       );
     } catch (e) {
-      _addLog("❌ 匯出詳細數據失敗: $e");
+      _addLog("❌ 匯出數據失敗: $e");
     }
   }
 
@@ -535,7 +608,7 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mesh Topology API 測試'),
+        title: const Text('API 測試中心 (Mesh + Dashboard + Throughput)'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         actions: [
@@ -547,8 +620,13 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
             ),
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: isLoading ? null : _getMeshTopology,
-              tooltip: '手動刷新',
+              onPressed: isLoading ? null : _getAllApiData,
+              tooltip: '刷新所有數據',
+            ),
+            IconButton(
+              icon: const Icon(Icons.file_download),
+              onPressed: _exportAllRawData,
+              tooltip: '匯出所有原始數據',
             ),
           ],
           IconButton(
@@ -571,14 +649,16 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
               // 認證區域
               if (!isAuthenticated) _buildAuthSection(),
 
-              // Mesh API 測試區域
-              if (isAuthenticated) _buildMeshTestSection(),
+              // API 測試區域
+              if (isAuthenticated) _buildApiTestSection(),
 
-              // 數據統計區域
-              if (isAuthenticated && rawMeshData != null) _buildStatisticsSection(),
+              // 統計區域
+              if (isAuthenticated) _buildStatisticsSection(),
 
-              // 數據匯出區域
-              if (isAuthenticated && rawMeshData != null) _buildExportSection(),
+              const SizedBox(height: 16),
+
+              // 拓撲圖顯示
+              if (isAuthenticated && topologyStructure != null) _buildTopologyView(),
 
               const SizedBox(height: 16),
 
@@ -618,6 +698,15 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
               textAlign: TextAlign.center,
             ),
             if (isAuthenticated) ...[
+              const SizedBox(height: 8),
+              Text(
+                'API 調用次數: Mesh(${apiCallCounts['mesh']}), Dashboard(${apiCallCounts['dashboard']}), Throughput(${apiCallCounts['throughput']})',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.green[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 8),
               ElevatedButton.icon(
                 onPressed: _logout,
@@ -689,8 +778,8 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
     );
   }
 
-  /// 建構 Mesh 測試區域
-  Widget _buildMeshTestSection() {
+  /// 建構 API 測試區域
+  Widget _buildApiTestSection() {
     return Card(
       elevation: 3,
       child: Padding(
@@ -699,31 +788,69 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '🌐 Mesh Topology API 測試',
+              '🌐 API 測試區域',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
+
+            // 第一行：Mesh 和 Dashboard
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: isLoading ? null : _getMeshTopology,
-                    icon: const Icon(Icons.download),
-                    label: Text(isLoading ? '獲取中...' : '獲取 Mesh 數據'),
+                    icon: const Icon(Icons.hub),
+                    label: Text('Mesh 拓撲\n(${apiCallCounts['mesh']} 次)'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: isAutoRefreshEnabled ? _stopAutoRefresh : _startAutoRefresh,
-                  icon: Icon(isAutoRefreshEnabled ? Icons.pause : Icons.play_arrow),
-                  label: Text(isAutoRefreshEnabled ? '停止自動刷新' : '自動刷新'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isAutoRefreshEnabled ? Colors.orange : Colors.green,
-                    foregroundColor: Colors.white,
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: isLoading ? null : _getDashboard,
+                    icon: const Icon(Icons.dashboard),
+                    label: Text('Dashboard\n(${apiCallCounts['dashboard']} 次)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // 第二行：Throughput 和 All APIs
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: isLoading ? null : _getThroughput,
+                    icon: const Icon(Icons.speed),
+                    label: Text('Throughput\n(${apiCallCounts['throughput']} 次)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: isLoading ? null : _getAllApiData,
+                    icon: const Icon(Icons.data_usage),
+                    label: const Text('取得所有 API 數據'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurpleAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                 ),
               ],
@@ -744,73 +871,122 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '📊 數據統計',
+              '📊 數據統計與分析',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard('總節點數', totalNodes.toString(), Colors.blue),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard('連接設備數', totalConnectedDevices.toString(), Colors.green),
-                ),
-              ],
+            const SizedBox(height: 16),
+            _buildStatItem('總設備數', '${detailedDevices.length} 個'),
+            _buildStatItem('主路由器 (Host)', '${_analyzer.filteredHosts} 個'),
+            _buildStatItem('延伸器 (Extender)', '${_analyzer.filteredExtenders} 個'),
+            const SizedBox(height: 8),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              'Mesh Topology 原始數據概覽:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard('詳細設備', detailedDevices.length.toString(), Colors.purple),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard('過濾設備', '${filteredExtenders + filteredHosts}', Colors.orange),
-                ),
-              ],
-            ),
+            const SizedBox(height: 8),
+            _buildRawDataSummary('Mesh Topology', rawMeshData),
+            _buildRawDataSummary('Dashboard', rawDashboardData),
+            _buildRawDataSummary('Throughput', rawThroughputData),
           ],
         ),
       ),
     );
   }
 
-  /// 建構統計卡片
-  Widget _buildStatCard(String title, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(1.0)),
-      ),
-      child: Column(
+  Widget _buildStatItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+            label,
+            style: const TextStyle(fontSize: 15),
           ),
           Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: color.withOpacity(1.0),
-            ),
-            textAlign: TextAlign.center,
+            value,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
 
-  /// 建構匯出區域
-  Widget _buildExportSection() {
+  Widget _buildRawDataSummary(String title, dynamic data) {
+    String summary;
+    Color color;
+    if (data == null) {
+      summary = '無數據';
+      color = Colors.grey;
+    } else if (data is Map && data.containsKey('error')) {
+      summary = 'API 錯誤: ${data['error']}';
+      color = Colors.red;
+    } else {
+      try {
+        summary = JsonEncoder.withIndent('  ').convert(data).substring(0, (data.toString().length > 100 ? 100 : data.toString().length)) + '...';
+        color = Colors.black87;
+      } catch (e) {
+        summary = '無法解析數據';
+        color = Colors.red;
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$title:',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            summary,
+            style: TextStyle(fontSize: 13, color: color),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  /// 建構拓撲圖顯示區域
+  Widget _buildTopologyView() {
+    if (topologyStructure == null || parsedDevices.isEmpty) {
+      return const Card(
+        elevation: 3,
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '🌐 網路拓樸圖',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+              Center(
+                child: Text(
+                  '沒有可用的拓樸數據。請先獲取 Mesh Topology 數據。',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 調整 NetworkTopologyComponent 的高度以適應內容
+    double topologyHeight = (parsedDevices.length * 80.0) + (parsedConnections.length * 40.0).clamp(200, 600);
+
+
     return Card(
       elevation: 3,
       child: Padding(
@@ -819,42 +995,23 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '📤 數據匯出',
+              '🌐 網路拓樸圖',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _exportRawData,
-                    icon: const Icon(Icons.code),
-                    label: const Text('匯出原始數據'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _exportDetailedData,
-                    icon: const Icon(Icons.analytics),
-                    label: const Text('匯出分析數據'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 16),
+            Container(
+              height: topologyHeight, // 可調整高度
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
 
   /// 建構日誌區域
   Widget _buildLogSection() {
@@ -865,87 +1022,29 @@ class _MeshTopologyTestPageState extends State<MeshTopologyTestPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '📋 測試日誌',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Row(
-                  children: [
-                    Text(
-                      '${logs.length} 條日誌',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: _clearLogs,
-                      tooltip: '清除日誌',
-                      iconSize: 20,
-                    ),
-                  ],
-                ),
-              ],
+            const Text(
+              '📜 操作日誌',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Container(
-              height: 300,
+              height: 200,
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: Colors.grey.shade700),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  itemCount: logs.length,
-                  itemBuilder: (context, index) {
-                    final log = logs[index];
-                    Color textColor = Colors.green;
-
-                    // 根據日誌內容設置不同顏色
-                    if (log.contains('❌') || log.contains('錯誤') || log.contains('失敗')) {
-                      textColor = Colors.red;
-                    } else if (log.contains('⚠️') || log.contains('警告')) {
-                      textColor = Colors.orange;
-                    } else if (log.contains('✅') || log.contains('成功')) {
-                      textColor = Colors.lightGreen;
-                    } else if (log.contains('🔐') || log.contains('🌐') || log.contains('📊')) {
-                      textColor = Colors.cyan;
-                    } else if (log.contains('🔄') || log.contains('⏹️')) {
-                      textColor = Colors.yellow;
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 1),
-                      child: Text(
-                        log,
-                        style: TextStyle(
-                          color: textColor,
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+              padding: const EdgeInsets.all(8.0),
+              child: ListView.builder(
+                controller: _scrollController,
+                itemCount: logs.length,
+                itemBuilder: (context, index) {
+                  return Text(
+                    logs[index],
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  );
+                },
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '日誌會自動滾動到最新內容。不同顏色代表不同類型的訊息：綠色(一般)、紅色(錯誤)、橙色(警告)、青色(重要操作)',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
