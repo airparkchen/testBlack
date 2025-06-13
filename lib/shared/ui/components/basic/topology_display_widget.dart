@@ -1,4 +1,4 @@
-// lib/shared/ui/components/basic/topology_display_widget.dart - 修改版本
+// lib/shared/ui/components/basic/topology_display_widget.dart - 修正版本
 
 import 'package:flutter/material.dart';
 import 'dart:ui';
@@ -11,7 +11,7 @@ import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
 /// 拓樸圖和速度圖組合組件
 class TopologyDisplayWidget extends StatefulWidget {
   final List<NetworkDevice> devices;
-  final List<DeviceConnection> connections;
+  final List<DeviceConnection> deviceConnections;  // 🔧 修正：改為 deviceConnections
   final String gatewayName;
   final bool enableInteractions;
   final Function(NetworkDevice)? onDeviceSelected;
@@ -20,7 +20,7 @@ class TopologyDisplayWidget extends StatefulWidget {
   const TopologyDisplayWidget({
     Key? key,
     required this.devices,
-    required this.connections,
+    required this.deviceConnections,  // 🔧 修正：使用正確的參數名
     required this.gatewayName,
     required this.enableInteractions,
     required this.animationController,
@@ -107,7 +107,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
               child: NetworkTopologyComponent(
                 gatewayName: widget.gatewayName,
                 devices: widget.devices,
-                deviceConnections: widget.connections,
+                deviceConnections: widget.deviceConnections,  // 🔧 修正：使用正確的參數名
                 totalConnectedDevices: _calculateTotalConnectedDevices(),
                 height: screenSize.height * NetworkTopoConfig.topologyHeightRatio,
                 onDeviceSelected: widget.enableInteractions ? widget.onDeviceSelected : null,
@@ -121,13 +121,13 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
 
   /// 動態計算總連接設備數（只計算 Host）
   int _calculateTotalConnectedDevices() {
-    if (widget.connections.isEmpty) {
-      print('⚠️ connections 為空，返回設備數量');
+    if (widget.deviceConnections.isEmpty) {  // 🔧 修正：使用正確的參數名
+      print('⚠️ deviceConnections 為空，返回設備數量');
       return widget.devices.length;
     }
 
     try {
-      final gatewayConnection = widget.connections.firstWhere(
+      final gatewayConnection = widget.deviceConnections.firstWhere(  // 🔧 修正：使用正確的參數名
             (conn) => conn.deviceId.contains('00037fbadbad') ||
             conn.deviceId.toLowerCase().contains('gateway'),
         orElse: () => DeviceConnection(deviceId: '', connectedDevicesCount: 0),
@@ -282,27 +282,22 @@ class SpeedChartWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final double currentSpeed = dataGenerator.currentSpeed.round().toDouble();
     final int speedValue = currentSpeed.toInt();
-    final double currentWidthPercentage = dataGenerator.getWidthPercentage();
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final double actualWidth = constraints.maxWidth;
         final double actualHeight = constraints.maxHeight;
-
-        if (actualWidth <= 0 || actualHeight <= 0) {
-          return const SizedBox();
-        }
-
-        // 🎯 固定在70%位置
         final double chartEndX = actualWidth * endAtPercent;
-        final double range = dataGenerator.maxSpeed - dataGenerator.minSpeed;
-        final double normalizedValue = (currentSpeed - dataGenerator.minSpeed) / range;
+
+        final double normalizedValue = (currentSpeed - dataGenerator.minSpeed) /
+            (dataGenerator.maxSpeed - dataGenerator.minSpeed);
         final double dotY = (1.0 - normalizedValue) * actualHeight;
+        final double currentWidthPercentage = dataGenerator.getWidthPercentage();
 
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            // 🎯 修改：速度曲線 - 固定長度滑動窗口模式
+            // 速度曲線
             Positioned.fill(
               child: AnimatedBuilder(
                 animation: animationController,
@@ -439,7 +434,6 @@ class RealSpeedChartWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 🎯 修改：繪製真實數據圖表（目前是預設直線）
     final double currentSpeed = dataGenerator.currentSpeed.round().toDouble();
     final int speedValue = currentSpeed.toInt();
 
@@ -447,20 +441,16 @@ class RealSpeedChartWidget extends StatelessWidget {
       builder: (context, constraints) {
         final double actualWidth = constraints.maxWidth;
         final double actualHeight = constraints.maxHeight;
-
-        if (actualWidth <= 0 || actualHeight <= 0) {
-          return const SizedBox();
-        }
-
         final double chartEndX = actualWidth * endAtPercent;
-        final double range = 150.0 - 20.0; // 使用固定範圍
-        final double normalizedValue = (currentSpeed - 20.0) / range;
+
+        final double normalizedValue = (currentSpeed - dataGenerator.minSpeed) /
+            (dataGenerator.maxSpeed - dataGenerator.minSpeed);
         final double dotY = (1.0 - normalizedValue) * actualHeight;
 
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            // 🎯 真實數據曲線（目前是預設直線）
+            // 速度曲線
             Positioned.fill(
               child: AnimatedBuilder(
                 animation: animationController,
@@ -468,8 +458,8 @@ class RealSpeedChartWidget extends StatelessWidget {
                   return CustomPaint(
                     painter: RealSpeedCurvePainter(
                       speedData: dataGenerator.data,
-                      minSpeed: 20.0,
-                      maxSpeed: 150.0,
+                      minSpeed: dataGenerator.minSpeed,
+                      maxSpeed: dataGenerator.maxSpeed,
                       animationValue: animationController.value,
                       endAtPercent: endAtPercent,
                       currentSpeed: currentSpeed,
@@ -480,7 +470,7 @@ class RealSpeedChartWidget extends StatelessWidget {
               ),
             ),
 
-            // 白點和垂直線（與假數據相同的樣式）
+            // 白點和垂直線
             if (dataGenerator.data.isNotEmpty) ...[
               // 垂直線
               Positioned(
@@ -737,68 +727,38 @@ class SpeedCurvePainter extends CustomPainter {
     // 🎯 繪製平滑曲線
     path.moveTo(points[0].dx, points[0].dy);
 
-    if (points.length > 2) {
-      // 使用貝茲曲線創建平滑效果
-      for (int i = 0; i < points.length - 2; i++) {
-        final Offset current = points[i];
-        final Offset next = points[i + 1];
-
-        // 計算控制點以創建平滑曲線
-        final double controlX1 = current.dx + (next.dx - current.dx) * 0.5;
-        final double controlY1 = current.dy;
-        final double controlX2 = next.dx - (next.dx - current.dx) * 0.5;
-        final double controlY2 = next.dy;
-
-        path.cubicTo(controlX1, controlY1, controlX2, controlY2, next.dx, next.dy);
-      }
-
-      // 連接到最後一個點
-      path.lineTo(points[points.length - 1].dx, points[points.length - 1].dy);
-    } else if (points.length == 2) {
-      // 只有兩個點時直接連線
-      path.lineTo(points[1].dx, points[1].dy);
+    for (int i = 1; i < points.length; i++) {
+      final cp1 = Offset(
+        points[i - 1].dx + (points[i].dx - points[i - 1].dx) * 0.4,
+        points[i - 1].dy,
+      );
+      final cp2 = Offset(
+        points[i - 1].dx + (points[i].dx - points[i - 1].dx) * 0.6,
+        points[i].dy,
+      );
+      path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, points[i].dx, points[i].dy);
     }
 
-    // 🎯 創建漸變色畫筆
+    // 創建漸層效果畫筆
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..shader = const LinearGradient(
         colors: [
+          Color.fromRGBO(255, 255, 255, 0.3),
           Color(0xFF00EEFF),
-          Color.fromRGBO(255, 255, 255, 0.5),
         ],
       ).createShader(Rect.fromLTWH(0, 0, chartWidth, size.height));
 
-    // 🎯 創建發光效果畫筆
+    // 添加發光效果
     final glowPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
-      ..shader = const LinearGradient(
-        colors: [
-          Color(0xFF00EEFF),
-          Color.fromRGBO(255, 255, 255, 0.5),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, chartWidth, size.height))
+      ..color = const Color(0xFF00EEFF).withOpacity(0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
 
-    // 先繪製發光效果，再繪製主線條
     canvas.drawPath(path, glowPaint);
     canvas.drawPath(path, paint);
-
-    // 🎯 調試用：可以取消註解來查看數據點位置
-    // _drawDebugPoints(canvas, points);
-  }
-
-  /// 🎯 調試用：繪製數據點（可選）
-  void _drawDebugPoints(Canvas canvas, List<Offset> points) {
-    final pointPaint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.fill;
-
-    for (final point in points) {
-      canvas.drawCircle(point, 2, pointPaint);
-    }
   }
 
   @override
@@ -806,6 +766,6 @@ class SpeedCurvePainter extends CustomPainter {
     return oldDelegate.speedData != speedData ||
         oldDelegate.animationValue != animationValue ||
         oldDelegate.currentSpeed != currentSpeed ||
-        oldDelegate.isFixedLength != isFixedLength;
+        oldDelegate.currentWidthPercentage != currentWidthPercentage;
   }
 }

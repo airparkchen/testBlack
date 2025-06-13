@@ -1,10 +1,11 @@
-// lib/shared/ui/components/basic/DashboardComponent.dart - 最小修改版本
+// lib/shared/ui/components/basic/DashboardComponent.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/services/dashboard_data_service.dart';
+import 'package:whitebox/shared/api/wifi_api_service.dart';
 
 class DashboardComponent extends StatefulWidget {
   // ==================== 保持原有的所有參數 ====================
@@ -100,6 +101,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     // 新增：載入 API 資料（不阻塞原有流程）
     _loadApiData();
 
+    _testDashboardApi;
     // 啟動動畫
     _fadeAnimationController.forward();
 
@@ -118,10 +120,49 @@ class _DashboardComponentState extends State<DashboardComponent>
     super.dispose();
   }
 
+  Future<void> _testDashboardApi() async {
+    try {
+      print('🔍 開始測試 Dashboard API...');
+      final result = await WifiApiService.getSystemDashboard();
+
+      print('✅ Dashboard API 回應:');
+      print('📄 完整回應: $result');
+
+      // 檢查關鍵資料
+      if (result.containsKey('model_name')) {
+        print('📱 Model Name: ${result['model_name']}');
+      }
+
+      if (result.containsKey('vaps')) {
+        final vaps = result['vaps'] as List;
+        print('📡 WiFi VAPs 數量: ${vaps.length}');
+        for (var vap in vaps) {
+          if (vap is Map<String, dynamic>) {
+            print('   - SSID: ${vap['ssid']}, Enabled: ${vap['vap_enabled']}, Radio: ${vap['radio_name']}');
+          }
+        }
+      }
+
+      if (result.containsKey('wan')) {
+        final wan = result['wan'] as List;
+        print('🌐 WAN 連接數量: ${wan.length}');
+        for (var wanItem in wan) {
+          if (wanItem is Map<String, dynamic>) {
+            print('   - Status: ${wanItem['connected_status']}, Type: ${wanItem['connect_type']}');
+          }
+        }
+      }
+
+    } catch (e) {
+      print('❌ Dashboard API 測試失敗: $e');
+    }
+  }
+
   // ==================== 新增：API 資料載入 ====================
 
   /// 載入 API 資料（背景載入，不影響 UI）
   Future<void> _loadApiData() async {
+    print('🔧 DEBUG: _loadApiData() 被呼叫() 被呼叫了');
     if (!mounted) return;
 
     setState(() {

@@ -432,6 +432,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       setState(() {
         _currentWirelessSettings = wirelessSettings;
         _updateStatus("無線設置已獲取");
+        print('=== _currentWirelessSettings 的完整內容 ===');
+        print(json.encode(_currentWirelessSettings));
 
         // 如果存在有效的VAP配置，使用它填充無線設置
         if (wirelessSettings.containsKey('vaps') &&
@@ -522,15 +524,14 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       // 設置VAPs數組
       List<Map<String, dynamic>> vaps = [];
 
-      // 如果已經有VAPs，保留其結構但更新值
       if (_currentWirelessSettings.containsKey('vaps') &&
           _currentWirelessSettings['vaps'] is List &&
           _currentWirelessSettings['vaps'].isNotEmpty) {
+        print("保留VAP結構，只更新值並修正數據類型");
 
         for (int i = 0; i < _currentWirelessSettings['vaps'].length; i++) {
           Map<String, dynamic> originalVap = Map<String, dynamic>.from(_currentWirelessSettings['vaps'][i]);
 
-          // 只更新第一個（主要的）VAP
           if (i == 0) {
             // 既然只支援 WPA3，固定使用 'sae' 安全類型
             String apiSecurityType = 'sae'; // WPA3 Personal
@@ -544,8 +545,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           vaps.add(originalVap);
         }
       }
-      // 如果沒有現有VAPs，創建新的結構
       else {
+        print("創建新的VAP結構");
         Map<String, dynamic> newVap = {
           'vap_index': 1,
           'vap_type': 'primary',
@@ -553,19 +554,18 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           'security_type': 'sae', // WPA3 Personal
           'ssid': ssid,
           'password': ssidPassword
+          // TODO: 未來 API 團隊會添加 band 字段支援，屆時需要在此處添加：
+          // 'band': "2g", // 或 "5g", "6g" 根據需要
         };
 
         vaps.add(newVap);
       }
 
-      // 設置VAPs數組到配置中
       wirelessConfig['vaps'] = vaps;
 
       print('即將提交的無線設置: ${json.encode(wirelessConfig)}');
 
-      // 調用API提交無線設置
       final result = await WifiApiService.updateWirelessBasic(wirelessConfig);
-
       print('無線設置更新結果: ${json.encode(result)}');
 
       setState(() {

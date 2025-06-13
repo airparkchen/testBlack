@@ -1,4 +1,4 @@
-// lib/shared/ui/pages/home/Topo/fake_data_generator.dart - 修改版本
+// lib/shared/ui/pages/home/Topo/fake_data_generator.dart - 修復後的完整檔案
 
 import 'dart:math' as math;
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
@@ -25,7 +25,6 @@ class FakeDataGenerator {
       if (i == 2 && deviceCount >= 3) {
         parentAccessPoint = '48:21:0B:4A:47:9C'; // 連接到第二個設備的 MAC（需要修改 MAC）
       }
-
 
       switch (i) {
         case 0:
@@ -89,10 +88,11 @@ class FakeDataGenerator {
     return connections;
   }
 
-  /// 創建速度數據生成器（修改為固定長度滑動窗口）
+  /// 創建速度數據生成器（修改為雙線固定長度滑動窗口）
   static SpeedDataGenerator createSpeedGenerator() {
     return SpeedDataGenerator(
-      initialSpeed: 87,
+      initialUploadSpeed: 65,
+      initialDownloadSpeed: 83,
       minSpeed: 20,
       maxSpeed: 150,
       dataPointCount: 100,
@@ -102,13 +102,18 @@ class FakeDataGenerator {
   }
 }
 
-/// 🎯 修改：速度數據生成器 - 固定長度滑動窗口模式
+/// 🎯 修改：雙線速度數據生成器 - 固定長度滑動窗口模式
 class SpeedDataGenerator {
   final int dataPointCount;
   final double minSpeed;
   final double maxSpeed;
-  final List<double> _speedData = [];
-  final List<double> _smoothedData = [];
+
+  // 🎯 修改：雙線數據存儲
+  final List<double> _uploadData = [];
+  final List<double> _downloadData = [];
+  final List<double> _uploadSmoothed = [];
+  final List<double> _downloadSmoothed = [];
+
   final math.Random _random = math.Random();
   final double smoothingFactor;
   final double fluctuationAmplitude;
@@ -121,72 +126,106 @@ class SpeedDataGenerator {
     this.dataPointCount = 100,
     this.minSpeed = 20,
     this.maxSpeed = 1000,
-    double? initialSpeed,
+    double? initialUploadSpeed,    // 🎯 修改：分別設定上傳和下載初始值
+    double? initialDownloadSpeed,
     this.smoothingFactor = 1,
     this.endAtPercent = 0.7,
     this.fluctuationAmplitude = 15.0,
     this.useFixedLengthMode = true, // 🎯 預設使用固定長度模式
   }) {
-    final initialValue = initialSpeed ?? 87.0;
+    final initialUpload = initialUploadSpeed ?? 65.0;
+    final initialDownload = initialDownloadSpeed ?? 83.0;
 
-    // 🎯 修改：初始化時就填滿整個數據陣列
+    // 🎯 修改：初始化雙線數據
     if (useFixedLengthMode) {
       // 填滿整個陣列，讓線圖一開始就顯示完整的70%長度
       for (int i = 0; i < dataPointCount; i++) {
-        // 可以添加一些小的隨機變化讓初始線條更自然
-        final variation = (_random.nextDouble() * 10) - 5; // ±5的變化
-        final value = (initialValue + variation).clamp(minSpeed, maxSpeed);
-        _speedData.add(value);
-        _smoothedData.add(value);
+        // 上傳數據（稍低一些，比如65左右）
+        final uploadVariation = (_random.nextDouble() * 8) - 4; // ±4的變化
+        final uploadValue = (initialUpload + uploadVariation).clamp(minSpeed, maxSpeed);
+
+        // 下載數據（稍高一些，比如83左右）
+        final downloadVariation = (_random.nextDouble() * 10) - 5; // ±5的變化
+        final downloadValue = (initialDownload + downloadVariation).clamp(minSpeed, maxSpeed);
+
+        _uploadData.add(uploadValue);
+        _downloadData.add(downloadValue);
+        _uploadSmoothed.add(uploadValue);
+        _downloadSmoothed.add(downloadValue);
       }
     } else {
       // 原有的逐漸增長模式
       for (int i = 0; i < 5; i++) {
-        _speedData.add(initialValue);
-        _smoothedData.add(initialValue);
+        _uploadData.add(initialUpload);
+        _downloadData.add(initialDownload);
+        _uploadSmoothed.add(initialUpload);
+        _downloadSmoothed.add(initialDownload);
       }
     }
   }
 
-  List<double> get data => List.from(_smoothedData);
-  double get currentSpeed => _smoothedData.last;
+  // 🎯 修改：新的 getter 方法
+  List<double> get uploadData => List.from(_uploadSmoothed);
+  List<double> get downloadData => List.from(_downloadSmoothed);
+  double get currentUpload => _uploadSmoothed.isNotEmpty ? _uploadSmoothed.last : 65.0;
+  double get currentDownload => _downloadSmoothed.isNotEmpty ? _downloadSmoothed.last : 83.0;
+
+  // 🎯 保留舊的方法以兼容性
+  List<double> get data => downloadData; // 向後兼容，返回下載數據
+  double get currentSpeed => currentDownload; // 向後兼容，返回下載速度
 
   // 🎯 修改：固定長度模式下總是返回 endAtPercent
   double getWidthPercentage() => useFixedLengthMode ? endAtPercent : _calculateDynamicWidth();
 
   // 原有的動態寬度計算（保留給舊模式使用）
   double _calculateDynamicWidth() {
-    return (_smoothedData.length / dataPointCount * endAtPercent).clamp(0.0, endAtPercent);
+    return (_downloadSmoothed.length / dataPointCount * endAtPercent).clamp(0.0, endAtPercent);
   }
 
-  /// 🎯 修改：更新方法 - 固定長度滑動窗口
+  /// 🎯 修改：雙線更新方法 - 固定長度滑動窗口
   void update() {
-    double newValue = _generateNextValue(_speedData.last);
+    double newUpload = _generateNextValue(_uploadData.last);
+    double newDownload = _generateNextValue(_downloadData.last);
 
     if (useFixedLengthMode) {
       // 🎯 固定長度模式：總是移除第一個元素，添加新元素到末尾
       // 這樣會產生向右滑動的效果
-      _speedData.removeAt(0);
-      _smoothedData.removeAt(0);
+      _uploadData.removeAt(0);
+      _downloadData.removeAt(0);
+      _uploadSmoothed.removeAt(0);
+      _downloadSmoothed.removeAt(0);
     } else {
       // 原有的動態增長模式
-      if (_speedData.length >= dataPointCount) {
-        _speedData.removeAt(0);
-        _smoothedData.removeAt(0);
+      if (_uploadData.length >= dataPointCount) {
+        _uploadData.removeAt(0);
+        _downloadData.removeAt(0);
+        _uploadSmoothed.removeAt(0);
+        _downloadSmoothed.removeAt(0);
       }
     }
 
-    _speedData.add(newValue);
+    _uploadData.add(newUpload);
+    _downloadData.add(newDownload);
 
-    // 平滑處理
-    double smoothedValue;
-    if (_smoothedData.isNotEmpty) {
-      smoothedValue = _smoothedData.last * smoothingFactor + newValue * (1 - smoothingFactor);
+    // 🎯 修改：分別處理上傳和下載的平滑
+    // 上傳平滑處理
+    double smoothedUpload;
+    if (_uploadSmoothed.isNotEmpty) {
+      smoothedUpload = _uploadSmoothed.last * smoothingFactor + newUpload * (1 - smoothingFactor);
     } else {
-      smoothedValue = newValue;
+      smoothedUpload = newUpload;
     }
 
-    _smoothedData.add(smoothedValue);
+    // 下載平滑處理
+    double smoothedDownload;
+    if (_downloadSmoothed.isNotEmpty) {
+      smoothedDownload = _downloadSmoothed.last * smoothingFactor + newDownload * (1 - smoothingFactor);
+    } else {
+      smoothedDownload = newDownload;
+    }
+
+    _uploadSmoothed.add(smoothedUpload);
+    _downloadSmoothed.add(smoothedDownload);
   }
 
   double _generateNextValue(double currentValue) {
@@ -210,7 +249,8 @@ class RealSpeedDataService {
   static const String speedApiEndpoint = '/api/v1/system/speed';
 
   // 快取機制
-  static double? _cachedSpeed;
+  static double? _cachedUploadSpeed;
+  static double? _cachedDownloadSpeed;
   static DateTime? _lastFetchTime;
   static const Duration _cacheExpiry = Duration(seconds: 5); // 5秒快取
 
@@ -223,83 +263,111 @@ class RealSpeedDataService {
     return DateTime.now().difference(_lastFetchTime!) < _cacheExpiry;
   }
 
-  /// 🎯 從真實 API 獲取速度數據（目前返回預設值）
-  static Future<double> getCurrentSpeed() async {
+  /// 🎯 從真實 API 獲取上傳速度數據（目前返回預設值）
+  static Future<double> getCurrentUploadSpeed() async {
     try {
       // 檢查快取
-      if (_isCacheValid() && _cachedSpeed != null) {
-        return _cachedSpeed!;
+      if (_isCacheValid() && _cachedUploadSpeed != null) {
+        return _cachedUploadSpeed!;
       }
 
       // 🎯 目前直接返回預設值，不呼叫API
       if (!isApiAvailable) {
-        final speed = 87.0;
+        final speed = 65.0;
 
         // 更新快取
-        _cachedSpeed = speed;
+        _cachedUploadSpeed = speed;
         _lastFetchTime = DateTime.now();
 
         return speed;
       }
 
       // 🎯 TODO: 將來實現真實的 API 呼叫
-      /*
-      print('🌐 從 API 獲取速度數據: $speedApiEndpoint');
-      final response = await WifiApiService.getSystemSpeed();
-      final speed = response['current_speed']?.toDouble() ?? 87.0;
-
-      // 更新快取
-      _cachedSpeed = speed;
-      _lastFetchTime = DateTime.now();
-
-      print('✅ 獲取速度數據: ${speed.toInt()} Mbps');
-      return speed;
-      */
-
-      return 87.0; // 備用預設值
+      return 65.0; // 備用預設值
 
     } catch (e) {
-      print('❌ 獲取速度數據時發生錯誤: $e');
-      return 87.0; // 返回預設值
+      print('❌ 獲取上傳速度數據時發生錯誤: $e');
+      return 65.0; // 返回預設值
+    }
+  }
+
+  /// 🎯 從真實 API 獲取下載速度數據（目前返回預設值）
+  static Future<double> getCurrentDownloadSpeed() async {
+    try {
+      // 檢查快取
+      if (_isCacheValid() && _cachedDownloadSpeed != null) {
+        return _cachedDownloadSpeed!;
+      }
+
+      // 🎯 目前直接返回預設值，不呼叫API
+      if (!isApiAvailable) {
+        final speed = 83.0;
+
+        // 更新快取
+        _cachedDownloadSpeed = speed;
+        _lastFetchTime = DateTime.now();
+
+        return speed;
+      }
+
+      // 🎯 TODO: 將來實現真實的 API 呼叫
+      return 83.0; // 備用預設值
+
+    } catch (e) {
+      print('❌ 獲取下載速度數據時發生錯誤: $e');
+      return 83.0; // 返回預設值
     }
   }
 
   /// 🎯 清除快取（用於強制重新載入）
   static void clearCache() {
-    _cachedSpeed = null;
+    _cachedUploadSpeed = null;
+    _cachedDownloadSpeed = null;
     _lastFetchTime = null;
   }
 
-  /// 🎯 獲取速度歷史數據（預留方法）
-  static Future<List<double>> getSpeedHistory({int pointCount = 100}) async {
+  /// 🎯 獲取上傳速度歷史數據（預留方法）
+  static Future<List<double>> getUploadSpeedHistory({int pointCount = 100}) async {
     try {
       // 🎯 目前直接返回預設直線，不呼叫API
       if (!isApiAvailable) {
-        final currentSpeed = await getCurrentSpeed();
+        final currentSpeed = await getCurrentUploadSpeed();
         return List.filled(pointCount, currentSpeed);
       }
 
-      // 🎯 TODO: 將來實現真實的 API 呼叫
-      /*
-      final response = await WifiApiService.getSystemSpeedHistory(pointCount);
-      return response['speed_history']?.cast<double>() ?? [];
-      */
-
-      return List.filled(pointCount, 87.0);
+      return List.filled(pointCount, 65.0);
 
     } catch (e) {
-      print('❌ 獲取速度歷史數據時發生錯誤: $e');
-      return List.filled(pointCount, 87.0);
+      print('❌ 獲取上傳速度歷史數據時發生錯誤: $e');
+      return List.filled(pointCount, 65.0);
+    }
+  }
+
+  /// 🎯 獲取下載速度歷史數據（預留方法）
+  static Future<List<double>> getDownloadSpeedHistory({int pointCount = 100}) async {
+    try {
+      // 🎯 目前直接返回預設直線，不呼叫API
+      if (!isApiAvailable) {
+        final currentSpeed = await getCurrentDownloadSpeed();
+        return List.filled(pointCount, currentSpeed);
+      }
+
+      return List.filled(pointCount, 83.0);
+
+    } catch (e) {
+      print('❌ 獲取下載速度歷史數據時發生錯誤: $e');
+      return List.filled(pointCount, 83.0);
     }
   }
 }
 
-/// 🎯 新增：真實速度數據生成器
+/// 🎯 修改：真實雙線速度數據生成器
 class RealSpeedDataGenerator {
   final int dataPointCount;
   final double minSpeed;
   final double maxSpeed;
-  final List<double> _speedData = [];
+  final List<double> _uploadData = [];
+  final List<double> _downloadData = [];
 
   // 更新間隔
   final Duration updateInterval;
@@ -313,39 +381,59 @@ class RealSpeedDataGenerator {
     _initializeData();
   }
 
-  /// 初始化數據
+  /// 初始化雙線數據
   void _initializeData() async {
     try {
-      final history = await RealSpeedDataService.getSpeedHistory(pointCount: dataPointCount);
-      _speedData.clear();
-      _speedData.addAll(history);
-      print('✅ 初始化真實速度數據: ${_speedData.length} 個點');
+      final uploadHistory = await RealSpeedDataService.getUploadSpeedHistory(pointCount: dataPointCount);
+      final downloadHistory = await RealSpeedDataService.getDownloadSpeedHistory(pointCount: dataPointCount);
+
+      _uploadData.clear();
+      _downloadData.clear();
+      _uploadData.addAll(uploadHistory);
+      _downloadData.addAll(downloadHistory);
+
+      print('✅ 初始化真實雙線速度數據: 上傳 ${_uploadData.length} 個點, 下載 ${_downloadData.length} 個點');
     } catch (e) {
-      print('❌ 初始化真實速度數據失敗: $e');
+      print('❌ 初始化真實雙線速度數據失敗: $e');
       // 使用預設直線
-      _speedData.clear();
-      _speedData.addAll(List.filled(dataPointCount, 87.0));
+      _uploadData.clear();
+      _downloadData.clear();
+      _uploadData.addAll(List.filled(dataPointCount, 65.0));
+      _downloadData.addAll(List.filled(dataPointCount, 83.0));
     }
   }
 
-  /// 更新數據
+  /// 更新雙線數據
   Future<void> update() async {
     try {
-      final newSpeed = await RealSpeedDataService.getCurrentSpeed();
+      final newUploadSpeed = await RealSpeedDataService.getCurrentUploadSpeed();
+      final newDownloadSpeed = await RealSpeedDataService.getCurrentDownloadSpeed();
 
       // 🎯 固定長度滑動窗口：移除第一個，添加新的到最後
-      if (_speedData.length >= dataPointCount) {
-        _speedData.removeAt(0);
+      if (_uploadData.length >= dataPointCount) {
+        _uploadData.removeAt(0);
       }
-      _speedData.add(newSpeed);
+      if (_downloadData.length >= dataPointCount) {
+        _downloadData.removeAt(0);
+      }
 
-      // print('📈 更新真實速度數據: ${newSpeed.toInt()} Mbps');
+      _uploadData.add(newUploadSpeed);
+      _downloadData.add(newDownloadSpeed);
+
+      // print('📈 更新真實雙線速度數據: 上傳 ${newUploadSpeed.toInt()} Mbps, 下載 ${newDownloadSpeed.toInt()} Mbps');
     } catch (e) {
-      print('❌ 更新真實速度數據失敗: $e');
+      print('❌ 更新真實雙線速度數據失敗: $e');
     }
   }
 
-  List<double> get data => List.from(_speedData);
-  double get currentSpeed => _speedData.isNotEmpty ? _speedData.last : 87.0;
+  // Getters
+  List<double> get uploadData => List.from(_uploadData);
+  List<double> get downloadData => List.from(_downloadData);
+  double get currentUpload => _uploadData.isNotEmpty ? _uploadData.last : 65.0;
+  double get currentDownload => _downloadData.isNotEmpty ? _downloadData.last : 83.0;
+
+  // 向後兼容
+  List<double> get data => downloadData;
+  double get currentSpeed => currentDownload;
   double get widthPercentage => 0.7; // 固定70%
 }

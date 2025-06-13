@@ -10,6 +10,7 @@ import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/services/dashboard_data_service.dart';
+import 'package:whitebox/shared/ui/components/basic/DashboardComponent.dart';
 
 class DashboardPage extends StatefulWidget {
   // ==================== 配置參數 ====================
@@ -896,13 +897,13 @@ class _DashboardContentComponentState extends State<DashboardContentComponent> {
   }
 
   Widget _buildContent() {
-    if (widget.isLoading && widget.ethernetPages == null) {
-      return _buildLoadingState();
-    }
-
-    if (widget.hasError && widget.ethernetPages == null) {
-      return _buildErrorState();
-    }
+    // if (widget.isLoading && widget.ethernetPages == null) {
+    //   return _buildLoadingState();
+    // }
+    //
+    // if (widget.hasError && widget.ethernetPages == null) {
+    //   return _buildErrorState();
+    // }
 
     return _buildNormalContent();
   }

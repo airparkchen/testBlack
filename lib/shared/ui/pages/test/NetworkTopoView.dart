@@ -445,7 +445,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
       return TopologyDisplayWidget(
         key: _topologyDisplayKey,
         devices: devices,
-        connections: connections,
+        deviceConnections: connections,
         gatewayName: _gatewayName,
         enableInteractions: widget.enableInteractions,
         animationController: _animationController,
