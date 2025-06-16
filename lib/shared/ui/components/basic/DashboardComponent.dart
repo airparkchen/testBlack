@@ -1,4 +1,4 @@
-// lib/shared/ui/components/basic/DashboardComponent.dart
+// lib/shared/ui/components/basic/DashboardComponent.dart - 修正版本
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -72,7 +72,7 @@ class _DashboardComponentState extends State<DashboardComponent>
   // 捲動控制器
   final ScrollController _scrollController = ScrollController();
 
-  // 新增：API 資料狀態（不影響原有架構）
+  // 修正：API 資料狀態（使用新的資料模型）
   bool _isLoadingApiData = false;
   DashboardData? _apiData;
 
@@ -98,10 +98,9 @@ class _DashboardComponentState extends State<DashboardComponent>
       curve: Curves.easeInOut,
     ));
 
-    // 新增：載入 API 資料（不阻塞原有流程）
+    // 載入 API 資料
     _loadApiData();
 
-    _testDashboardApi;
     // 啟動動畫
     _fadeAnimationController.forward();
 
@@ -120,49 +119,10 @@ class _DashboardComponentState extends State<DashboardComponent>
     super.dispose();
   }
 
-  Future<void> _testDashboardApi() async {
-    try {
-      print('🔍 開始測試 Dashboard API...');
-      final result = await WifiApiService.getSystemDashboard();
+  // ==================== 修正：API 資料載入 ====================
 
-      print('✅ Dashboard API 回應:');
-      print('📄 完整回應: $result');
-
-      // 檢查關鍵資料
-      if (result.containsKey('model_name')) {
-        print('📱 Model Name: ${result['model_name']}');
-      }
-
-      if (result.containsKey('vaps')) {
-        final vaps = result['vaps'] as List;
-        print('📡 WiFi VAPs 數量: ${vaps.length}');
-        for (var vap in vaps) {
-          if (vap is Map<String, dynamic>) {
-            print('   - SSID: ${vap['ssid']}, Enabled: ${vap['vap_enabled']}, Radio: ${vap['radio_name']}');
-          }
-        }
-      }
-
-      if (result.containsKey('wan')) {
-        final wan = result['wan'] as List;
-        print('🌐 WAN 連接數量: ${wan.length}');
-        for (var wanItem in wan) {
-          if (wanItem is Map<String, dynamic>) {
-            print('   - Status: ${wanItem['connected_status']}, Type: ${wanItem['connect_type']}');
-          }
-        }
-      }
-
-    } catch (e) {
-      print('❌ Dashboard API 測試失敗: $e');
-    }
-  }
-
-  // ==================== 新增：API 資料載入 ====================
-
-  /// 載入 API 資料（背景載入，不影響 UI）
+  /// 載入 API 資料（使用新的服務）
   Future<void> _loadApiData() async {
-    print('🔧 DEBUG: _loadApiData() 被呼叫() 被呼叫了');
     if (!mounted) return;
 
     setState(() {
@@ -170,13 +130,16 @@ class _DashboardComponentState extends State<DashboardComponent>
     });
 
     try {
-      final data = await DashboardDataService.getDashboardData();
+      final data = await DashboardDataService.getDashboardData(forceRefresh: true);
       if (mounted) {
         setState(() {
           _apiData = data;
           _isLoadingApiData = false;
         });
         print('✅ API 資料載入完成');
+
+        // 輸出解析結果（調試用）
+        DashboardDataService.printParsedData(data);
       }
     } catch (e) {
       print('❌ API 資料載入失敗: $e');
@@ -241,9 +204,9 @@ class _DashboardComponentState extends State<DashboardComponent>
     _restartAutoSwitch();
   }
 
-  // ==================== 修改：資料獲取方法 ====================
+  // ==================== 重寫：資料獲取方法 ====================
 
-  /// 獲取分頁資料（整合 API 和原有邏輯）
+  /// 獲取分頁資料（使用新的資料模型）
   List<EthernetPageData> _getEthernetPages() {
     // 如果有外部傳入的資料，優先使用
     if (widget.ethernetPages != null && widget.ethernetPages!.isNotEmpty) {
@@ -259,30 +222,32 @@ class _DashboardComponentState extends State<DashboardComponent>
     return _getDefaultEthernetPages();
   }
 
-  /// 將 API 資料轉換為原有的 EthernetPageData 格式
+  /// 重寫：將新 API 資料轉換為 EthernetPageData 格式
   List<EthernetPageData> _convertApiDataToEthernetPages(DashboardData apiData) {
     final pages = <EthernetPageData>[];
 
-    // 第一頁：系統狀態
+    // ==================== 第一頁：系統狀態 ====================
     final firstPageConnections = <EthernetConnection>[];
 
-    // Model Name
+    // Model Name（單行顯示）
     firstPageConnections.add(EthernetConnection(
         speed: 'Model Name',
         status: apiData.modelName
     ));
 
-    // Internet Status
+    // Internet（單行顯示）
     firstPageConnections.add(EthernetConnection(
         speed: 'Internet',
-        status: apiData.internetStatus.formattedConnectionType
-    ));
-    firstPageConnections.add(EthernetConnection(
-        speed: 'Status',
-        status: apiData.internetStatus.connectionStatus
+        status: apiData.internetStatus.formattedStatus
     ));
 
-    // WiFi 頻率狀態
+    // WiFi（多行顯示，標題後換行）
+    firstPageConnections.add(EthernetConnection(
+        speed: 'WiFi',
+        status: '' // 空字符串表示標題
+    ));
+
+    // WiFi 頻率狀態列表
     for (var freq in apiData.wifiFrequencies) {
       firstPageConnections.add(EthernetConnection(
           speed: freq.displayFrequency,
@@ -290,22 +255,68 @@ class _DashboardComponentState extends State<DashboardComponent>
       ));
     }
 
+    // Guest WiFi（如果啟用的話）
+    if (DashboardConfig.showGuestWiFi && apiData.guestWifiFrequencies.isNotEmpty) {
+      firstPageConnections.add(EthernetConnection(
+          speed: 'Guest WiFi',
+          status: '' // 空字符串表示標題
+      ));
+
+      for (var freq in apiData.guestWifiFrequencies) {
+        firstPageConnections.add(EthernetConnection(
+            speed: freq.displayFrequency,
+            status: freq.statusText
+        ));
+      }
+    }
+
     pages.add(EthernetPageData(
       pageTitle: "System Status",
       connections: firstPageConnections,
     ));
 
-    // 第二頁：WiFi SSID
+    // ==================== 第二頁：SSID 列表 ====================
     final secondPageConnections = <EthernetConnection>[];
 
-    for (var ssid in apiData.enabledSSIDs) {
-      final freq = _getFrequencyFromSSID(ssid);
+    // 只顯示啟用的 WiFi SSID
+    final enabledWiFiSSIDs = apiData.wifiSSIDs.where((ssid) => ssid.isEnabled).toList();
+
+    if (enabledWiFiSSIDs.isNotEmpty) {
+      // WiFi 標題
       secondPageConnections.add(EthernetConnection(
-          speed: freq,
-          status: ssid
+          speed: 'WiFi',
+          status: '' // 空字符串表示標題
       ));
+
+      // 各頻率的 SSID（按照圖片要求，SSID 名稱要換行顯示）
+      for (var ssidInfo in enabledWiFiSSIDs) {
+        secondPageConnections.add(EthernetConnection(
+            speed: ssidInfo.ssidLabel, // 例如：SSID(2.4GHz)
+            status: ssidInfo.ssid      // 例如：OWA813V_2.4G（會換行顯示）
+        ));
+      }
     }
 
+    // Guest WiFi SSID（如果啟用的話）
+    if (DashboardConfig.showGuestWiFi && apiData.guestWifiSSIDs.isNotEmpty) {
+      final enabledGuestSSIDs = apiData.guestWifiSSIDs.where((ssid) => ssid.isEnabled).toList();
+
+      if (enabledGuestSSIDs.isNotEmpty) {
+        secondPageConnections.add(EthernetConnection(
+            speed: 'Guest WiFi',
+            status: '' // 空字符串表示標題
+        ));
+
+        for (var ssidInfo in enabledGuestSSIDs) {
+          secondPageConnections.add(EthernetConnection(
+              speed: ssidInfo.ssidLabel,
+              status: ssidInfo.ssid
+          ));
+        }
+      }
+    }
+
+    // 如果沒有啟用的 SSID
     if (secondPageConnections.isEmpty) {
       secondPageConnections.add(EthernetConnection(
           speed: 'WiFi',
@@ -318,7 +329,7 @@ class _DashboardComponentState extends State<DashboardComponent>
       connections: secondPageConnections,
     ));
 
-    // 第三頁：Ethernet（只顯示標題）
+    // ==================== 第三頁：Ethernet ====================
     pages.add(EthernetPageData(
       pageTitle: "Ethernet",
       connections: [], // 空的連接列表，只顯示標題
@@ -327,56 +338,19 @@ class _DashboardComponentState extends State<DashboardComponent>
     return pages;
   }
 
-  /// 從 SSID 推斷頻率
-  String _getFrequencyFromSSID(String ssid) {
-    final ssidLower = ssid.toLowerCase();
-    if (ssidLower.contains('2g') || ssidLower.contains('2.4')) {
-      return 'SSID(2.4GHz)';
-    } else if (ssidLower.contains('5g')) {
-      return 'SSID(5GHz)';
-    } else if (ssidLower.contains('6g')) {
-      return 'SSID(6GHz)';
-    } else if (ssidLower.contains('mlo')) {
-      return 'SSID(MLO)';
-    } else {
-      return 'SSID';
-    }
-  }
-
   /// 獲取預設的分頁資料（保持原有邏輯）
   List<EthernetPageData> _getDefaultEthernetPages() {
     return [
       EthernetPageData(
-        pageTitle: "Ethernet Status - Page 1",
+        pageTitle: "Loading...",
         connections: [
-          EthernetConnection(speed: "10Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-        ],
-      ),
-      EthernetPageData(
-        pageTitle: "Ethernet Status - Page 2",
-        connections: [
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Disconnect"),
-        ],
-      ),
-      EthernetPageData(
-        pageTitle: "Ethernet Status - Page 3",
-        connections: [
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-          EthernetConnection(speed: "10Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
+          EthernetConnection(speed: "Loading", status: "Please wait..."),
         ],
       ),
     ];
   }
 
-  // ==================== 保持原有的 UI 構建方法 ====================
+  // ==================== 保持原有的 UI 構建方法（略作調整） ====================
 
   @override
   Widget build(BuildContext context) {
@@ -389,7 +363,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     double cardWidth = widget.width ?? (screenSize.width * 0.9);
     double cardHeight = widget.height ?? (screenSize.height * 0.45);
 
-    // 鍵盤彈出時調整卡片高度（參考 SummaryComponent）
+    // 鍵盤彈出時調整卡片高度
     if (bottomInset > 0) {
       cardHeight = screenSize.height - bottomInset - 190;
       cardHeight = cardHeight < 300 ? 300 : cardHeight;
@@ -473,7 +447,6 @@ class _DashboardComponentState extends State<DashboardComponent>
   // ==================== 保持原有的分頁指示器構建 ====================
 
   Widget _buildPageIndicators(double bottomInset) {
-    // 指示器尺寸配置
     final double indicatorSize = bottomInset > 0 ? 6.0 : 8.0;
     final double indicatorSpacing = bottomInset > 0 ? 12.0 : 16.0;
 
@@ -504,7 +477,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 保持原有的分頁內容構建 ====================
+  // ==================== 修正：分頁內容構建 ====================
 
   Widget _buildPageContent(EdgeInsets contentPadding, double bottomInset) {
     final ethernetPages = _getEthernetPages();
@@ -535,7 +508,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 保持原有的頁面構建方法 ====================
+  // ==================== 重寫：頁面構建方法（符合新的版面需求） ====================
 
   Widget _buildEthernetPage(
       EthernetPageData pageData,
@@ -548,12 +521,21 @@ class _DashboardComponentState extends State<DashboardComponent>
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          // 分頁標題區域（保持原有樣式）
-          _buildSectionTitle(_getSectionTitle(pageData.pageTitle), bottomInset),
-          SizedBox(height: bottomInset > 0 ? 15 : 20),
-
-          // 連線狀態列表
-          if (pageData.connections.isNotEmpty)
+          // 如果是第三頁（Ethernet）且沒有連接資料，只顯示標題
+          if (pageData.pageTitle.contains("Ethernet") && pageData.connections.isEmpty) ...[
+            _buildSectionTitle("Ethernet", bottomInset),
+            SizedBox(height: 40),
+            Center(
+              child: Text(
+                'Details hidden',
+                style: TextStyle(
+                  fontSize: bottomInset > 0 ? 14 : 16,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+              ),
+            ),
+          ] else ...[
+            // 其他頁面顯示完整內容
             ...pageData.connections.asMap().entries.map((entry) {
               int index = entry.key;
               EthernetConnection connection = entry.value;
@@ -561,26 +543,12 @@ class _DashboardComponentState extends State<DashboardComponent>
 
               return Column(
                 children: [
-                  _buildConnectionItem(connection, bottomInset),
+                  _buildConnectionItem(connection, bottomInset, index == 0),
                   if (!isLastItem) _buildDivider(bottomInset),
                 ],
               );
             }).toList(),
-
-          // 如果是第三頁（Ethernet）且沒有連接資料，顯示空狀態
-          if (pageData.connections.isEmpty && pageData.pageTitle.contains("Ethernet"))
-            Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Text(
-                  'Details hidden',
-                  style: TextStyle(
-                    fontSize: bottomInset > 0 ? 14 : 16,
-                    color: Colors.white.withOpacity(0.5),
-                  ),
-                ),
-              ),
-            ),
+          ],
 
           // 鍵盤彈出時的額外空間
           if (bottomInset > 0)
@@ -590,12 +558,94 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  /// 獲取區段標題
-  String _getSectionTitle(String pageTitle) {
-    if (pageTitle.contains("System")) return "System Status";
-    if (pageTitle.contains("WiFi")) return "WiFi";
-    if (pageTitle.contains("Ethernet")) return "Ethernet";
-    return pageTitle;
+  // ==================== 重寫：連接項目構建（符合新的版面需求） ====================
+
+  /// 修正：連接項目構建，支援標題左對齊和內容右對齊
+  Widget _buildConnectionItem(EthernetConnection connection, double bottomInset, bool isFirstItem) {
+    // 如果 status 為空，表示這是一個標題行
+    if (connection.status.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(
+          top: isFirstItem ? 0 : (bottomInset > 0 ? 15 : 20),
+          bottom: bottomInset > 0 ? 8 : 12,
+        ),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            connection.speed,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 檢查是否為單行項目（Model Name, Internet）
+    bool isSingleLineItem = _isSingleLineItem(connection.speed);
+
+    if (isSingleLineItem) {
+      // 單行項目：標題和內容在同一行
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 8 : 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              connection.speed,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            Text(
+              connection.status,
+              style: TextStyle(
+                fontSize: 16,
+                color: _getStatusColor(connection.status),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // 多行項目：內容右對齊，但在標題下方
+      return Padding(
+        padding: EdgeInsets.only(
+          left: 0, // 不縮進，保持與標題對齊
+          bottom: bottomInset > 0 ? 8 : 12,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              connection.speed,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white,
+              ),
+            ),
+            Text(
+              connection.status,
+              style: TextStyle(
+                fontSize: 16,
+                color: _getStatusColor(connection.status),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  /// 判斷是否為單行項目
+  bool _isSingleLineItem(String speed) {
+    return speed == 'Model Name' || speed == 'Internet';
   }
 
   // ==================== 保持原有的 UI 元件構建方法 ====================
@@ -621,7 +671,7 @@ class _DashboardComponentState extends State<DashboardComponent>
               ),
             ),
             Text(
-              'No data available',
+              'Loading...',
               style: TextStyle(
                 fontSize: bottomInset > 0 ? 14 : 16,
                 color: Colors.white.withOpacity(0.5),
@@ -637,35 +687,9 @@ class _DashboardComponentState extends State<DashboardComponent>
     return Text(
       title,
       style: TextStyle(
-        fontSize: bottomInset > 0 ? 16 : 18,
+        fontSize: 16,
         fontWeight: FontWeight.bold,
         color: Colors.white,
-      ),
-    );
-  }
-
-  Widget _buildConnectionItem(EthernetConnection connection, double bottomInset) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 8 : 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            connection.speed,
-            style: TextStyle(
-              fontSize: bottomInset > 0 ? 14 : 16,
-              color: Colors.white,
-            ),
-          ),
-          Text(
-            connection.status,
-            style: TextStyle(
-              fontSize: bottomInset > 0 ? 14 : 16,
-              color: _getStatusColor(connection.status),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -698,17 +722,16 @@ class _DashboardComponentState extends State<DashboardComponent>
 
 // ==================== 保持原有的資料模型類別 ====================
 
-/// 乙太網路連線資料模型
+/// 乙太網路連線資料模型（保持向後兼容）
 class EthernetConnection {
-  final String speed;    // 連線速度（如 "10Gbps", "1Gbps"）
-  final String status;   // 連線狀態（如 "Connected", "Disconnect"）
+  final String speed;    // 連線速度或標籤名稱
+  final String status;   // 連線狀態或內容
 
   const EthernetConnection({
     required this.speed,
     required this.status,
   });
 
-  // JSON 序列化支援
   factory EthernetConnection.fromJson(Map<String, dynamic> json) {
     return EthernetConnection(
       speed: json['speed'] ?? '',
@@ -729,17 +752,16 @@ class EthernetConnection {
   }
 }
 
-/// 乙太網路分頁資料模型
+/// 乙太網路分頁資料模型（保持向後兼容）
 class EthernetPageData {
-  final String pageTitle;                    // 分頁標題
-  final List<EthernetConnection> connections; // 連線列表
+  final String pageTitle;
+  final List<EthernetConnection> connections;
 
   const EthernetPageData({
     required this.pageTitle,
     required this.connections,
   });
 
-  // JSON 序列化支援
   factory EthernetPageData.fromJson(Map<String, dynamic> json) {
     var connectionsJson = json['connections'] as List? ?? [];
     List<EthernetConnection> connections = connectionsJson

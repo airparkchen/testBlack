@@ -180,35 +180,180 @@ class _DashboardPageState extends State<DashboardPage>
 
   /// 模擬 API 呼叫
   Future<List<EthernetPageData>> _fetchDashboardDataFromAPI() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      print('🌐 開始載入真實 Dashboard 資料...');
 
+      // 使用 DashboardDataService 獲取真實資料
+      final dashboardData = await DashboardDataService.getDashboardData(forceRefresh: true);
+
+      // 輸出解析結果（調試用）
+      DashboardDataService.printParsedData(dashboardData);
+
+      // 轉換為 EthernetPageData 格式
+      final pages = _convertDashboardDataToEthernetPages(dashboardData);
+
+      print('✅ 成功轉換為 ${pages.length} 個 EthernetPageData 分頁');
+      return pages;
+
+    } catch (e) {
+      print('❌ 載入真實 Dashboard 資料失敗: $e');
+
+      // 失敗時返回備用資料
+      return _getFallbackEthernetPages();
+    }
+  }
+
+  /// 將 DashboardData 轉換為 EthernetPageData 格式
+  List<EthernetPageData> _convertDashboardDataToEthernetPages(DashboardData dashboardData) {
+    final pages = <EthernetPageData>[];
+
+    // ==================== 第一頁：系統狀態 ====================
+    final firstPageConnections = <EthernetConnection>[];
+
+    // Model Name (單行右對齊)
+    firstPageConnections.add(EthernetConnection(
+      speed: 'Model Name',
+      status: dashboardData.modelName,
+    ));
+
+    // Internet (單行右對齊)
+    firstPageConnections.add(EthernetConnection(
+      speed: 'Internet',
+      status: dashboardData.internetStatus.formattedStatus,
+    ));
+
+    // WiFi (標題)
+    firstPageConnections.add(EthernetConnection(
+      speed: 'WiFi',
+      status: '', // 空值，表示這是一個標題行
+    ));
+
+    // WiFi 頻率狀態 (列表，右對齊)
+    for (var freq in dashboardData.wifiFrequencies) {
+      firstPageConnections.add(EthernetConnection(
+        speed: freq.displayFrequency,
+        status: freq.statusText,
+      ));
+    }
+
+    // Guest WiFi (如果啟用)
+    if (DashboardConfig.showGuestWiFi && dashboardData.guestWifiFrequencies.isNotEmpty) {
+      firstPageConnections.add(EthernetConnection(
+        speed: 'Guest WiFi',
+        status: '', // 標題行
+      ));
+
+      for (var freq in dashboardData.guestWifiFrequencies) {
+        firstPageConnections.add(EthernetConnection(
+          speed: freq.displayFrequency,
+          status: freq.statusText,
+        ));
+      }
+    }
+
+    pages.add(EthernetPageData(
+      pageTitle: "System Status",
+      connections: firstPageConnections,
+    ));
+
+    // ==================== 第二頁：SSID 列表 ====================
+    final secondPageConnections = <EthernetConnection>[];
+
+    // WiFi SSID (標題)
+    secondPageConnections.add(EthernetConnection(
+      speed: 'WiFi',
+      status: '', // 標題行
+    ));
+
+    // 只顯示啟用的 WiFi SSID
+    final enabledWiFiSSIDs = dashboardData.wifiSSIDs.where((ssid) => ssid.isEnabled).toList();
+    for (var ssidInfo in enabledWiFiSSIDs) {
+      secondPageConnections.add(EthernetConnection(
+        speed: ssidInfo.ssidLabel, // SSID(2.4GHz), SSID(5GHz), etc.
+        status: ssidInfo.ssid,     // 實際的 SSID 名稱
+      ));
+    }
+
+    // Guest WiFi SSID (如果啟用)
+    if (DashboardConfig.showGuestWiFi && dashboardData.guestWifiSSIDs.isNotEmpty) {
+      secondPageConnections.add(EthernetConnection(
+        speed: 'Guest WiFi',
+        status: '', // 標題行
+      ));
+
+      final enabledGuestSSIDs = dashboardData.guestWifiSSIDs.where((ssid) => ssid.isEnabled).toList();
+      for (var ssidInfo in enabledGuestSSIDs) {
+        secondPageConnections.add(EthernetConnection(
+          speed: ssidInfo.ssidLabel,
+          status: ssidInfo.ssid,
+        ));
+      }
+    }
+
+    // 如果沒有啟用的 SSID，顯示提示
+    if (secondPageConnections.length == 1) { // 只有標題
+      secondPageConnections.add(EthernetConnection(
+        speed: 'No enabled',
+        status: 'networks',
+      ));
+    }
+
+    pages.add(EthernetPageData(
+      pageTitle: "WiFi SSID",
+      connections: secondPageConnections,
+    ));
+
+    // ==================== 第三頁：Ethernet ====================
+    final thirdPageConnections = <EthernetConnection>[];
+
+    // 根據配置決定是否顯示詳細資訊
+    if (DashboardConfig.showEthernetDetails) {
+      // 如果要顯示詳細資訊，可以在這裡添加乙太網路相關的連接資料
+      thirdPageConnections.add(EthernetConnection(
+        speed: 'Port 1',
+        status: 'Connected',
+      ));
+      // ... 其他乙太網路連接
+    }
+    // 如果不顯示詳細資訊，connections 保持空列表，只顯示 "Ethernet" 標題
+
+    pages.add(EthernetPageData(
+      pageTitle: "Ethernet",
+      connections: thirdPageConnections,
+    ));
+
+    print('📋 轉換完成：');
+    print('  第一頁：${firstPageConnections.length} 個項目');
+    print('  第二頁：${secondPageConnections.length} 個項目');
+    print('  第三頁：${thirdPageConnections.length} 個項目');
+
+    return pages;
+  }
+
+  /// 備用的 EthernetPageData（API 失敗時使用）
+  List<EthernetPageData> _getFallbackEthernetPages() {
+    print('⚠️ 使用備用的 EthernetPageData');
     return [
       EthernetPageData(
-        pageTitle: "Network Status - Group 1",
+        pageTitle: "System Status",
         connections: [
-          EthernetConnection(speed: "10Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
+          EthernetConnection(speed: "Model Name", status: "API Error"),
+          EthernetConnection(speed: "Internet", status: "Unknown"),
+          EthernetConnection(speed: "WiFi", status: ""),
+          EthernetConnection(speed: "2.4GHz", status: "Unknown"),
+          EthernetConnection(speed: "5GHz", status: "Unknown"),
         ],
       ),
       EthernetPageData(
-        pageTitle: "Network Status - Group 2",
+        pageTitle: "WiFi SSID",
         connections: [
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Disconnect"),
+          EthernetConnection(speed: "WiFi", status: ""),
+          EthernetConnection(speed: "No data", status: "available"),
         ],
       ),
       EthernetPageData(
-        pageTitle: "Network Status - Group 3",
-        connections: [
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-          EthernetConnection(speed: "10Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-        ],
+        pageTitle: "Ethernet",
+        connections: [], // 空列表，只顯示標題
       ),
     ];
   }

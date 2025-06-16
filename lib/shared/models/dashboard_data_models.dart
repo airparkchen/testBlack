@@ -1,13 +1,22 @@
-// lib/shared/models/dashboard_data_models.dart
+// lib/shared/models/dashboard_data_models.dart - 重新設計版本
 
-/// Dashboard 完整資料模型
+/// Dashboard 配置類
+class DashboardConfig {
+  // Guest WiFi 顯示控制（目前關閉）
+  static const bool showGuestWiFi = false;
+
+  // Ethernet 詳細資訊顯示控制（目前關閉）
+  static const bool showEthernetDetails = false;
+}
+
+/// Dashboard 完整資料模型 - 重新設計
 class DashboardData {
   final String modelName;
   final InternetStatus internetStatus;
   final List<WiFiFrequencyStatus> wifiFrequencies;
-  final List<WiFiFrequencyStatus> guestWifiFrequencies;
-  final List<String> enabledSSIDs;
-  final List<String> enabledGuestSSIDs;
+  final List<WiFiFrequencyStatus> guestWifiFrequencies;  // 預留，目前不使用
+  final List<WiFiSSIDInfo> wifiSSIDs;                    // 第二頁用的 SSID 資訊
+  final List<WiFiSSIDInfo> guestWifiSSIDs;               // 預留，目前不使用
   final EthernetStatus ethernetStatus;
 
   DashboardData({
@@ -15,66 +24,69 @@ class DashboardData {
     required this.internetStatus,
     required this.wifiFrequencies,
     required this.guestWifiFrequencies,
-    required this.enabledSSIDs,
-    required this.enabledGuestSSIDs,
+    required this.wifiSSIDs,
+    required this.guestWifiSSIDs,
     required this.ethernetStatus,
   });
 }
 
 /// 網路連接狀態模型
 class InternetStatus {
-  final String connectionStatus;  // "Connected" / "Not Connected"
-  final String connectionType;    // "dhcp" / "static" / "pppoe"
+  final String pingStatus;        // 從 wan[0].ping_status 取得
+  final String connectionType;    // 從 /network/wan_eth 的 connection_type 取得
 
   InternetStatus({
-    required this.connectionStatus,
+    required this.pingStatus,
     required this.connectionType,
   });
 
-  /// 格式化連接類型顯示文字
-  String get formattedConnectionType {
+  /// 格式化連接顯示文字
+  String get formattedStatus {
+    // 根據 connection_type 格式化顯示
+    String typeText;
     switch (connectionType.toLowerCase()) {
       case 'dhcp':
-        return 'Connect(DHCP)';
+        typeText = 'DHCP';
+        break;
       case 'static':
-        return 'Connect(Static)';
+        typeText = 'Static';
+        break;
       case 'pppoe':
-        return 'Connect(PPPoE)';
+        typeText = 'PPPoE';
+        break;
       default:
-        return 'Connect($connectionType)';
+        typeText = connectionType;
     }
+
+    return 'Connect($typeText)';
   }
 }
 
-/// WiFi 頻率狀態模型
+/// WiFi 頻率狀態模型 - 用於第一頁
 class WiFiFrequencyStatus {
-  final String frequency;   // "2.4GHz" / "5GHz" / "6GHz" / "MLO"
-  final bool isEnabled;     // true = ON, false = OFF
-  final String? ssid;       // 對應的 SSID 名稱
+  final String radioName;     // 原始的 radio_name (wifi_2G, wifi_5G, etc.)
+  final bool isEnabled;       // vap_enabled == "ON"
+  final String ssid;          // 對應的 SSID 名稱
 
   WiFiFrequencyStatus({
-    required this.frequency,
+    required this.radioName,
     required this.isEnabled,
-    this.ssid,
+    required this.ssid,
   });
 
-  /// 格式化頻率顯示文字
+  /// 格式化頻率顯示文字 - 修正 MLO 對應
   String get displayFrequency {
-    switch (frequency.toLowerCase()) {
+    switch (radioName.toLowerCase()) {
       case 'wifi_2g':
-      case '2g':
         return '2.4GHz';
       case 'wifi_5g':
-      case '5g':
         return '5GHz';
       case 'wifi_6g':
-      case '6g':
         return '6GHz';
-      case 'wifi_mlo':
-      case 'mlo':
+      case 'wifi_mlo':           // 修正：加入 MLO 對應
         return 'MLO';
       default:
-        return frequency;
+        return radioName;
     }
   }
 
@@ -82,14 +94,46 @@ class WiFiFrequencyStatus {
   String get statusText => isEnabled ? 'ON' : 'OFF';
 }
 
-/// 乙太網路狀態模型（目前使用假資料）
+/// WiFi SSID 資訊模型 - 用於第二頁
+class WiFiSSIDInfo {
+  final String radioName;     // wifi_2G, wifi_5G, etc.
+  final String ssid;          // SSID 名稱
+  final bool isEnabled;       // 是否啟用
+
+  WiFiSSIDInfo({
+    required this.radioName,
+    required this.ssid,
+    required this.isEnabled,
+  });
+
+  /// 格式化頻率顯示文字（用於 SSID 標籤）
+  String get displayFrequency {
+    switch (radioName.toLowerCase()) {
+      case 'wifi_2g':
+        return '2.4GHz';
+      case 'wifi_5g':
+        return '5GHz';
+      case 'wifi_6g':
+        return '6GHz';
+      case 'wifi_mlo':
+        return 'OLM';              // 根據圖片，MLO 在 SSID 頁面顯示為 OLM
+      default:
+        return radioName;
+    }
+  }
+
+  /// SSID 標籤格式：SSID(2.4GHz)
+  String get ssidLabel => 'SSID(${displayFrequency})';
+}
+
+/// 乙太網路狀態模型
 class EthernetStatus {
   final String title;
-  final bool showDetails;  // 控制是否顯示詳細資訊
+  final bool showDetails;
 
   EthernetStatus({
     this.title = 'Ethernet',
-    this.showDetails = false,
+    this.showDetails = DashboardConfig.showEthernetDetails,  // 使用配置控制
   });
 }
 
@@ -108,9 +152,9 @@ class DashboardPageData {
 
 /// Dashboard 分頁類型
 enum DashboardPageType {
-  systemStatus,    // 第一頁：系統狀態
-  wifiSSID,        // 第二頁：WiFi SSID
-  ethernet,        // 第三頁：乙太網路
+  systemStatus,    // 第一頁：系統狀態（Model Name, Internet, WiFi 頻率）
+  ssidList,        // 第二頁：SSID 列表（WiFi SSID, Guest WiFi SSID）
+  ethernet,        // 第三頁：乙太網路（只顯示標題）
 }
 
 /// 顯示控制配置
@@ -134,14 +178,74 @@ class DashboardDisplayConfig {
     this.showModelName = true,
     this.showInternet = true,
     this.showWiFiFrequencies = true,
-    this.showGuestWiFiFrequencies = false,  // Guest WiFi 預設隱藏
+    this.showGuestWiFiFrequencies = DashboardConfig.showGuestWiFi,  // 使用配置控制
 
     // 第二頁
     this.showWiFiSSIDs = true,
-    this.showGuestWiFiSSIDs = false,  // Guest WiFi SSID 預設隱藏
+    this.showGuestWiFiSSIDs = DashboardConfig.showGuestWiFi,       // 使用配置控制
 
     // 第三頁
     this.showEthernetTitle = true,
-    this.showEthernetDetails = false,  // 乙太網路詳細資訊預設隱藏
+    this.showEthernetDetails = DashboardConfig.showEthernetDetails, // 使用配置控制
   });
+}
+
+/// Dashboard 頁面內容生成器
+class DashboardPageContentGenerator {
+  /// 生成第一頁內容：系統狀態
+  static Map<String, dynamic> generateSystemStatusContent(DashboardData data) {
+    return {
+      'modelName': data.modelName,
+      'internetStatus': data.internetStatus,
+      'wifiFrequencies': data.wifiFrequencies,
+      'guestWifiFrequencies': DashboardConfig.showGuestWiFi ? data.guestWifiFrequencies : <WiFiFrequencyStatus>[],
+    };
+  }
+
+  /// 生成第二頁內容：SSID 列表
+  static Map<String, dynamic> generateSSIDListContent(DashboardData data) {
+    // 只顯示啟用的 SSID
+    final enabledWiFiSSIDs = data.wifiSSIDs.where((ssid) => ssid.isEnabled).toList();
+    final enabledGuestSSIDs = DashboardConfig.showGuestWiFi
+        ? data.guestWifiSSIDs.where((ssid) => ssid.isEnabled).toList()
+        : <WiFiSSIDInfo>[];
+
+    return {
+      'wifiSSIDs': enabledWiFiSSIDs,
+      'guestWifiSSIDs': enabledGuestSSIDs,
+    };
+  }
+
+  /// 生成第三頁內容：乙太網路
+  static Map<String, dynamic> generateEthernetContent(DashboardData data) {
+    return {
+      'ethernetStatus': data.ethernetStatus,
+    };
+  }
+
+  /// 生成所有分頁
+  static List<DashboardPageData> generateAllPages(DashboardData data) {
+    return [
+      // 第一頁：系統狀態
+      DashboardPageData(
+        pageTitle: 'System Status',
+        pageType: DashboardPageType.systemStatus,
+        content: generateSystemStatusContent(data),
+      ),
+
+      // 第二頁：SSID 列表
+      DashboardPageData(
+        pageTitle: 'SSID List',
+        pageType: DashboardPageType.ssidList,
+        content: generateSSIDListContent(data),
+      ),
+
+      // 第三頁：乙太網路
+      DashboardPageData(
+        pageTitle: 'Ethernet',
+        pageType: DashboardPageType.ethernet,
+        content: generateEthernetContent(data),
+      ),
+    ];
+  }
 }
