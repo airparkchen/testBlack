@@ -1,4 +1,4 @@
-// lib/shared/services/real_data_integration_service.dart - 修正版本
+// lib/shared/services/real_data_integration_service.dart - 🎯 正確修正版本
 
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/services/mesh_data_analyzer.dart';
@@ -7,16 +7,13 @@ import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dar
 import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 
-/// 真實數據整合服務 - 修正版本
-/// 🎯 關鍵修正：統一資料來源，確保拓樸圖和列表使用相同的數據
+/// 🎯 正確修正：真實數據整合服務 - 拓樸圖只顯示 Extender，List 顯示 Gateway + Extender
 class RealDataIntegrationService {
   static final MeshDataAnalyzer _analyzer = MeshDataAnalyzer();
 
-  // 🎯 修正：使用可配置的快取時間
+  // 快取機制
   static NetworkTopologyStructure? _cachedTopologyStructure;
   static DateTime? _lastFetchTime;
-
-  /// 🎯 修正：使用配置檔案中的快取時間
   static Duration get _cacheExpiry => NetworkTopoConfig.actualCacheDuration;
 
   /// 檢查快取是否有效
@@ -26,18 +23,10 @@ class RealDataIntegrationService {
     final timeSinceLastFetch = DateTime.now().difference(_lastFetchTime!);
     final isValid = timeSinceLastFetch < _cacheExpiry;
 
-    // 🎯 新增：詳細的快取狀態日誌
     print('🕒 快取檢查: 上次更新 ${timeSinceLastFetch.inSeconds} 秒前, '
         '快取期限 ${_cacheExpiry.inSeconds} 秒, 是否有效: $isValid');
 
     return isValid;
-  }
-
-  /// 🎯 新增：強制重新載入（忽略快取）
-  static Future<NetworkTopologyStructure?> forceReload() async {
-    print('🔄 強制重新載入 Mesh 數據...');
-    clearCache();
-    return await getTopologyStructure();
   }
 
   /// 清除快取
@@ -47,7 +36,14 @@ class RealDataIntegrationService {
     print('🗑️ 已清除真實數據快取');
   }
 
-  /// 🎯 修正：獲取網路拓樸結構（統一資料源）
+  /// 強制重新載入
+  static Future<NetworkTopologyStructure?> forceReload() async {
+    print('🔄 強制重新載入 Mesh 數據...');
+    clearCache();
+    return await getTopologyStructure();
+  }
+
+  /// 核心方法：獲取網路拓樸結構（統一資料源）
   static Future<NetworkTopologyStructure?> getTopologyStructure() async {
     try {
       // 檢查快取
@@ -60,7 +56,6 @@ class RealDataIntegrationService {
       print('🌐 快取已過期或不存在，開始從 Mesh API 獲取拓樸結構...');
       print('⚙️  當前快取設定: ${_cacheExpiry.inSeconds} 秒');
 
-      // 記錄 API 呼叫時間
       final apiStartTime = DateTime.now();
 
       // 1. 獲取原始 Mesh 數據
@@ -72,7 +67,7 @@ class RealDataIntegrationService {
       // 3. 建立拓樸結構
       final topologyStructure = _analyzer.analyzeTopologyStructure(detailedDevices);
 
-      // 🎯 更新快取和時間戳記
+      // 更新快取和時間戳記
       _cachedTopologyStructure = topologyStructure;
       _lastFetchTime = DateTime.now();
 
@@ -95,10 +90,10 @@ class RealDataIntegrationService {
     }
   }
 
-  /// 🎯 修正：拓樸圖設備列表（只返回 Extender，但包含正確的連接數）
+  /// 🎯 正確：拓樸圖設備列表 - 只包含 Extender（Internet → Gateway → Extender 連線圖）
   static Future<List<NetworkDevice>> getNetworkDevices() async {
     try {
-      print('🌐 獲取拓樸圖設備資料（只包含 Extender）...');
+      print('🌐 獲取拓樸圖設備資料（只包含 Extender，用於顯示連線圖）...');
 
       // 1. 獲取統一的拓樸結構
       final topologyStructure = await getTopologyStructure();
@@ -107,11 +102,12 @@ class RealDataIntegrationService {
         return [];
       }
 
-      // 2. 🎯 只轉換 Extender 為 NetworkDevice，但包含正確的 Host 數量
       final networkDevices = <NetworkDevice>[];
 
+      // 🎯 拓樸圖只轉換 Extender 為 NetworkDevice
+      // Gateway 會透過 gatewayDevice 參數單獨傳遞給 NetworkTopologyComponent
       for (final extender in topologyStructure.extenders) {
-        // 🎯 計算直接連接的 Host 數量
+        // 計算直接連接的 Host 數量
         final directHosts = _getDirectHostDevices(topologyStructure, extender.macAddress);
 
         final networkDevice = NetworkDevice(
@@ -131,8 +127,8 @@ class RealDataIntegrationService {
             'radio': extender.connectionInfo.radio,
             'parentAccessPoint': extender.parentAccessPoint,
             'hops': extender.hops.toString(),
-            'clientCount': directHosts.length.toString(), // 🎯 正確的 Host 數量
-            'clients': directHosts.length.toString(), // 🎯 統一欄位名稱
+            'clientCount': directHosts.length.toString(),
+            'clients': directHosts.length.toString(),
             'connectionDescription': extender.connectionInfo.description,
             'linkstate': extender.rawData['linkstate'] ?? '',
             'wirelessStandard': extender.connectionInfo.wirelessStandard,
@@ -145,7 +141,7 @@ class RealDataIntegrationService {
         print('✅ 添加拓樸圖 Extender: ${extender.deviceName}, Host 數量: ${directHosts.length}');
       }
 
-      print('✅ 拓樸圖設備數量: ${networkDevices.length} 個 Extender');
+      print('✅ 拓樸圖設備數量: ${networkDevices.length} 個 Extender（Gateway 透過 gatewayDevice 參數傳遞）');
       return networkDevices;
 
     } catch (e) {
@@ -154,7 +150,7 @@ class RealDataIntegrationService {
     }
   }
 
-  /// 🎯 修正：設備連接數據（包含 Gateway 和所有 Extender 的正確 Host 數量）
+  /// 🎯 設備連接數據（包含 Gateway 和所有 Extender 的正確 Host 數量）
   static Future<List<DeviceConnection>> getDeviceConnections() async {
     try {
       print('🌐 獲取設備連接資料（包含 Gateway 和 Extender 的 Host 數量）...');
@@ -168,7 +164,7 @@ class RealDataIntegrationService {
 
       final deviceConnections = <DeviceConnection>[];
 
-      // 2. 🎯 Gateway 的連接數 = 直接連接的 Host 數量
+      // 2. Gateway 的連接數 = 直接連接的 Host 數量
       final gatewayHosts = _getDirectHostDevices(topologyStructure, topologyStructure.gateway.macAddress);
       final gatewayConnection = DeviceConnection(
         deviceId: _generateDeviceId(topologyStructure.gateway.macAddress),
@@ -177,7 +173,7 @@ class RealDataIntegrationService {
       deviceConnections.add(gatewayConnection);
       print('✅ Gateway (${topologyStructure.gateway.macAddress}) Host 連接數: ${gatewayHosts.length}');
 
-      // 3. 🎯 每個 Extender 的連接數 = 直接連接的 Host 數量
+      // 3. 每個 Extender 的連接數 = 直接連接的 Host 數量
       for (final extender in topologyStructure.extenders) {
         final extenderHosts = _getDirectHostDevices(topologyStructure, extender.macAddress);
         final extenderConnection = DeviceConnection(
@@ -197,10 +193,10 @@ class RealDataIntegrationService {
     }
   }
 
-  /// 🎯 修正：List 視圖設備列表（Gateway + 所有 Extender，使用統一資料源）
+  /// 🎯 List 視圖設備列表（Gateway + 所有 Extender，用於設備管理列表）
   static Future<List<NetworkDevice>> getListViewDevices() async {
     try {
-      print('🌐 獲取 List 視圖設備資料（Gateway + Extender）...');
+      print('🌐 獲取 List 視圖設備資料（Gateway + Extender，用於設備管理）...');
 
       // 1. 獲取統一的拓樸結構
       final topologyStructure = await getTopologyStructure();
@@ -211,40 +207,60 @@ class RealDataIntegrationService {
 
       final listDevices = <NetworkDevice>[];
 
-      // 2. 🎯 添加 Gateway - 使用真實 MAC 地址和正確的 Host 數量
+      // 2. 🎯 List 視圖：添加 Gateway（供點擊進入詳情頁）
       final gatewayHosts = _getDirectHostDevices(topologyStructure, topologyStructure.gateway.macAddress);
       final gatewayDevice = NetworkDevice(
         name: 'Controller',
         id: _generateDeviceId(topologyStructure.gateway.macAddress),
-        mac: topologyStructure.gateway.macAddress, // 🎯 使用真實 MAC
+        mac: topologyStructure.gateway.macAddress, // 🎯 使用真實 Gateway MAC
         ip: topologyStructure.gateway.ipAddress,
         connectionType: ConnectionType.wired,
         additionalInfo: {
           'type': 'gateway',
+          'devName': topologyStructure.gateway.deviceName,
           'status': 'online',
-          'clients': gatewayHosts.length.toString(), // 🎯 正確的 Host 數量
+          'clients': gatewayHosts.length.toString(), // 🎯 真實的客戶端數量
           'rssi': '',
+          'ssid': '',
+          'radio': '',
+          'parentAccessPoint': '',
+          'hops': '0',
+          'connectionDescription': 'Gateway 主控制器',
+          'linkstate': topologyStructure.gateway.rawData['linkstate'] ?? '',
+          'wirelessStandard': '',
+          'rxrate': topologyStructure.gateway.rawData['rxrate'] ?? '',
+          'txrate': topologyStructure.gateway.rawData['txrate'] ?? '',
         },
       );
       listDevices.add(gatewayDevice);
       print('✅ 添加 List Gateway: ${topologyStructure.gateway.macAddress}, Host 數量 ${gatewayHosts.length}');
 
-      // 3. 🎯 添加所有 Extender - 使用真實資料和正確的 Host 數量
+      // 3. 🎯 List 視圖：添加所有 Extender（供點擊進入詳情頁）
       for (final extender in topologyStructure.extenders) {
         final extenderHosts = _getDirectHostDevices(topologyStructure, extender.macAddress);
         final extenderDevice = NetworkDevice(
           name: _generateDisplayName(extender),
           id: _generateDeviceId(extender.macAddress),
-          mac: extender.macAddress, // 🎯 使用真實 MAC
+          mac: extender.macAddress, // 🎯 使用真實 Extender MAC
           ip: extender.ipAddress,
           connectionType: extender.connectionInfo.isWired
               ? ConnectionType.wired
               : ConnectionType.wireless,
           additionalInfo: {
             'type': 'extender',
+            'devName': extender.deviceName,
             'status': 'online',
-            'clients': extenderHosts.length.toString(), // 🎯 正確的 Host 數量
+            'clients': extenderHosts.length.toString(), // 🎯 真實的客戶端數量
             'rssi': extender.rssiValues.join(','),
+            'ssid': extender.connectionInfo.ssid,
+            'radio': extender.connectionInfo.radio,
+            'parentAccessPoint': extender.parentAccessPoint,
+            'hops': extender.hops.toString(),
+            'connectionDescription': extender.connectionInfo.description,
+            'linkstate': extender.rawData['linkstate'] ?? '',
+            'wirelessStandard': extender.connectionInfo.wirelessStandard,
+            'rxrate': extender.rawData['rxrate'] ?? '',
+            'txrate': extender.rawData['txrate'] ?? '',
           },
         );
         listDevices.add(extenderDevice);
@@ -260,7 +276,58 @@ class RealDataIntegrationService {
     }
   }
 
-  /// 🎯 修正：獲取客戶端設備列表（使用統一資料源）
+  /// 🎯 新增：專門獲取 Gateway 設備資料的方法
+  static Future<NetworkDevice?> getGatewayDevice() async {
+    try {
+      print('🌐 獲取 Gateway 設備資料...');
+
+      // 獲取拓樸結構
+      final topologyStructure = await getTopologyStructure();
+      if (topologyStructure == null) {
+        print('❌ 無法獲取拓樸結構');
+        return null;
+      }
+
+      // 計算 Gateway 的客戶端數量
+      final gatewayHosts = _getDirectHostDevices(topologyStructure, topologyStructure.gateway.macAddress);
+
+      // 創建 Gateway NetworkDevice
+      final gatewayDevice = NetworkDevice(
+        name: 'Controller',
+        id: _generateDeviceId(topologyStructure.gateway.macAddress),
+        mac: topologyStructure.gateway.macAddress, // 🎯 真實 Gateway MAC
+        ip: topologyStructure.gateway.ipAddress,
+        connectionType: ConnectionType.wired,
+        additionalInfo: {
+          'type': 'gateway',
+          'devName': topologyStructure.gateway.deviceName,
+          'status': 'online',
+          'clients': gatewayHosts.length.toString(), // 🎯 真實的客戶端數量
+          'rssi': '',
+          'ssid': '',
+          'radio': '',
+          'parentAccessPoint': '',
+          'hops': '0',
+          'connectionDescription': 'Gateway 主控制器',
+          'linkstate': topologyStructure.gateway.rawData['linkstate'] ?? '',
+          'wirelessStandard': '',
+          'rxrate': topologyStructure.gateway.rawData['rxrate'] ?? '',
+          'txrate': topologyStructure.gateway.rawData['txrate'] ?? '',
+        },
+      );
+
+      print('✅ 成功獲取 Gateway 設備: ${gatewayDevice.name} (${gatewayDevice.mac})');
+      print('   Gateway 客戶端數量: ${gatewayHosts.length}');
+
+      return gatewayDevice;
+
+    } catch (e) {
+      print('❌ 獲取 Gateway 設備時發生錯誤: $e');
+      return null;
+    }
+  }
+
+  /// 獲取客戶端設備列表（使用統一資料源）
   static Future<List<ClientDevice>> getClientDevicesForParent(String parentDeviceId) async {
     try {
       print('🌐 獲取設備 $parentDeviceId 的客戶端列表...');
@@ -297,7 +364,7 @@ class RealDataIntegrationService {
         return [];
       }
 
-      // 3. 🎯 只獲取直接連接的 Host 設備
+      // 3. 只獲取直接連接的 Host 設備
       final hostDevices = _getDirectHostDevices(topologyStructure, parentDevice.macAddress);
       print('✅ 找到 ${hostDevices.length} 個直接連接的 Host 設備');
 
@@ -338,12 +405,11 @@ class RealDataIntegrationService {
     }
   }
 
-  /// 🎯 修正：獲取 Gateway 名稱（使用真實資料）
+  /// 獲取 Gateway 名稱（使用真實資料）
   static Future<String> getGatewayName() async {
     try {
       final topologyStructure = await getTopologyStructure();
       if (topologyStructure != null) {
-        // 如果有設備名稱就使用，否則使用 "Controller"
         final gatewayName = topologyStructure.gateway.deviceName.isNotEmpty
             ? topologyStructure.gateway.deviceName
             : 'Controller';
@@ -357,16 +423,16 @@ class RealDataIntegrationService {
     }
   }
 
-  // ==================== 🎯 核心輔助方法 ====================
+  // ==================== 核心輔助方法 ====================
 
-  /// 🎯 關鍵方法：獲取指定設備直接連接的 Host 設備（不包括 Extender）
+  /// 關鍵方法：獲取指定設備直接連接的 Host 設備（不包括 Extender）
   static List<DetailedDeviceInfo> _getDirectHostDevices(
       NetworkTopologyStructure topology,
       String parentMacAddress) {
 
     final directConnectedDevices = topology.getDirectConnectedDevices(parentMacAddress);
 
-    // 🎯 只保留 Host 設備，過濾掉 Extender
+    // 只保留 Host 設備，過濾掉 Extender
     final hostDevices = directConnectedDevices
         .where((device) => device.deviceType == 'host')
         .toList();
@@ -384,6 +450,8 @@ class RealDataIntegrationService {
   /// 生成設備顯示名稱
   static String _generateDisplayName(DetailedDeviceInfo device) {
     switch (device.deviceType) {
+      case 'gateway':
+        return 'Controller';
       case 'extender':
         return device.deviceName.isNotEmpty ? device.deviceName : 'Agent';
       case 'host':
@@ -449,7 +517,7 @@ class RealDataIntegrationService {
     }
   }
 
-  /// 🎯 新增：輸出完整的資料統計（調試用）
+  /// 🎯 輸出完整的資料統計（調試用） - 更新版本
   static Future<void> printCompleteDataStatistics() async {
     try {
       print('\n=== 🎯 完整資料統計報告 ===');
@@ -468,18 +536,26 @@ class RealDataIntegrationService {
       // 分別獲取不同用途的資料
       final topologyDevices = await getNetworkDevices();
       final listDevices = await getListViewDevices();
+      final gatewayDevice = await getGatewayDevice();
       final deviceConnections = await getDeviceConnections();
 
-      print('\n📊 拓樸圖資料 (Extender):');
-      print('   設備數量: ${topologyDevices.length}');
+      print('\n📊 拓樸圖資料 (只有 Extender，用於連線圖):');
+      print('   Extender 數量: ${topologyDevices.length}');
       for (var device in topologyDevices) {
         print('   - ${device.name} (${device.mac}) → Host: ${device.additionalInfo['clients']}');
       }
 
-      print('\n📊 List 視圖資料 (Gateway + Extender):');
+      print('\n📊 Gateway 設備資料 (用於拓樸圖點擊):');
+      if (gatewayDevice != null) {
+        print('   - ${gatewayDevice.name} (${gatewayDevice.mac}) → Host: ${gatewayDevice.additionalInfo['clients']}');
+      } else {
+        print('   ❌ 無法獲取 Gateway 設備');
+      }
+
+      print('\n📊 List 視圖資料 (Gateway + Extender，用於設備管理):');
       print('   設備數量: ${listDevices.length}');
       for (var device in listDevices) {
-        print('   - ${device.name} (${device.mac}) → Host: ${device.additionalInfo['clients']}');
+        print('   - ${device.name} (${device.mac}) [${device.additionalInfo['type']}] → Host: ${device.additionalInfo['clients']}');
       }
 
       print('\n📊 設備連接資料 (小圓圈數字):');
@@ -509,5 +585,7 @@ class RealDataIntegrationService {
       print('❌ 輸出完整資料統計時發生錯誤: $e');
     }
   }
+
+
 
 }
