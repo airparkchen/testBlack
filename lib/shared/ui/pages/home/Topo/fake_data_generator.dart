@@ -1,7 +1,9 @@
-// lib/shared/ui/pages/home/Topo/fake_data_generator.dart - 修復後的完整檔案
+// lib/shared/ui/pages/home/Topo/fake_data_generator.dart - 修正版本
+// 🎯 修正：移動 RealSpeedDataGenerator 到這裡，統一管理所有數據生成器
 
 import 'dart:math' as math;
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
+import 'package:whitebox/shared/services/real_speed_data_service.dart'; // 🎯 新增
 
 /// 假資料生成器 - 可作為 package 使用
 class FakeDataGenerator {
@@ -243,129 +245,13 @@ class SpeedDataGenerator {
   }
 }
 
-/// 🎯 新增：真實速度數據服務
-class RealSpeedDataService {
-  // API 端點（預留）
-  static const String speedApiEndpoint = '/api/v1/system/speed';
-
-  // 快取機制
-  static double? _cachedUploadSpeed;
-  static double? _cachedDownloadSpeed;
-  static DateTime? _lastFetchTime;
-  static const Duration _cacheExpiry = Duration(seconds: 5); // 5秒快取
-
-  // 🎯 新增：API 可用性標記（目前設為 false）
-  static const bool isApiAvailable = false;
-
-  /// 檢查快取是否有效
-  static bool _isCacheValid() {
-    if (_lastFetchTime == null) return false;
-    return DateTime.now().difference(_lastFetchTime!) < _cacheExpiry;
-  }
-
-  /// 🎯 從真實 API 獲取上傳速度數據（目前返回預設值）
-  static Future<double> getCurrentUploadSpeed() async {
-    try {
-      // 檢查快取
-      if (_isCacheValid() && _cachedUploadSpeed != null) {
-        return _cachedUploadSpeed!;
-      }
-
-      // 🎯 目前直接返回預設值，不呼叫API
-      if (!isApiAvailable) {
-        final speed = 65.0;
-
-        // 更新快取
-        _cachedUploadSpeed = speed;
-        _lastFetchTime = DateTime.now();
-
-        return speed;
-      }
-
-      // 🎯 TODO: 將來實現真實的 API 呼叫
-      return 65.0; // 備用預設值
-
-    } catch (e) {
-      print('❌ 獲取上傳速度數據時發生錯誤: $e');
-      return 65.0; // 返回預設值
-    }
-  }
-
-  /// 🎯 從真實 API 獲取下載速度數據（目前返回預設值）
-  static Future<double> getCurrentDownloadSpeed() async {
-    try {
-      // 檢查快取
-      if (_isCacheValid() && _cachedDownloadSpeed != null) {
-        return _cachedDownloadSpeed!;
-      }
-
-      // 🎯 目前直接返回預設值，不呼叫API
-      if (!isApiAvailable) {
-        final speed = 83.0;
-
-        // 更新快取
-        _cachedDownloadSpeed = speed;
-        _lastFetchTime = DateTime.now();
-
-        return speed;
-      }
-
-      // 🎯 TODO: 將來實現真實的 API 呼叫
-      return 83.0; // 備用預設值
-
-    } catch (e) {
-      print('❌ 獲取下載速度數據時發生錯誤: $e');
-      return 83.0; // 返回預設值
-    }
-  }
-
-  /// 🎯 清除快取（用於強制重新載入）
-  static void clearCache() {
-    _cachedUploadSpeed = null;
-    _cachedDownloadSpeed = null;
-    _lastFetchTime = null;
-  }
-
-  /// 🎯 獲取上傳速度歷史數據（預留方法）
-  static Future<List<double>> getUploadSpeedHistory({int pointCount = 100}) async {
-    try {
-      // 🎯 目前直接返回預設直線，不呼叫API
-      if (!isApiAvailable) {
-        final currentSpeed = await getCurrentUploadSpeed();
-        return List.filled(pointCount, currentSpeed);
-      }
-
-      return List.filled(pointCount, 65.0);
-
-    } catch (e) {
-      print('❌ 獲取上傳速度歷史數據時發生錯誤: $e');
-      return List.filled(pointCount, 65.0);
-    }
-  }
-
-  /// 🎯 獲取下載速度歷史數據（預留方法）
-  static Future<List<double>> getDownloadSpeedHistory({int pointCount = 100}) async {
-    try {
-      // 🎯 目前直接返回預設直線，不呼叫API
-      if (!isApiAvailable) {
-        final currentSpeed = await getCurrentDownloadSpeed();
-        return List.filled(pointCount, currentSpeed);
-      }
-
-      return List.filled(pointCount, 83.0);
-
-    } catch (e) {
-      print('❌ 獲取下載速度歷史數據時發生錯誤: $e');
-      return List.filled(pointCount, 83.0);
-    }
-  }
-}
-
-/// 🎯 修改：真實雙線速度數據生成器
+/// 🎯 新增：真實速度數據生成器（移到這裡統一管理）
 class RealSpeedDataGenerator {
   final int dataPointCount;
   final double minSpeed;
   final double maxSpeed;
+
+  // 🎯 真實資料模式：數據來自API
   final List<double> _uploadData = [];
   final List<double> _downloadData = [];
 
@@ -374,15 +260,41 @@ class RealSpeedDataGenerator {
 
   RealSpeedDataGenerator({
     this.dataPointCount = 100,
-    this.minSpeed = 20,
+    this.minSpeed = 0,      // 🎯 真實模式從0開始
     this.maxSpeed = 1000,
-    this.updateInterval = const Duration(seconds: 5),
+    this.updateInterval = const Duration(seconds: 10), // 🎯 統一10秒更新
   }) {
     _initializeData();
   }
 
-  /// 初始化雙線數據
+  /// 🎯 修正：初始化真實速度數據 - 立即顯示預設值0
   void _initializeData() async {
+    try {
+      print('🌐 初始化真實速度數據...');
+
+      // 🎯 修正：先填入預設值0，讓白球立即顯示
+      _uploadData.clear();
+      _downloadData.clear();
+      _uploadData.addAll(List.filled(dataPointCount, 0.0)); // 🎯 預設值0
+      _downloadData.addAll(List.filled(dataPointCount, 0.0)); // 🎯 預設值0
+
+      print('✅ 初始化完成: 上傳 ${_uploadData.length} 個點, 下載 ${_downloadData.length} 個點 (預設值: 0 Mbps)');
+
+      // 🎯 然後異步載入真實數據
+      _loadRealDataAsync();
+
+    } catch (e) {
+      print('❌ 初始化真實速度數據失敗: $e');
+      // 錯誤時使用全0數據
+      _uploadData.clear();
+      _downloadData.clear();
+      _uploadData.addAll(List.filled(dataPointCount, 0.0));
+      _downloadData.addAll(List.filled(dataPointCount, 0.0));
+    }
+  }
+
+  /// 🎯 新增：異步載入真實數據
+  void _loadRealDataAsync() async {
     try {
       final uploadHistory = await RealSpeedDataService.getUploadSpeedHistory(pointCount: dataPointCount);
       final downloadHistory = await RealSpeedDataService.getDownloadSpeedHistory(pointCount: dataPointCount);
@@ -392,18 +304,14 @@ class RealSpeedDataGenerator {
       _uploadData.addAll(uploadHistory);
       _downloadData.addAll(downloadHistory);
 
-      print('✅ 初始化真實雙線速度數據: 上傳 ${_uploadData.length} 個點, 下載 ${_downloadData.length} 個點');
+      print('📈 異步載入真實數據完成: 上傳 ${currentUpload.toStringAsFixed(2)} Mbps, 下載 ${currentDownload.toStringAsFixed(2)} Mbps');
+
     } catch (e) {
-      print('❌ 初始化真實雙線速度數據失敗: $e');
-      // 使用預設直線
-      _uploadData.clear();
-      _downloadData.clear();
-      _uploadData.addAll(List.filled(dataPointCount, 65.0));
-      _downloadData.addAll(List.filled(dataPointCount, 83.0));
+      print('❌ 異步載入真實數據失敗: $e');
     }
   }
 
-  /// 更新雙線數據
+  /// 🎯 更新真實速度數據
   Future<void> update() async {
     try {
       final newUploadSpeed = await RealSpeedDataService.getCurrentUploadSpeed();
@@ -420,19 +328,20 @@ class RealSpeedDataGenerator {
       _uploadData.add(newUploadSpeed);
       _downloadData.add(newDownloadSpeed);
 
-      // print('📈 更新真實雙線速度數據: 上傳 ${newUploadSpeed.toInt()} Mbps, 下載 ${newDownloadSpeed.toInt()} Mbps');
+      print('📈 更新真實速度: 上傳 ${newUploadSpeed.toStringAsFixed(2)} Mbps, 下載 ${newDownloadSpeed.toStringAsFixed(2)} Mbps');
+
     } catch (e) {
-      print('❌ 更新真實雙線速度數據失敗: $e');
+      print('❌ 更新真實速度數據失敗: $e');
     }
   }
 
   // Getters
   List<double> get uploadData => List.from(_uploadData);
   List<double> get downloadData => List.from(_downloadData);
-  double get currentUpload => _uploadData.isNotEmpty ? _uploadData.last : 65.0;
-  double get currentDownload => _downloadData.isNotEmpty ? _downloadData.last : 83.0;
+  double get currentUpload => _uploadData.isNotEmpty ? _uploadData.last : 0.0;
+  double get currentDownload => _downloadData.isNotEmpty ? _downloadData.last : 0.0;
 
-  // 向後兼容
+  // 向後兼容（用於現有的速度圖表）
   List<double> get data => downloadData;
   double get currentSpeed => currentDownload;
   double get widthPercentage => 0.7; // 固定70%

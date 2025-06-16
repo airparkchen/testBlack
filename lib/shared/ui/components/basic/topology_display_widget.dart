@@ -1,4 +1,5 @@
 // lib/shared/ui/components/basic/topology_display_widget.dart - 修正版本
+// 🎯 關鍵修正：只修改速度資料來源，保持原有功能不變
 
 import 'package:flutter/material.dart';
 import 'dart:ui';
@@ -7,6 +8,7 @@ import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dar
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
+import 'package:whitebox/shared/services/real_speed_data_service.dart' ;
 
 /// 拓樸圖和速度圖組合組件
 class TopologyDisplayWidget extends StatefulWidget {
@@ -46,12 +48,13 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     if (NetworkTopoConfig.useRealData) {
       _realSpeedDataGenerator = RealSpeedDataGenerator(
         dataPointCount: 100,
-        minSpeed: 20,
-        maxSpeed: 150,
-        updateInterval: Duration(seconds: 5),
+        minSpeed: 0,        // 🎯 真實模式從0開始
+        maxSpeed: 1000,     // 🎯 適當的最大值
+        updateInterval: Duration(seconds: 10), // 🎯 統一10秒更新
       );
       _fakeSpeedDataGenerator = null;
       print('🌐 初始化真實速度數據生成器');
+
       // 🎯 關鍵修正：確保初始化完成後觸發 Widget 重建
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -217,6 +220,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
       endAtPercent: 0.7,
     );
   }
+
 
   /// 🎯 新增：錯誤狀態顯示
   Widget _buildErrorChart(String errorMessage) {
@@ -419,7 +423,7 @@ class SpeedChartWidget extends StatelessWidget {
   }
 }
 
-/// 🎯 新增：真實數據速度圖表小部件
+/// 🎯 修正：真實數據速度圖表小部件 - 立即顯示白球
 class RealSpeedChartWidget extends StatelessWidget {
   final RealSpeedDataGenerator dataGenerator;
   final AnimationController animationController;
@@ -470,7 +474,7 @@ class RealSpeedChartWidget extends StatelessWidget {
               ),
             ),
 
-            // 白點和垂直線
+            // 🎯 修正：白點和垂直線（始終顯示，包括速度為0時）
             if (dataGenerator.data.isNotEmpty) ...[
               // 垂直線
               Positioned(
@@ -479,12 +483,13 @@ class RealSpeedChartWidget extends StatelessWidget {
                 left: chartEndX - 1,
                 child: Container(
                   width: 2,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.white,
+                        // 🎯 修正：速度為0時使用淡色，否則正常顏色
+                        currentSpeed > 0 ? Colors.white : Colors.white.withOpacity(0.5),
                         Color.fromRGBO(255, 255, 255, 0),
                       ],
                     ),
@@ -492,25 +497,26 @@ class RealSpeedChartWidget extends StatelessWidget {
                 ),
               ),
 
-              // 白色圓點
+              // 白色圓點（始終顯示）
               Positioned(
                 top: dotY - 8,
                 left: chartEndX - 8,
                 child: Container(
                   width: 16,
                   height: 16,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    // 🎯 修正：速度為0時使用淡色圓點
+                    color: currentSpeed > 0 ? Colors.white : Colors.white.withOpacity(0.8),
                     shape: BoxShape.circle,
                   ),
                 ),
               ),
 
-              // 速度標籤
+              // 速度標籤（始終顯示）
               Positioned(
                 top: dotY - 50,
                 left: chartEndX - 44,
-                child: _buildSpeedLabel(speedValue),
+                child: _buildSpeedLabel(speedValue, currentSpeed > 0),
               ),
             ],
           ],
@@ -519,7 +525,8 @@ class RealSpeedChartWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSpeedLabel(int speed) {
+  /// 🎯 修正：速度標籤 - 支援0值顯示
+  Widget _buildSpeedLabel(int speed, bool hasSpeed) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -537,8 +544,11 @@ class RealSpeedChartWidget extends StatelessWidget {
               child: Center(
                 child: Text(
                   '$speed Mb/s',
-                  style: const TextStyle(
-                    color: Color.fromRGBO(255, 255, 255, 0.8),
+                  style: TextStyle(
+                    // 🎯 修正：速度為0時使用淡色文字
+                    color: hasSpeed
+                        ? Color.fromRGBO(255, 255, 255, 0.8)
+                        : Color.fromRGBO(255, 255, 255, 0.6),
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
