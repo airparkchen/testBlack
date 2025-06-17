@@ -407,7 +407,6 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   /// 建構主要內容
   /// 修正：建構主要內容（加入載入狀態和正確的數據源）
   Widget _buildMainContent() {
-    // 顯示載入狀態
     if (_isLoadingData) {
       return const Center(
         child: Column(
@@ -415,10 +414,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
           children: [
             CircularProgressIndicator(color: Colors.white),
             SizedBox(height: 16),
-            Text(
-              'Loading...',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
+            Text('Loading...', style: TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
       );
@@ -426,38 +422,30 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
 
     final devices = _getDevices();
     final connections = _getDeviceConnections(devices);
-    // 🎯 調試輸出
-    print('=== 主要內容建構 ===');
-    print('當前視圖模式: $_viewMode');
-    print('設備數量: ${devices.length}');
-    print('連接數量: ${connections.length}');
-    print('Gateway 名稱: $_gatewayName');
 
-    if (devices.isNotEmpty) {
-      print('設備列表:');
-      for (var device in devices) {
-        print('  - ${device.name} (${device.additionalInfo['type']})');
-      }
-    }
-    print('==================');
+    // 🎯 關鍵修改：使用 IndexedStack 代替條件式顯示
+    return IndexedStack(
+      index: _viewMode == 'topology' ? 0 : 1,
+      children: [
+        // 🎯 Topology 頁面（包含速度圖）- 始終存在但可能不可見
+        TopologyDisplayWidget(
+          key: _topologyDisplayKey,
+          devices: devices,
+          deviceConnections: connections,
+          gatewayName: _gatewayName,
+          enableInteractions: widget.enableInteractions,
+          animationController: _animationController,
+          onDeviceSelected: _handleDeviceSelected,
+        ),
 
-    if (_viewMode == 'topology') {
-      return TopologyDisplayWidget(
-        key: _topologyDisplayKey,
-        devices: devices,
-        deviceConnections: connections,
-        gatewayName: _gatewayName,
-        enableInteractions: widget.enableInteractions,
-        animationController: _animationController,
-        onDeviceSelected: _handleDeviceSelected,
-      );
-    } else {
-      return DeviceListWidget(
-        devices: devices,
-        enableInteractions: widget.enableInteractions,
-        onDeviceSelected: _handleDeviceSelected,
-      );
-    }
+        // 🎯 List 頁面 - 始終存在但可能不可見
+        DeviceListWidget(
+          devices: devices,
+          enableInteractions: widget.enableInteractions,
+          onDeviceSelected: _handleDeviceSelected,
+        ),
+      ],
+    );
   }
 
 
