@@ -7,6 +7,7 @@ import 'package:whitebox/shared/ui/pages/initialization/QrCodeScannerPage.dart';
 import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart';
 import 'package:whitebox/shared/ui/pages/initialization/WifiSettingFlowPage.dart';
 import 'package:whitebox/shared/ui/pages/initialization/LoginPage.dart';
+import 'package:whitebox/shared/ui/pages/test/SpeedAreaTestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/TestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/MeshTopologyTestPage.dart';
 import 'package:whitebox/shared/ui/pages/test/TestPasswordPage.dart';

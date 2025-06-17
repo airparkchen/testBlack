@@ -52,7 +52,7 @@ class NetworkTopoConfig {
   }
 
   /// 🎯 自動重新載入控制
-  static const bool enableAutoReload = true; // 是否啟用自動重新載入
+  static const bool enableAutoReload = false; // 是否啟用自動重新載入
   static const int autoReloadIntervalSeconds = 30; // 自動重新載入間隔（30秒，比API更新慢）
 
   /// 獲取自動重新載入間隔

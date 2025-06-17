@@ -1,16 +1,41 @@
-// lib/shared/ui/components/basic/topology_display_widget.dart - 最小修正版本
-// 🎯 只添加 Gateway 設備載入，保持原有結構不變
+// lib/shared/ui/components/basic/topology_display_widget.dart - 完整修正版本
+// 🎯 雙線速度圖表實現 + 插值動畫 + 重疊處理
 
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
-import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart' as RealSpeedService;   //改用fake_data_generator中的服務
-//TODO 未來要重構與分類  real_speed_data_service,real_data_integration_service,fake_data_generator...etc之中的套件
-import 'package:whitebox/shared/services/real_data_integration_service.dart'; // 🎯 新增
+import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart' as RealSpeedService;
+import 'package:whitebox/shared/services/real_data_integration_service.dart';
+
+/// 智能單位格式化工具
+/// 根據速度數值自動選擇合適的單位顯示
+class SpeedUnitFormatter {
+  /// 將 Mbps 數值格式化為適當單位的字串
+  static String formatSpeed(double speedMbps) {
+    if (speedMbps >= 100) {
+      // >= 100 Mbps 顯示為 Gbps
+      final gbps = speedMbps / 1000.0;
+      return '${gbps.toStringAsFixed(2)} Gb/s';
+    } else if (speedMbps >= 0.1) {
+      // >= 0.1 Mbps 顯示為 Mbps
+      return '${speedMbps.toStringAsFixed(2)} Mb/s';
+    } else {
+      // < 0.1 Mbps 顯示為 Kbps
+      final kbps = speedMbps * 1000.0;
+      return '${kbps.toStringAsFixed(1)} Kb/s';
+    }
+  }
+
+  /// 針對整數速度的格式化（向後兼容現有程式碼）
+  static String formatSpeedInt(int speedMbps) {
+    return formatSpeed(speedMbps.toDouble());
+  }
+}
 
 /// 拓樸圖和速度圖組合組件
 class TopologyDisplayWidget extends StatefulWidget {
@@ -46,6 +71,9 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
   NetworkDevice? _gatewayDevice;
   bool _isLoadingGateway = false;
 
+  // 🎯 新增：API 更新計時器（10秒一次）
+  Timer? _apiUpdateTimer;
+
   @override
   void initState() {
     super.initState();
@@ -53,13 +81,16 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     // 🎯 原有的速度數據初始化邏輯
     if (NetworkTopoConfig.useRealData) {
       _realSpeedDataGenerator = RealSpeedService.RealSpeedDataGenerator(
-        dataPointCount: 100,
+        dataPointCount: 20,  //資料點
         minSpeed: 0,
         maxSpeed: 1000,
         updateInterval: Duration(seconds: 10),
       );
       _fakeSpeedDataGenerator = null;
       print('🌐 初始化真實速度數據生成器');
+
+      // 🎯 新增：啟動 API 更新計時器
+      _startAPIUpdates();
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -77,6 +108,27 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     _loadGatewayDevice();
   }
 
+  @override
+  void dispose() {
+    // 🎯 新增：清理 API 更新計時器
+    _apiUpdateTimer?.cancel();
+    super.dispose();
+  }
+
+  /// 🎯 新增：啟動 API 更新計時器（10秒一次）
+  void _startAPIUpdates() {
+    _apiUpdateTimer?.cancel();
+
+    print('🔄 啟動 API 更新計時器，間隔: 10 秒');
+
+    _apiUpdateTimer = Timer.periodic(Duration(seconds: 10), (_) {
+      if (mounted && NetworkTopoConfig.useRealData && _realSpeedDataGenerator != null) {
+        print('⏰ API 更新計時器觸發');
+        _realSpeedDataGenerator!.updateFromAPI();
+      }
+    });
+  }
+
   /// 🎯 新增：載入真實 Gateway 設備資料
   Future<void> _loadGatewayDevice() async {
     if (!mounted) return;
@@ -86,10 +138,8 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     });
 
     try {
-      // 🎯 使用 RealDataIntegrationService 獲取 Gateway 設備
       final listDevices = await RealDataIntegrationService.getListViewDevices();
 
-      // 找到 Gateway 設備
       final gateway = listDevices.firstWhere(
             (device) => device.additionalInfo['type'] == 'gateway',
         orElse: () => NetworkDevice(
@@ -158,7 +208,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
           Expanded(
             child: Center(
               child: NetworkTopologyComponent(
-                gatewayDevice: _gatewayDevice, // 🎯 新增：傳遞真實 Gateway 設備
+                gatewayDevice: _gatewayDevice,
                 gatewayName: widget.gatewayName,
                 devices: widget.devices,
                 deviceConnections: widget.deviceConnections,
@@ -182,7 +232,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
 
     try {
       final gatewayConnection = widget.deviceConnections.firstWhere(
-            (conn) => conn.deviceId.contains('8c0f6f610a77') || // 🎯 修正：使用正確的 Gateway MAC
+            (conn) => conn.deviceId.contains('8c0f6f610a77') ||
             conn.deviceId.toLowerCase().contains('gateway') ||
             conn.deviceId.toLowerCase().contains('controller'),
         orElse: () => DeviceConnection(deviceId: '', connectedDevicesCount: 0),
@@ -269,12 +319,19 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     );
   }
 
-  /// 更新速度數據（供外部調用）
+  /// 🎯 修改：更新速度數據（現在是插值動畫，500ms一次）
   void updateSpeedData() {
     if (!mounted) return;
 
     if (NetworkTopoConfig.useRealData) {
-      _realSpeedDataGenerator?.update();
+      // 🎯 修改：現在調用插值更新，不是 API 更新
+      _realSpeedDataGenerator?.update().then((_) {
+        if (mounted) {
+          setState(() {
+            // 觸發 UI 重繪
+          });
+        }
+      });
     } else {
       if (_fakeSpeedDataGenerator != null) {
         setState(() {
@@ -285,7 +342,6 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
   }
 }
 
-// 🎯 保持原有的所有 Widget 類別不變
 /// 假數據速度圖表小部件
 class SpeedChartWidget extends StatelessWidget {
   final SpeedDataGenerator dataGenerator;
@@ -346,9 +402,9 @@ class SpeedChartWidget extends StatelessWidget {
             if (dataGenerator.data.isNotEmpty) ...[
               // 垂直線
               Positioned(
-                top: dotY + 8,
+                top: dotY ,
                 bottom: 0,
-                left: chartEndX - 1,
+                left: chartEndX - 5,
                 child: Container(
                   width: 2,
                   decoration: const BoxDecoration(
@@ -367,7 +423,7 @@ class SpeedChartWidget extends StatelessWidget {
               // 白色圓點
               Positioned(
                 top: dotY - 8,
-                left: chartEndX - 8,
+                left: chartEndX - 6,
                 child: Container(
                   width: 16,
                   height: 16,
@@ -408,7 +464,7 @@ class SpeedChartWidget extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  '$speed Mb/s',
+                  SpeedUnitFormatter.formatSpeed(speed.toDouble()),
                   style: const TextStyle(
                     color: Color.fromRGBO(255, 255, 255, 0.8),
                     fontSize: 14,
@@ -442,7 +498,269 @@ class SpeedChartWidget extends StatelessWidget {
   }
 }
 
-/// 真實數據速度圖表小部件
+/// 🎯 雙線速度標籤小部件
+class DualSpeedLabelWidget extends StatelessWidget {
+  final double uploadSpeed;
+  final double downloadSpeed;
+  final double width;
+  final double height;
+
+  const DualSpeedLabelWidget({
+    Key? key,
+    required this.uploadSpeed,
+    required this.downloadSpeed,
+    this.width = 120,
+    this.height = 50,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // 主體部分（圓角矩形）
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+            child: Container(
+              width: width,
+              height: height,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 上傳速度行
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        '↑ ${SpeedUnitFormatter.formatSpeed(uploadSpeed)}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  // 下載速度行
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Color(0xFF00EEFF),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        '↓ ${SpeedUnitFormatter.formatSpeed(downloadSpeed)}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // 底部三角形
+        Positioned(
+          bottom: -6,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: ClipPath(
+              clipper: TriangleClipper(),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+                child: Container(
+                  width: 16,
+                  height: 6,
+                  color: Colors.white.withOpacity(0.15),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 🎯 雙線速度曲線繪製器
+class DualSpeedCurvePainter extends CustomPainter {
+  final List<double> uploadData;
+  final List<double> downloadData;
+  final double minSpeed;
+  final double maxSpeed;
+  final double animationValue;
+  final double endAtPercent;
+  final double currentUpload;
+  final double currentDownload;
+
+  DualSpeedCurvePainter({
+    required this.uploadData,
+    required this.downloadData,
+    required this.minSpeed,
+    required this.maxSpeed,
+    required this.animationValue,
+    this.endAtPercent = 0.7,
+    required this.currentUpload,
+    required this.currentDownload,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (uploadData.isEmpty || downloadData.isEmpty) return;
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final double range = maxSpeed - minSpeed;
+    if (range <= 0) return;
+
+    final double endX = size.width * endAtPercent;
+
+    // 🎯 繪製上傳速度曲線（橙色）
+    _drawSpeedCurve(
+      canvas,
+      size,
+      uploadData,
+      range,
+      endX,
+      currentUpload,
+      Colors.orange,
+      Colors.orange.withOpacity(0.6),
+    );
+
+    // 🎯 繪製下載速度曲線（藍色）
+    _drawSpeedCurve(
+      canvas,
+      size,
+      downloadData,
+      range,
+      endX,
+      currentDownload,
+      Color(0xFF00EEFF),
+      Color(0xFF00EEFF).withOpacity(0.6),
+    );
+  }
+
+  void _drawSpeedCurve(
+      Canvas canvas,
+      Size size,
+      List<double> data,
+      double range,
+      double endX,
+      double currentValue,
+      Color primaryColor,
+      Color secondaryColor,
+      ) {
+    final path = Path();
+
+    // 🎯 修正：繪製滑動窗口的歷史數據曲線
+    if (data.isEmpty) return;
+
+    // 計算每個數據點之間的水平距離
+    final double stepX = endX / (data.length - 1);
+
+    // 🎯 從左到右繪製歷史數據（左邊是舊數據，右邊是新數據）
+    final List<Offset> points = [];
+
+    for (int i = 0; i < data.length; i++) {
+      // X位置：從左到右排列
+      final double x = i * stepX;
+
+      // Y位置：根據數據值計算
+      final double normalizedValue = (data[i] - minSpeed) / range;
+      final double y = size.height - (normalizedValue * size.height);
+
+      points.add(Offset(x, y));
+    }
+
+    if (points.isEmpty) return;
+
+    // 🎯 使用貝茲曲線平滑連接點
+    path.moveTo(points[0].dx, points[0].dy);
+
+    if (points.length > 2) {
+      for (int i = 0; i < points.length - 2; i++) {
+        final Offset current = points[i];
+        final Offset next = points[i + 1];
+
+        // 計算控制點（平滑曲線）
+        final double controlX1 = current.dx + (next.dx - current.dx) * 0.5;
+        final double controlY1 = current.dy;
+        final double controlX2 = next.dx - (next.dx - current.dx) * 0.5;
+        final double controlY2 = next.dy;
+
+        // 使用三次貝茲曲線
+        path.cubicTo(controlX1, controlY1, controlX2, controlY2, next.dx, next.dy);
+      }
+
+      // 連接最後兩個點
+      if (points.length >= 2) {
+        path.lineTo(points.last.dx, points.last.dy);
+      }
+    } else if (points.length == 2) {
+      // 只有兩個點，直接連線
+      path.lineTo(points[1].dx, points[1].dy);
+    }
+
+    // 創建漸變畫筆
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..shader = LinearGradient(
+        colors: [primaryColor, secondaryColor],
+      ).createShader(Rect.fromLTWH(0, 0, endX, size.height));
+
+    // 發光效果
+    final glowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..shader = LinearGradient(
+        colors: [primaryColor, secondaryColor],
+      ).createShader(Rect.fromLTWH(0, 0, endX, size.height))
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2);
+
+    // 繪製
+    canvas.drawPath(path, glowPaint);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant DualSpeedCurvePainter oldDelegate) {
+    return oldDelegate.uploadData != uploadData ||
+        oldDelegate.downloadData != downloadData ||
+        oldDelegate.animationValue != animationValue ||
+        oldDelegate.currentUpload != currentUpload ||
+        oldDelegate.currentDownload != currentDownload;
+  }
+}
+
+/// 🎯 真實數據速度圖表小部件（雙線版本 + 重疊處理）
 class RealSpeedChartWidget extends StatelessWidget {
   final RealSpeedService.RealSpeedDataGenerator dataGenerator;
   final AnimationController animationController;
@@ -457,8 +775,11 @@ class RealSpeedChartWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double currentSpeed = dataGenerator.currentSpeed.round().toDouble();
-    final int speedValue = currentSpeed.toInt();
+    // 🎯 獲取雙線資料，保留原始精度
+    final double currentUpload = dataGenerator.currentUpload;
+    final double currentDownload = dataGenerator.currentDownload;
+    final List<double> uploadData = dataGenerator.uploadData;
+    final List<double> downloadData = dataGenerator.downloadData;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -466,26 +787,45 @@ class RealSpeedChartWidget extends StatelessWidget {
         final double actualHeight = constraints.maxHeight;
         final double chartEndX = actualWidth * endAtPercent;
 
-        final double normalizedValue = (currentSpeed - dataGenerator.minSpeed) /
-            (dataGenerator.maxSpeed - dataGenerator.minSpeed);
-        final double dotY = (1.0 - normalizedValue) * actualHeight;
+        // 🎯 可調整的圓點位置參數
+        final double uploadDotOffset = -3.0;    // 🎯 上傳圓點左右偏移（負數向左，正數向右）
+        final double downloadDotOffset = 3.0;   // 🎯 下載圓點左右偏移（負數向左，正數向右）
+        final double overlapDotOffset = 0.0;    // 🎯 重疊時圓點的偏移
+
+        // 🎯 可調整的垂直線位置參數
+        final double uploadLineOffset = -1.0;   // 🎯 上傳垂直線左右偏移
+        final double downloadLineOffset = 1.0;  // 🎯 下載垂直線左右偏移
+        final double overlapLineOffset = 0.0;   // 🎯 重疊時垂直線的偏移
+
+        // 計算圓點位置
+        final double range = dataGenerator.maxSpeed - dataGenerator.minSpeed;
+        final double uploadNormalized = range > 0 ? (currentUpload - dataGenerator.minSpeed) / range : 0.0;
+        final double downloadNormalized = range > 0 ? (currentDownload - dataGenerator.minSpeed) / range : 0.0;
+
+        final double uploadDotY = (1.0 - uploadNormalized) * actualHeight;
+        final double downloadDotY = (1.0 - downloadNormalized) * actualHeight;
+
+        // 檢查是否重疊
+        final bool isOverlapping = (uploadDotY - downloadDotY).abs() < 12;
 
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            // 速度曲線
+            // 雙線速度曲線
             Positioned.fill(
               child: AnimatedBuilder(
                 animation: animationController,
                 builder: (context, child) {
                   return CustomPaint(
-                    painter: RealSpeedCurvePainter(
-                      speedData: dataGenerator.data,
+                    painter: DualSpeedCurvePainter(
+                      uploadData: uploadData,
+                      downloadData: downloadData,
                       minSpeed: dataGenerator.minSpeed,
                       maxSpeed: dataGenerator.maxSpeed,
                       animationValue: animationController.value,
                       endAtPercent: endAtPercent,
-                      currentSpeed: currentSpeed,
+                      currentUpload: currentUpload,
+                      currentDownload: currentDownload,
                     ),
                     size: Size(actualWidth, actualHeight),
                   );
@@ -493,173 +833,100 @@ class RealSpeedChartWidget extends StatelessWidget {
               ),
             ),
 
-            // 白點和垂直線
-            if (dataGenerator.data.isNotEmpty) ...[
-              // 垂直線
+            // 🎯 垂直線：重疊時只顯示藍色
+            if (!isOverlapping) ...[
+              // 上傳速度垂直線（橙色）
+              if (uploadData.isNotEmpty)
+                Positioned(
+                  top: uploadDotY + 8,
+                  bottom: 0,
+                  left: chartEndX + uploadLineOffset,  // 🎯 使用可調整參數
+                  child: Container(
+                    width: 1,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.orange.withOpacity(0.8),
+                          Colors.orange.withOpacity(0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+
+            // 下載速度垂直線（藍色）
+            if (downloadData.isNotEmpty)
               Positioned(
-                top: dotY + 8,
+                top: downloadDotY + 8,
                 bottom: 0,
-                left: chartEndX - 1,
+                left: chartEndX + (isOverlapping ? overlapLineOffset : downloadLineOffset), // 🎯 使用可調整參數
                 child: Container(
-                  width: 2,
+                  width: 1,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        currentSpeed > 0 ? Colors.white : Colors.white.withOpacity(0.5),
-                        Color.fromRGBO(255, 255, 255, 0),
+                        Color(0xFF00EEFF).withOpacity(0.8),
+                        Color(0xFF00EEFF).withOpacity(0),
                       ],
                     ),
                   ),
                 ),
               ),
 
-              // 白色圓點
+            // 🎯 圓點：使用可調整的偏移參數
+            if (!isOverlapping) ...[
+              // 上傳速度圓點（橙色）
+              if (uploadData.isNotEmpty)
+                Positioned(
+                  top: uploadDotY - 6,
+                  left: chartEndX - 6 + uploadDotOffset,  // 🎯 使用可調整參數
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1),
+                    ),
+                  ),
+                ),
+            ],
+
+            // 下載速度圓點（藍色）
+            if (downloadData.isNotEmpty)
               Positioned(
-                top: dotY - 8,
-                left: chartEndX - 8,
+                top: downloadDotY - 6,
+                left: chartEndX - 6 + (isOverlapping ? overlapDotOffset : downloadDotOffset), // 🎯 使用可調整參數
                 child: Container(
-                  width: 16,
-                  height: 16,
+                  width: 12,
+                  height: 12,
                   decoration: BoxDecoration(
-                    color: currentSpeed > 0 ? Colors.white : Colors.white.withOpacity(0.8),
+                    color: Color(0xFF00EEFF),
                     shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1),
                   ),
                 ),
               ),
 
-              // 速度標籤
+            // 雙線速度標籤
+            if (uploadData.isNotEmpty && downloadData.isNotEmpty)
               Positioned(
-                top: dotY - 50,
-                left: chartEndX - 44,
-                child: _buildSpeedLabel(speedValue, currentSpeed > 0),
+                top: math.min(uploadDotY, downloadDotY) - 60,
+                left: chartEndX - 60,
+                child: DualSpeedLabelWidget(
+                  uploadSpeed: currentUpload,
+                  downloadSpeed: currentDownload,
+                ),
               ),
-            ],
           ],
         );
       },
     );
-  }
-
-  Widget _buildSpeedLabel(int speed, bool hasSpeed) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-            child: Container(
-              width: 88,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Center(
-                child: Text(
-                  '$speed Mb/s',
-                  style: TextStyle(
-                    color: hasSpeed
-                        ? Color.fromRGBO(255, 255, 255, 0.8)
-                        : Color.fromRGBO(255, 255, 255, 0.6),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: -6,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: ClipPath(
-              clipper: TriangleClipper(),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-                child: Container(
-                  width: 16,
-                  height: 6,
-                  color: Colors.white.withOpacity(0.1),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 真實數據曲線繪製器
-class RealSpeedCurvePainter extends CustomPainter {
-  final List<double> speedData;
-  final double minSpeed;
-  final double maxSpeed;
-  final double animationValue;
-  final double endAtPercent;
-  final double currentSpeed;
-
-  RealSpeedCurvePainter({
-    required this.speedData,
-    required this.minSpeed,
-    required this.maxSpeed,
-    required this.animationValue,
-    this.endAtPercent = 0.7,
-    required this.currentSpeed,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (speedData.isEmpty || size.width <= 0 || size.height <= 0) return;
-
-    final double range = maxSpeed - minSpeed;
-    if (range <= 0) return;
-
-    final path = Path();
-    final double chartWidth = size.width * endAtPercent;
-
-    final double normalizedValue = (currentSpeed - minSpeed) / range;
-    final double y = size.height - (normalizedValue * size.height);
-
-    // 繪製水平直線
-    path.moveTo(0, y);
-    path.lineTo(chartWidth, y);
-
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..shader = const LinearGradient(
-        colors: [
-          Color(0xFF00EEFF),
-          Color.fromRGBO(255, 255, 255, 0.5),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, chartWidth, size.height));
-
-    final glowPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..shader = const LinearGradient(
-        colors: [
-          Color(0xFF00EEFF),
-          Color.fromRGBO(255, 255, 255, 0.5),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, chartWidth, size.height))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-
-    canvas.drawPath(path, glowPaint);
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant RealSpeedCurvePainter oldDelegate) {
-    return oldDelegate.speedData != speedData ||
-        oldDelegate.animationValue != animationValue ||
-        oldDelegate.currentSpeed != currentSpeed;
   }
 }
 

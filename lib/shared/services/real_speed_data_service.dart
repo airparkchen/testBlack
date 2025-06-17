@@ -32,90 +32,86 @@ class RealSpeedDataService {
   /// 🎯 從真實 Throughput API 獲取上傳速度
   static Future<double> getCurrentUploadSpeed() async {
     try {
-      // 檢查快取
-      if (_isCacheValid() && _cachedUploadSpeed != null) {
-        return _cachedUploadSpeed!;
-      }
-
-      print('🌐 從 Throughput API 獲取上傳速度...');
-
-      // 呼叫真實API
       final throughputResult = await WifiApiService.getSystemThroughput();
-
       double uploadSpeed = 0.0;
 
       if (throughputResult is Map<String, dynamic>) {
-        // 解析 wan[0].tx_speed
         if (throughputResult.containsKey('wan') && throughputResult['wan'] is List) {
           final List<dynamic> wanList = throughputResult['wan'];
           if (wanList.isNotEmpty && wanList[0] is Map<String, dynamic>) {
             final wanData = wanList[0] as Map<String, dynamic>;
             final String txSpeedStr = wanData['tx_speed']?.toString() ?? '0';
 
-            // 轉換為數字（假設單位為 bps，轉為 Mbps）
+            // 🎯 改善：保留更多精度的數字轉換
             final double txSpeedBps = double.tryParse(txSpeedStr) ?? 0.0;
-            uploadSpeed = txSpeedBps / 1000000.0; // bps 轉 Mbps
 
-            print('✅ 解析上傳速度: ${txSpeedStr} bps = ${uploadSpeed.toStringAsFixed(2)} Mbps');
+            if (txSpeedBps > 0) {
+              // 轉換 bps 到 Mbps，保留更多精度（不要過早四捨五入）
+              uploadSpeed = txSpeedBps / 1000000.0;
+
+              // 🎯 詳細調試輸出，幫助理解數據轉換
+              if (uploadSpeed < 0.01 && txSpeedBps > 0) {
+                final double kbps = txSpeedBps / 1000.0;
+                print('✅ 上傳速度轉換: ${txSpeedStr} bps → ${kbps.toStringAsFixed(2)} Kbps → ${uploadSpeed.toStringAsFixed(6)} Mbps');
+              } else {
+                print('✅ 上傳速度轉換: ${txSpeedStr} bps → ${uploadSpeed.toStringAsFixed(6)} Mbps');
+              }
+            } else {
+              print('✅ 上傳速度: ${txSpeedStr} bps = 0.00 Mbps (無上傳流量)');
+            }
           }
         }
       }
 
-      // 更新快取
-      _cachedUploadSpeed = uploadSpeed;
-      _lastFetchTime = DateTime.now();
-
       return uploadSpeed;
-
     } catch (e) {
       print('❌ 獲取上傳速度時發生錯誤: $e');
-      return 0.0; // 錯誤時返回0
+      return 0.0;
     }
   }
 
   /// 🎯 從真實 Throughput API 獲取下載速度
+  /// 🎯 修正：獲取下載速度 - 改善轉換邏輯
   static Future<double> getCurrentDownloadSpeed() async {
     try {
-      // 檢查快取
-      if (_isCacheValid() && _cachedDownloadSpeed != null) {
-        return _cachedDownloadSpeed!;
-      }
-
-      print('🌐 從 Throughput API 獲取下載速度...');
-
-      // 呼叫真實API
       final throughputResult = await WifiApiService.getSystemThroughput();
-
       double downloadSpeed = 0.0;
 
       if (throughputResult is Map<String, dynamic>) {
-        // 解析 wan[0].rx_speed
         if (throughputResult.containsKey('wan') && throughputResult['wan'] is List) {
           final List<dynamic> wanList = throughputResult['wan'];
           if (wanList.isNotEmpty && wanList[0] is Map<String, dynamic>) {
             final wanData = wanList[0] as Map<String, dynamic>;
             final String rxSpeedStr = wanData['rx_speed']?.toString() ?? '0';
 
-            // 轉換為數字（假設單位為 bps，轉為 Mbps）
+            // 🎯 改善：保留更多精度的數字轉換
             final double rxSpeedBps = double.tryParse(rxSpeedStr) ?? 0.0;
-            downloadSpeed = rxSpeedBps / 1000000.0; // bps 轉 Mbps
 
-            print('✅ 解析下載速度: ${rxSpeedStr} bps = ${downloadSpeed.toStringAsFixed(2)} Mbps');
+            if (rxSpeedBps > 0) {
+              // 轉換 bps 到 Mbps，保留更多精度（不要過早四捨五入）
+              downloadSpeed = rxSpeedBps / 1000000.0;
+
+              // 🎯 詳細調試輸出，幫助理解數據轉換
+              if (downloadSpeed < 0.01 && rxSpeedBps > 0) {
+                final double kbps = rxSpeedBps / 1000.0;
+                print('✅ 下載速度轉換: ${rxSpeedStr} bps → ${kbps.toStringAsFixed(2)} Kbps → ${downloadSpeed.toStringAsFixed(6)} Mbps');
+              } else {
+                print('✅ 下載速度轉換: ${rxSpeedStr} bps → ${downloadSpeed.toStringAsFixed(6)} Mbps');
+              }
+            } else {
+              print('✅ 下載速度: ${rxSpeedStr} bps = 0.00 Mbps (無下載流量)');
+            }
           }
         }
       }
 
-      // 更新快取
-      _cachedDownloadSpeed = downloadSpeed;
-      _lastFetchTime = DateTime.now();
-
       return downloadSpeed;
-
     } catch (e) {
       print('❌ 獲取下載速度時發生錯誤: $e');
-      return 0.0; // 錯誤時返回0
+      return 0.0;
     }
   }
+
 
   /// 🎯 獲取上傳速度歷史數據（真實API模式）
   static Future<List<double>> getUploadSpeedHistory({int pointCount = 100}) async {
