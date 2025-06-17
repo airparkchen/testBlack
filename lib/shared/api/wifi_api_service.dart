@@ -1151,7 +1151,9 @@ class WifiApiService {
       // 如果沒有提供用戶名，嘗試從系統資訊獲取
       if (username == null) {
         final systemInfo = await getSystemInfo();
-        username = systemInfo['default_user'] ?? 'admin';
+        // 因應api修改，暫時改成hardcode
+        // username = systemInfo['default_user'] ?? 'admin';
+        username = 'admin';
       }
 
       // 執行登入
@@ -1212,7 +1214,9 @@ class WifiApiService {
       // 獲取必要參數
       final serialNumber = systemInfo['serial_number'];
       final loginSalt = systemInfo['login_salt'];
-      final defaultUser = systemInfo['default_user'] ?? username;
+      //因應api修改，暫時改成hardcode
+      // final defaultUser = systemInfo['default_user'] ?? username;
+      final defaultUser = username;
 
       // 步驟 2: 計算初始密碼
       final password = await calculateInitialPassword(
