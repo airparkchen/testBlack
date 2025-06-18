@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/ui/pages/home/DashboardPage.dart';
+import 'package:whitebox/shared/services/api_preloader_service.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onLoginSuccess;
@@ -250,14 +251,11 @@ class _LoginPageState extends State<LoginPage> {
         // 真正的成功
         WifiApiService.setJwtToken(loginResult.jwtToken!);
 
+        print('✅ 登入成功！開始預載入 API 資料...');
+        await ApiPreloaderService.preloadAllAPIs();
         setState(() {
           _isLoggingIn = false;
         });
-
-        // 在導航到 NetworkTopoView 之前測試 Mesh Topology API
-        print('登入成功，準備測試 Mesh Topology API...');
-        // await _testMeshTopologyAPI();
-        print('暫時取消mesh topology測試');
 
         if (mounted) {
           Navigator.of(context).pushReplacement(

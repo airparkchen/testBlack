@@ -3,13 +3,14 @@
 import 'dart:async';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
+import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 
 /// Dashboard 資料處理服務 - 重寫版本
 class DashboardDataService {
   // 快取機制
   static DashboardData? _cachedData;
   static DateTime? _lastFetchTime;
-  static const Duration _cacheExpiry = Duration(seconds: 30);
+  static Duration get _cacheExpiry => NetworkTopoConfig.actualCacheDuration;  //api更新頻率
 
   /// 檢查快取是否有效
   static bool _isCacheValid() {

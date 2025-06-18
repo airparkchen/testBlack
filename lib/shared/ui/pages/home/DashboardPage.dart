@@ -38,7 +38,8 @@ class DashboardPage extends StatefulWidget {
     this.enableBackground = true,
     this.customBackgroundPath,
     this.apiEndpoint,
-    this.refreshInterval = const Duration(minutes: 1),
+    // this.refreshInterval = const Duration(minutes: 1), //api自動更新
+    this.refreshInterval = const Duration(seconds: 15),
     this.enableAutoSwitch = false,
     this.autoSwitchDuration = const Duration(seconds: 5),
     this.showBottomNavigation = true,
@@ -592,27 +593,32 @@ class _DashboardPageState extends State<DashboardPage>
 
   /// 構建 NetworkTopo 頁面（修改：支援設備詳情）
   Widget _buildNetworkTopoPage() {
-    // 如果正在顯示設備詳情
-    if (_showDeviceDetail && _selectedDeviceForDetail != null) {
-      return DeviceDetailPage(
-        selectedDevice: _selectedDeviceForDetail!,
-        isGateway: _selectedDeviceIsGateway,
-        showBottomNavigation: false, // 不顯示自己的背景和導航
-        onBack: _handleDeviceDetailBack, // 返回回調
-      );
-    } else {
-      // 正常的 NetworkTopo 頁面
-      return Container(
-        color: Colors.transparent,
-        child: NetworkTopoView(
-          showDeviceCountController: false,
-          defaultDeviceCount: 4,
-          enableInteractions: true,
-          showBottomNavigation: false,
-          onDeviceSelected: _handleDeviceSelected, // 👈 傳遞設備選擇回調
+    return IndexedStack(
+      index: _showDeviceDetail ? 1 : 0,
+      children: [
+        // 0: NetworkTopoView（始終保持活躍）
+        Container(
+          color: Colors.transparent,
+          child: NetworkTopoView(
+            showDeviceCountController: false,
+            defaultDeviceCount: 4,
+            enableInteractions: true,
+            showBottomNavigation: false,
+            onDeviceSelected: _handleDeviceSelected,
+          ),
         ),
-      );
-    }
+
+        // 1: DeviceDetailPage
+        _selectedDeviceForDetail != null
+            ? DeviceDetailPage(
+          selectedDevice: _selectedDeviceForDetail!,
+          isGateway: _selectedDeviceIsGateway,
+          showBottomNavigation: false,
+          onBack: _handleDeviceDetailBack,
+        )
+            : Container(),
+      ],
+    );
   }
 
   /// 構建設定頁面

@@ -38,13 +38,19 @@ class NetworkTopoView extends StatefulWidget {
   State<NetworkTopoView> createState() => _NetworkTopoViewState();
 }
 
-class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProviderStateMixin {
+class _NetworkTopoViewState extends State<NetworkTopoView>
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   // ==================== 狀態變數 ====================
-
 
   // 視圖模式和導航
   String _viewMode = 'topology';
   int _selectedBottomTab = 1;
+
+  //分離的載入狀態
+  bool _isLoadingTopologyData = false;  // 只追蹤拓樸數據
+  bool _isSpeedDataInitialized = false; // 追蹤速度數據初始化
 
   // 設備數量控制
   late final TextEditingController _deviceCountController;
@@ -86,7 +92,8 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     );
 
     // 新增：載入數據
-    _loadData();
+    _loadTopologyData();        // 替換 _loadData()
+    _initializeSpeedData();     // 新增：獨立初始化速度數據
     // 啟動數據更新
     _startDataUpdates();
     //啟動自動重新載入
@@ -95,27 +102,35 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     }
   }
 
+  void _initializeSpeedData() {
+    if (!_isSpeedDataInitialized) {
+      _startDataUpdates(); // 原有的速度更新邏輯
+      _isSpeedDataInitialized = true;
+      print('✅ 速度數據已初始化，將持續運行');
+    }
+  }
+
   /// 新增：異步載入數據的方法
   /// 🎯 修正：異步載入數據的方法 - 加強調試和資料流追蹤
-  Future<void> _loadData() async {
+  Future<void> _loadTopologyData() async {
     if (!mounted) return;
 
     setState(() {
-      _isLoadingData = true;
+      _isLoadingTopologyData = true; // 使用新的載入狀態
     });
 
     try {
       if (NetworkTopoConfig.useRealData) {
-        print('🌐 載入真實數據...');
+        print('載入真實拓樸數據...');
 
-        // 🎯 呼叫統一的資料統計報告
+        //  呼叫統一的資料統計報告
         await RealDataIntegrationService.printCompleteDataStatistics();
 
-        // 分別獲取不同用途的資料
         final topologyDevices = await RealDataIntegrationService.getNetworkDevices();
         final listDevices = await RealDataIntegrationService.getListViewDevices();
         final connections = await RealDataIntegrationService.getDeviceConnections();
         final gatewayName = await RealDataIntegrationService.getGatewayName();
+
 
         // 🎯 詳細的資料流調試
         print('\n=== 🎯 NetworkTopoView 資料載入詳情 ===');
@@ -145,11 +160,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
             _listDevices = listDevices;
             _currentConnections = connections;
             _gatewayName = gatewayName;
-            _isLoadingData = false;
+            _isLoadingTopologyData = false; // 使用新的載入狀態
           });
         }
-
-        print('✅ 真實數據載入完成');
+        print(' 真實數據載入完成');
 
       } else {
         // 假數據邏輯保持不變
@@ -184,10 +198,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
         print('✅ 假數據載入完成');
       }
     } catch (e) {
-      print('❌ 載入數據時發生錯誤: $e');
+      print('❌ 載入拓樸數據時發生錯誤:: $e');
       if (mounted) {
         setState(() {
-          _isLoadingData = false;
+          _isLoadingTopologyData = false;
         });
       }
     }
@@ -221,17 +235,17 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
     if (!mounted) return;
 
     try {
-      print('🔄 執行強制重新載入...');
+      print('🔄 執行拓樸數據強制重新載入（保持速度區域連續）...');
 
-      // 清除快取並重新載入
+      // 清除拓樸數據快取
       await RealDataIntegrationService.forceReload();
 
-      // 重新載入當前頁面數據
-      await _loadData();
+      // 🎯 關鍵：只重新載入拓樸數據，不影響速度數據
+      await _loadTopologyData();
 
-      print('✅ 自動重新載入完成');
+      print('✅ 拓樸數據重新載入完成');
     } catch (e) {
-      print('❌ 自動重新載入失敗: $e');
+      print('❌ 拓樸數據重新載入失敗: $e');
     }
   }
 
@@ -279,7 +293,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
 
       // 如果使用假數據，重新載入
       if (!NetworkTopoConfig.useRealData) {
-        _loadData();
+        _loadTopologyData();
       }
     }
   }
@@ -352,6 +366,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final screenSize = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -407,14 +422,15 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   /// 建構主要內容
   /// 修正：建構主要內容（加入載入狀態和正確的數據源）
   Widget _buildMainContent() {
-    if (_isLoadingData) {
+    // 🎯 使用新的載入狀態
+    if (_isLoadingTopologyData && _topologyDevices.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(color: Colors.white),
             SizedBox(height: 16),
-            Text('Loading...', style: TextStyle(color: Colors.white, fontSize: 16)),
+            Text('Loading topology...', style: TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
       );
@@ -449,7 +465,6 @@ class _NetworkTopoViewState extends State<NetworkTopoView> with SingleTickerProv
   }
 
 
-  /// 建構設備數量控制器
   /// 建構設備數量控制器
   Widget _buildDeviceCountController() {
     return Container(
