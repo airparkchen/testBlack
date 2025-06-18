@@ -177,7 +177,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     _changePage(nextIndex);
   }
 
-  // ==================== 保持原有的分頁控制方法 ====================
+  // ==================== 分頁控制方法（簡化） ====================
 
   void _changePage(int newIndex) {
     if (newIndex != _currentPageIndex && newIndex >= 0 && newIndex < widget.totalPages) {
@@ -195,13 +195,6 @@ class _DashboardComponentState extends State<DashboardComponent>
       // 通知外部分頁變更
       widget.onPageChanged?.call(newIndex);
     }
-  }
-
-  void _onDotTapped(int index) {
-    // 用戶手動切換時，重新啟動自動切換計時器
-    _stopAutoSwitch();
-    _changePage(index);
-    _restartAutoSwitch();
   }
 
   // ==================== 重寫：資料獲取方法 ====================
@@ -241,13 +234,13 @@ class _DashboardComponentState extends State<DashboardComponent>
         status: apiData.internetStatus.formattedStatus
     ));
 
-    // WiFi（多行顯示，標題後換行）
+    // 🎯 修正：WiFi 區域 - 標題與頻段項目不用橫線分隔
     firstPageConnections.add(EthernetConnection(
         speed: 'WiFi',
         status: '' // 空字符串表示標題
     ));
 
-    // WiFi 頻率狀態列表
+    // WiFi 頻率狀態列表（這些項目將使用居中排版）
     for (var freq in apiData.wifiFrequencies) {
       firstPageConnections.add(EthernetConnection(
           speed: freq.displayFrequency,
@@ -255,11 +248,11 @@ class _DashboardComponentState extends State<DashboardComponent>
       ));
     }
 
-    // Guest WiFi（如果啟用的話）
+    // Guest WiFi（如果啟用）
     if (DashboardConfig.showGuestWiFi && apiData.guestWifiFrequencies.isNotEmpty) {
       firstPageConnections.add(EthernetConnection(
           speed: 'Guest WiFi',
-          status: '' // 空字符串表示標題
+          status: ''
       ));
 
       for (var freq in apiData.guestWifiFrequencies) {
@@ -278,61 +271,56 @@ class _DashboardComponentState extends State<DashboardComponent>
     // ==================== 第二頁：SSID 列表 ====================
     final secondPageConnections = <EthernetConnection>[];
 
-    // 只顯示啟用的 WiFi SSID
     final enabledWiFiSSIDs = apiData.wifiSSIDs.where((ssid) => ssid.isEnabled).toList();
 
     if (enabledWiFiSSIDs.isNotEmpty) {
-      // WiFi 標題
+      // 🎯 WiFi 標題
       secondPageConnections.add(EthernetConnection(
           speed: 'WiFi',
-          status: '' // 空字符串表示標題
+          status: '',
+          connectionType: 'wifi_title' // 🔥 新增：標記這是WiFi標題
       ));
 
-      // 各頻率的 SSID（按照圖片要求，SSID 名稱要換行顯示）
+      // 🎯 各頻率的 SSID（使用特殊的 SSID 排版）
       for (var ssidInfo in enabledWiFiSSIDs) {
         secondPageConnections.add(EthernetConnection(
             speed: ssidInfo.ssidLabel, // 例如：SSID(2.4GHz)
-            status: ssidInfo.ssid      // 例如：OWA813V_2.4G（會換行顯示）
+            status: ssidInfo.ssid,      // 例如：OWA813V_2.4G
+            connectionType: 'wifi_ssid' // 🔥 新增：標記這是WiFi SSID項目
         ));
       }
     }
 
-    // Guest WiFi SSID（如果啟用的話）
+    // Guest WiFi SSID（如果啟用）
     if (DashboardConfig.showGuestWiFi && apiData.guestWifiSSIDs.isNotEmpty) {
       final enabledGuestSSIDs = apiData.guestWifiSSIDs.where((ssid) => ssid.isEnabled).toList();
 
       if (enabledGuestSSIDs.isNotEmpty) {
         secondPageConnections.add(EthernetConnection(
             speed: 'Guest WiFi',
-            status: '' // 空字符串表示標題
+            status: '',
+            connectionType: 'guest_wifi_title' // 🔥 新增：標記這是Guest WiFi標題
         ));
 
         for (var ssidInfo in enabledGuestSSIDs) {
           secondPageConnections.add(EthernetConnection(
               speed: ssidInfo.ssidLabel,
-              status: ssidInfo.ssid
+              status: ssidInfo.ssid,
+              connectionType: 'guest_wifi_ssid' // 🔥 新增：標記這是Guest WiFi SSID項目
           ));
         }
       }
     }
 
-    // 如果沒有啟用的 SSID
-    if (secondPageConnections.isEmpty) {
-      secondPageConnections.add(EthernetConnection(
-          speed: 'WiFi',
-          status: 'No enabled networks'
-      ));
-    }
-
     pages.add(EthernetPageData(
-      pageTitle: "WiFi SSID",
+      pageTitle: "WiFi SSID",  // 🎯 明確標示這是 SSID 頁面
       connections: secondPageConnections,
     ));
 
     // ==================== 第三頁：Ethernet ====================
     pages.add(EthernetPageData(
       pageTitle: "Ethernet",
-      connections: [], // 空的連接列表，只顯示標題
+      connections: [], // 🎯 空的連接列表，只顯示標題
     ));
 
     return pages;
@@ -371,13 +359,11 @@ class _DashboardComponentState extends State<DashboardComponent>
 
     // ==================== 內部尺寸配置 ====================
 
-    final double titleHeight = bottomInset > 0 ? 60.0 : 80.0;
-    final double indicatorHeight = 40.0;
     final EdgeInsets contentPadding = EdgeInsets.fromLTRB(
         25,
-        bottomInset > 0 ? 10 : 15,
+        bottomInset > 0 ? 15 : 25,
         25,
-        bottomInset > 0 ? 10 : 25
+        bottomInset > 0 ? 15 : 25
     );
 
     return FadeTransition(
@@ -385,99 +371,12 @@ class _DashboardComponentState extends State<DashboardComponent>
       child: _appTheme.whiteBoxTheme.buildStandardCard(
         width: cardWidth,
         height: cardHeight,
-        child: Column(
-          children: [
-            // ==================== 標題區域 ====================
-            Container(
-              height: titleHeight,
-              padding: EdgeInsets.fromLTRB(
-                  25,
-                  bottomInset > 0 ? 15 : 25,
-                  25,
-                  0
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Dashboard 標題
-                  Text(
-                    'Dashboard',
-                    style: TextStyle(
-                      fontSize: bottomInset > 0 ? 18 : 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-
-                  // 重新整理按鈕
-                  IconButton(
-                    onPressed: () {
-                      // 重新載入 API 資料
-                      _loadApiData();
-                      widget.onRefresh?.call();
-                    },
-                    icon: Icon(
-                      Icons.refresh,
-                      color: Colors.white.withOpacity(0.8),
-                      size: bottomInset > 0 ? 20 : 24,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ),
-
-            // ==================== 分頁指示器 ====================
-            Container(
-              height: indicatorHeight,
-              child: _buildPageIndicators(bottomInset),
-            ),
-
-            // ==================== 分頁內容區域 ====================
-            Expanded(
-              child: _buildPageContent(contentPadding, bottomInset),
-            ),
-          ],
-        ),
+        child: _buildPageContent(contentPadding, bottomInset),
       ),
     );
   }
 
-  // ==================== 保持原有的分頁指示器構建 ====================
-
-  Widget _buildPageIndicators(double bottomInset) {
-    final double indicatorSize = bottomInset > 0 ? 6.0 : 8.0;
-    final double indicatorSpacing = bottomInset > 0 ? 12.0 : 16.0;
-
-    return Center(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(widget.totalPages, (index) {
-          bool isActive = index == _currentPageIndex;
-
-          return GestureDetector(
-            onTap: () => _onDotTapped(index),
-            child: Container(
-              width: indicatorSize,
-              height: indicatorSize,
-              margin: EdgeInsets.symmetric(horizontal: indicatorSpacing / 2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isActive ? Colors.white : Colors.transparent,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 1.0,
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  // ==================== 修正：分頁內容構建 ====================
+  // ==================== 修正：分頁內容構建（移除分頁指示器邏輯） ====================
 
   Widget _buildPageContent(EdgeInsets contentPadding, double bottomInset) {
     final ethernetPages = _getEthernetPages();
@@ -521,8 +420,9 @@ class _DashboardComponentState extends State<DashboardComponent>
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          // 如果是第三頁（Ethernet）且沒有連接資料，只顯示標題
-          if (pageData.pageTitle.contains("Ethernet") && pageData.connections.isEmpty) ...[
+          // 🎯 修正：根據頁面類型決定是否顯示內容
+          if (pageData.pageTitle.contains("Ethernet")) ...[
+            // 第三頁：只顯示 Ethernet 標題，其他內容隱藏
             _buildSectionTitle("Ethernet", bottomInset),
             SizedBox(height: 40),
             Center(
@@ -535,16 +435,35 @@ class _DashboardComponentState extends State<DashboardComponent>
               ),
             ),
           ] else ...[
-            // 其他頁面顯示完整內容
+            // 第一頁和第二頁：顯示連接項目
             ...pageData.connections.asMap().entries.map((entry) {
               int index = entry.key;
               EthernetConnection connection = entry.value;
               bool isLastItem = index == pageData.connections.length - 1;
 
+              // 🔥 修正：根據connectionType來決定排版方式
+              String connectionType = connection.connectionType ?? '';
+              bool isWiFiOrGuestTitle = connectionType == 'wifi_title' || connectionType == 'guest_wifi_title';
+              bool isSSIDItem = connectionType == 'wifi_ssid' || connectionType == 'guest_wifi_ssid';
+              bool needsDividerAfter = isWiFiOrGuestTitle; // 只有WiFi/Guest WiFi標題後需要橫線
+
               return Column(
                 children: [
                   _buildConnectionItem(connection, bottomInset, index == 0),
-                  if (!isLastItem) _buildDivider(bottomInset),
+
+                  // 🎯 關鍵：只在WiFi或Guest WiFi標題後加橫線
+                  if (needsDividerAfter)
+                    _buildDivider(bottomInset),
+
+                  // 其他項目的間距處理
+                  if (!isLastItem && !needsDividerAfter) ...[
+                    if (pageData.pageTitle.contains("SSID"))
+                      SizedBox(height: 2) // SSID頁面的小間距
+                    else if (!_isWiFiRelatedItem(connection.speed))
+                      _buildDivider(bottomInset) // 第一頁非WiFi項目的橫線
+                    else
+                      SizedBox(height: 2), // 第一頁WiFi項目的小間距
+                  ],
                 ],
               );
             }).toList(),
@@ -558,11 +477,23 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 重寫：連接項目構建（符合新的版面需求） ====================
+  /// 🎯 新增：判斷是否為 WiFi 相關項目
+  bool _isWiFiRelatedItem(String speed) {
+    // WiFi 頻段相關項目：WiFi 標題、各頻段、Guest WiFi 標題等
+    final wifiRelatedItems = [
+      'WiFi', 'Guest WiFi',
+      '2.4GHz', '5GHz', '6GHz', 'MLO'
+    ];
+    return wifiRelatedItems.contains(speed);
+  }
 
-  /// 修正：連接項目構建，支援標題左對齊和內容右對齊
+  // ==================== 🔥 重寫：連接項目構建（完全重新設計） ====================
+
+  /// 修正：連接項目構建，支援多種排版格式
   Widget _buildConnectionItem(EthernetConnection connection, double bottomInset, bool isFirstItem) {
-    // 如果 status 為空，表示這是一個標題行
+    String connectionType = connection.connectionType ?? '';
+
+    // 🔥 情況1：標題行（如 "WiFi", "Guest WiFi"）
     if (connection.status.isEmpty) {
       return Padding(
         padding: EdgeInsets.only(
@@ -583,11 +514,48 @@ class _DashboardComponentState extends State<DashboardComponent>
       );
     }
 
-    // 檢查是否為單行項目（Model Name, Internet）
-    bool isSingleLineItem = _isSingleLineItem(connection.speed);
+    // 🔥 情況2：SSID項目（左上角標題，右下角SSID名稱）
+    if (connectionType == 'wifi_ssid' || connectionType == 'guest_wifi_ssid') {
+      return Padding(
+        padding: EdgeInsets.only(
+          top: bottomInset > 0 ? 12 : 15,
+          bottom: bottomInset > 0 ? 12 : 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 左上角：SSID 標題（如 "SSID(2.4GHz)"）
+            Align(
+              alignment: Alignment.center,
+              child: Text(
+                connection.speed,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.9),
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ),
+            SizedBox(height: 6),
+            // 右下角：SSID 名稱
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                connection.status,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.white.withOpacity(0.7),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-    if (isSingleLineItem) {
-      // 單行項目：標題和內容在同一行
+    // 🔥 情況3：單行項目（Model Name, Internet）
+    if (_isSingleLineItem(connection.speed)) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 8 : 12),
         child: Row(
@@ -612,35 +580,49 @@ class _DashboardComponentState extends State<DashboardComponent>
           ],
         ),
       );
-    } else {
-      // 多行項目：內容右對齊，但在標題下方
-      return Padding(
-        padding: EdgeInsets.only(
-          left: 0, // 不縮進，保持與標題對齊
-          bottom: bottomInset > 0 ? 8 : 12,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              connection.speed,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
-            Text(
-              connection.status,
-              style: TextStyle(
-                fontSize: 16,
-                color: _getStatusColor(connection.status),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
     }
+
+    // 🔥 情況4：WiFi頻段項目（第一頁的 2.4GHz, 5GHz 等 - 頻段居中，狀態右對齊）
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 6 : 8),
+      child: Row(
+        children: [
+          // 左側空間（讓頻段名稱看起來居中）
+          Expanded(flex: 1, child: SizedBox()),
+
+          // 中間：頻段名稱
+          Expanded(
+            flex: 2,
+            child: Center(
+              child: Text(
+                connection.speed,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.white.withOpacity(0.7),
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ),
+          ),
+
+          // 右側：狀態
+          Expanded(
+            flex: 1,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                connection.status,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _getStatusColor(connection.status),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 判斷是否為單行項目
@@ -657,12 +639,6 @@ class _DashboardComponentState extends State<DashboardComponent>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.wifi_off,
-              color: Colors.white.withOpacity(0.5),
-              size: bottomInset > 0 ? 40 : 48,
-            ),
-            SizedBox(height: 16),
             Text(
               'Page ${pageIndex + 1}',
               style: TextStyle(
@@ -670,6 +646,7 @@ class _DashboardComponentState extends State<DashboardComponent>
                 color: Colors.white.withOpacity(0.7),
               ),
             ),
+            SizedBox(height: 8),
             Text(
               'Loading...',
               style: TextStyle(
@@ -694,17 +671,20 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  /// 獲取狀態顏色
+  /// 獲取狀態顏色 不同狀態不同顏色
   Color _getStatusColor(String status) {
     final statusLower = status.toLowerCase();
     if (statusLower.contains('connect') && !statusLower.contains('disconnect')) {
-      return Colors.green.shade300;
+      // return Colors.green.shade300;
+      return Colors.white.withOpacity(0.7);
     } else if (statusLower.contains('on')) {
-      return Colors.green.shade300;
+      // return Colors.green.shade300;
+      return Colors.white.withOpacity(0.7);
     } else if (statusLower.contains('disconnect') || statusLower.contains('off')) {
-      return Colors.red.shade300;
+      // return Colors.red.shade300;
+      return Colors.white.withOpacity(0.7);
     } else {
-      return Colors.white;
+      return Colors.white.withOpacity(0.7);
     }
   }
 
@@ -720,22 +700,25 @@ class _DashboardComponentState extends State<DashboardComponent>
   }
 }
 
-// ==================== 保持原有的資料模型類別 ====================
+// ==================== 🔥 修正：資料模型類別（新增connectionType欄位） ====================
 
-/// 乙太網路連線資料模型（保持向後兼容）
+/// 乙太網路連線資料模型（新增connectionType欄位）
 class EthernetConnection {
   final String speed;    // 連線速度或標籤名稱
   final String status;   // 連線狀態或內容
+  final String? connectionType; // 🔥 新增：連接類型標記
 
   const EthernetConnection({
     required this.speed,
     required this.status,
+    this.connectionType, // 🔥 新增可選參數
   });
 
   factory EthernetConnection.fromJson(Map<String, dynamic> json) {
     return EthernetConnection(
       speed: json['speed'] ?? '',
       status: json['status'] ?? 'Unknown',
+      connectionType: json['connectionType'], // 🔥 新增從JSON讀取
     );
   }
 
@@ -743,12 +726,13 @@ class EthernetConnection {
     return {
       'speed': speed,
       'status': status,
+      if (connectionType != null) 'connectionType': connectionType, // 🔥 新增到JSON
     };
   }
 
   @override
   String toString() {
-    return 'EthernetConnection(speed: $speed, status: $status)';
+    return 'EthernetConnection(speed: $speed, status: $status, connectionType: $connectionType)';
   }
 }
 

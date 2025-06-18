@@ -1,4 +1,5 @@
-// 🎯 修正：NetworkTopologyComponent 使用真實 Gateway 資料
+// lib/shared/ui/components/basic/NetworkTopologyComponent.dart - 修正版本
+// 🎯 修正：只顯示到父節點的連線，保持原有佈局邏輯
 
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
@@ -19,9 +20,9 @@ class DeviceConnection {
   });
 }
 
-/// 🎯 修正：網絡拓撲圖元件 - 使用真實 Gateway 資料
+/// 🎯 修正：網絡拓撲圖元件 - 只連接到父節點
 class NetworkTopologyComponent extends StatefulWidget {
-  /// 🎯 新增：真實的 Gateway 設備資料
+  /// 🎯 真實的 Gateway 設備資料
   final NetworkDevice? gatewayDevice;
 
   /// 中央路由器/網關名稱（保留向後兼容）
@@ -50,7 +51,7 @@ class NetworkTopologyComponent extends StatefulWidget {
 
   const NetworkTopologyComponent({
     Key? key,
-    this.gatewayDevice, // 🎯 新增：真實 Gateway 資料
+    this.gatewayDevice,
     required this.gatewayName,
     required this.devices,
     this.deviceConnections,
@@ -112,10 +113,10 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
       color: Colors.transparent,
       child: Stack(
         children: [
-          // 背景和連接線
+          // 🎯 修正：背景和連接線 - 只連接到父節點
           Positioned.fill(
             child: CustomPaint(
-              painter: ConnectionLinesPainter(
+              painter: CorrectedConnectionLinesPainter(
                 calculateDevicePosition: _calculateDevicePosition,
                 devices: widget.devices,
                 showInternet: widget.showInternet,
@@ -123,6 +124,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
                 internetPosition: widget.showInternet ? _calculateInternetPosition(actualWidth, actualHeight) : null,
                 containerWidth: actualWidth,
                 containerHeight: actualHeight,
+                gatewayDevice: widget.gatewayDevice, // 🎯 新增：傳入 Gateway 資料
               ),
             ),
           ),
@@ -130,7 +132,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
           // 互聯網圖標
           if (widget.showInternet) _buildInternetIcon(actualWidth, actualHeight),
 
-          // 🎯 修正：Gateway 圖標（使用真實資料）
+          // Gateway 圖標
           _buildGatewayIcon(actualWidth, actualHeight),
 
           // Extender 設備圖標們
@@ -144,12 +146,11 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     );
   }
 
-  /// 🎯 修正：建構 Gateway 標籤 - 使用真實資料
-  /// 🎯 修正：建構 Gateway 標籤 - 優先使用真實 Gateway 資料
+  /// 建構 Gateway 標籤
   Widget _buildGatewayLabel(double containerWidth, double containerHeight) {
     final centerPosition = _calculateGatewayPosition(containerWidth, containerHeight);
 
-    // 🎯 優先從真實 Gateway 設備獲取連接數
+    // 優先從真實 Gateway 設備獲取連接數
     int gatewayConnectionCount = 0;
 
     if (widget.gatewayDevice != null) {
@@ -158,14 +159,12 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
       gatewayConnectionCount = int.tryParse(clientsStr) ?? 0;
       print('🎯 Gateway 連接數從真實設備獲取: $gatewayConnectionCount');
     } else if (widget.deviceConnections != null) {
-      // 備用方案：嘗試從 deviceConnections 查找（不硬編碼 MAC）
+      // 備用方案：嘗試從 deviceConnections 查找
       try {
-        // 🎯 智能查找：找第一個包含 gateway 或 controller 的連接
         final gatewayConnection = widget.deviceConnections!.firstWhere(
               (conn) => conn.deviceId.toLowerCase().contains('gateway') ||
               conn.deviceId.toLowerCase().contains('controller'),
           orElse: () {
-            // 如果找不到，取第一個連接數最大的（通常是 Gateway）
             if (widget.deviceConnections!.isNotEmpty) {
               var maxConnection = widget.deviceConnections!.first;
               for (var conn in widget.deviceConnections!) {
@@ -314,7 +313,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     );
   }
 
-  /// 🎯 修正：建構 Gateway 圖標 - 使用真實 Gateway 資料
+  /// 建構 Gateway 圖標
   Widget _buildGatewayIcon(double containerWidth, double containerHeight) {
     final centerPosition = _calculateGatewayPosition(containerWidth, containerHeight);
 
@@ -324,19 +323,16 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
       child: GestureDetector(
         onTap: () {
           if (widget.onDeviceSelected != null) {
-            // 🎯 優先使用真實 Gateway 設備資料
             NetworkDevice gatewayDeviceToSelect;
 
             if (widget.gatewayDevice != null) {
-              // 使用真實的 Gateway 設備資料
               gatewayDeviceToSelect = widget.gatewayDevice!;
               print('🎯 使用真實 Gateway 設備: ${gatewayDeviceToSelect.name} (${gatewayDeviceToSelect.mac})');
             } else {
-              // 🎯 備用方案：創建基本 Gateway 設備物件（不硬編碼）
               gatewayDeviceToSelect = NetworkDevice(
                 name: widget.gatewayName,
                 id: 'device-gateway',
-                mac: 'unknown', // 🎯 不硬編碼，標記為未知
+                mac: 'unknown',
                 ip: '192.168.1.1',
                 connectionType: ConnectionType.wired,
                 additionalInfo: {
@@ -475,7 +471,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
     }
   }
 
-  // 計算設備位置
+  // 🎯 保持原有佈局邏輯：計算設備位置
   Offset _calculateDevicePosition(NetworkDevice device, double containerWidth, double containerHeight) {
     final deviceCount = widget.devices.length;
     final index = widget.devices.indexOf(device);
@@ -540,8 +536,8 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
   }
 }
 
-/// 只負責繪製連接線的 CustomPainter
-class ConnectionLinesPainter extends CustomPainter {
+/// 🎯 修正：只負責繪製正確連接線的 CustomPainter
+class CorrectedConnectionLinesPainter extends CustomPainter {
   final List<NetworkDevice> devices;
   final bool showInternet;
   final Offset gatewayPosition;
@@ -549,8 +545,9 @@ class ConnectionLinesPainter extends CustomPainter {
   final double containerWidth;
   final double containerHeight;
   final Offset Function(NetworkDevice, double, double) calculateDevicePosition;
+  final NetworkDevice? gatewayDevice; // 🎯 新增：Gateway 設備資料
 
-  ConnectionLinesPainter({
+  CorrectedConnectionLinesPainter({
     required this.devices,
     required this.showInternet,
     required this.gatewayPosition,
@@ -558,6 +555,7 @@ class ConnectionLinesPainter extends CustomPainter {
     required this.containerWidth,
     required this.containerHeight,
     required this.calculateDevicePosition,
+    this.gatewayDevice, // 🎯 新增參數
   });
 
   @override
@@ -567,48 +565,68 @@ class ConnectionLinesPainter extends CustomPainter {
       _drawConnection(canvas, internetPosition!, gatewayPosition, ConnectionType.wired);
     }
 
-    // 繪製設備到網關的連線
-    for (var device in devices) {
-      final devicePosition = _calculateDevicePosition(device);
-      _drawConnection(canvas, gatewayPosition, devicePosition, device.connectionType);
-    }
-
-    // 繪製 Extender 之間的連線
-    _drawExtenderToExtenderConnections(canvas, size);
+    // 🎯 修正：根據真實的父節點關係繪製連線
+    _drawParentBasedConnections(canvas, size);
   }
 
-  /// 繪製 Extender 之間的連接線
-  void _drawExtenderToExtenderConnections(Canvas canvas, Size size) {
+  /// 🎯 新增：根據父節點關係繪製連線
+  void _drawParentBasedConnections(Canvas canvas, Size size) {
     if (!NetworkTopoConfig.showExtenderConnections) {
+      // 🎯 如果關閉 Extender 連線顯示，則使用原始邏輯（全部連到 Gateway）
+      for (var device in devices) {
+        final devicePosition = calculateDevicePosition(device, containerWidth, containerHeight);
+        _drawConnection(canvas, gatewayPosition, devicePosition, device.connectionType);
+      }
       return;
     }
 
     try {
+      // 🎯 修正：根據 parentAccessPoint 決定連線目標
       for (var device in devices) {
+        final devicePosition = calculateDevicePosition(device, containerWidth, containerHeight);
         final parentMAC = device.additionalInfo['parentAccessPoint']?.toString() ?? '';
 
-        if (parentMAC.isEmpty) continue;
+        print('🔍 [CONNECTION] 分析設備連線: ${device.name}');
+        print('   └─ 父節點 MAC: $parentMAC');
 
-        NetworkDevice? parentDevice;
-        try {
-          parentDevice = devices.firstWhere((d) => d.mac == parentMAC);
-        } catch (e) {
+        if (parentMAC.isEmpty) {
+          // 沒有父節點資訊，連接到 Gateway
+          print('   └─ 連接到: Gateway (無父節點資訊)');
+          _drawConnection(canvas, gatewayPosition, devicePosition, device.connectionType);
           continue;
         }
 
-        if (parentDevice.additionalInfo['type'] == 'gateway') {
-          continue;
-        }
+        // 🎯 關鍵修正：檢查父節點是 Gateway 還是其他 Extender
+        if (gatewayDevice != null && parentMAC == gatewayDevice!.mac) {
+          // 父節點是 Gateway，連接到 Gateway
+          print('   └─ 連接到: Gateway');
+          _drawConnection(canvas, gatewayPosition, devicePosition, device.connectionType);
+        } else {
+          // 🎯 父節點是其他 Extender，尋找父 Extender 並連接
+          NetworkDevice? parentDevice;
+          try {
+            parentDevice = devices.firstWhere((d) => d.mac == parentMAC);
+            print('   └─ 連接到: Extender ${parentDevice.name}');
+          } catch (e) {
+            print('   └─ 找不到父設備，連接到 Gateway');
+            _drawConnection(canvas, gatewayPosition, devicePosition, device.connectionType);
+            continue;
+          }
 
-        if (parentDevice.additionalInfo['type'] == 'extender') {
-          final devicePos = calculateDevicePosition(device, containerWidth, containerHeight);
-          final parentPos = calculateDevicePosition(parentDevice, containerWidth, containerHeight);
-
-          _drawConnection(canvas, parentPos, devicePos, ConnectionType.wired);
+          if (parentDevice != null) {
+            final parentPosition = calculateDevicePosition(parentDevice, containerWidth, containerHeight);
+            _drawConnection(canvas, parentPosition, devicePosition, device.connectionType);
+            print('   └─ ✅ 已繪製到父 Extender 的連線');
+          }
         }
       }
     } catch (e) {
-      // 錯誤處理
+      print('❌ [CONNECTION] 繪製連線時發生錯誤: $e');
+      // 發生錯誤時使用備用邏輯：全部連到 Gateway
+      for (var device in devices) {
+        final devicePosition = calculateDevicePosition(device, containerWidth, containerHeight);
+        _drawConnection(canvas, gatewayPosition, devicePosition, device.connectionType);
+      }
     }
   }
 
@@ -691,13 +709,8 @@ class ConnectionLinesPainter extends CustomPainter {
     }
   }
 
-  // 計算設備位置
-  Offset _calculateDevicePosition(NetworkDevice device) {
-    return calculateDevicePosition(device, containerWidth, containerHeight);
-  }
-
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CorrectedConnectionLinesPainter oldDelegate) => true;
 }
 
 /// 網絡設備類

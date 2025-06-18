@@ -10,7 +10,7 @@ import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/services/dashboard_data_service.dart';
-import 'package:whitebox/shared/ui/components/basic/DashboardComponent.dart';
+// 🔥 重要：移除重複的 import，使用 DashboardComponent 中的資料類別
 
 class DashboardPage extends StatefulWidget {
   // ==================== 配置參數 ====================
@@ -49,6 +49,7 @@ class DashboardPage extends StatefulWidget {
   @override
   State<DashboardPage> createState() => _DashboardPageState();
 }
+
 class _DashboardPageState extends State<DashboardPage>
     with TickerProviderStateMixin {
 
@@ -108,7 +109,7 @@ class _DashboardPageState extends State<DashboardPage>
   bool _hasError = false;
   String _errorMessage = '';
 
-  // Dashboard 資料
+  // 🔥 修正：使用 DashboardComponent 中的 EthernetPageData
   List<EthernetPageData>? _ethernetPages;
 
   // 重新整理計時器
@@ -147,7 +148,7 @@ class _DashboardPageState extends State<DashboardPage>
     super.dispose();
   }
 
-  // ==================== 資料載入方法（保持原有邏輯） ====================
+  // ==================== 資料載入方法（修正：使用正確的資料類別） ====================
 
   /// 載入 Dashboard 資料
   Future<void> _loadDashboardData() async {
@@ -179,7 +180,7 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
-  /// 模擬 API 呼叫
+  /// 模擬 API 呼叫（修正：使用正確的資料類別）
   Future<List<EthernetPageData>> _fetchDashboardDataFromAPI() async {
     try {
       print('🌐 開始載入真實 Dashboard 資料...');
@@ -204,7 +205,7 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
-  /// 將 DashboardData 轉換為 EthernetPageData 格式
+  /// 🔥 修正：將 DashboardData 轉換為 DashboardComponent 中的 EthernetPageData 格式
   List<EthernetPageData> _convertDashboardDataToEthernetPages(DashboardData dashboardData) {
     final pages = <EthernetPageData>[];
 
@@ -223,10 +224,11 @@ class _DashboardPageState extends State<DashboardPage>
       status: dashboardData.internetStatus.formattedStatus,
     ));
 
-    // WiFi (標題)
+    // WiFi (標題) - 🔥 加上 connectionType
     firstPageConnections.add(EthernetConnection(
       speed: 'WiFi',
       status: '', // 空值，表示這是一個標題行
+      connectionType: 'wifi_title',
     ));
 
     // WiFi 頻率狀態 (列表，右對齊)
@@ -234,6 +236,7 @@ class _DashboardPageState extends State<DashboardPage>
       firstPageConnections.add(EthernetConnection(
         speed: freq.displayFrequency,
         status: freq.statusText,
+        connectionType: 'wifi_frequency', // 標記為頻率項目
       ));
     }
 
@@ -242,12 +245,14 @@ class _DashboardPageState extends State<DashboardPage>
       firstPageConnections.add(EthernetConnection(
         speed: 'Guest WiFi',
         status: '', // 標題行
+        connectionType: 'guest_wifi_title',
       ));
 
       for (var freq in dashboardData.guestWifiFrequencies) {
         firstPageConnections.add(EthernetConnection(
           speed: freq.displayFrequency,
           status: freq.statusText,
+          connectionType: 'guest_wifi_frequency',
         ));
       }
     }
@@ -260,34 +265,44 @@ class _DashboardPageState extends State<DashboardPage>
     // ==================== 第二頁：SSID 列表 ====================
     final secondPageConnections = <EthernetConnection>[];
 
-    // WiFi SSID (標題)
-    secondPageConnections.add(EthernetConnection(
-      speed: 'WiFi',
-      status: '', // 標題行
-    ));
-
     // 只顯示啟用的 WiFi SSID
     final enabledWiFiSSIDs = dashboardData.wifiSSIDs.where((ssid) => ssid.isEnabled).toList();
-    for (var ssidInfo in enabledWiFiSSIDs) {
+
+    if (enabledWiFiSSIDs.isNotEmpty) {
+      // WiFi SSID (標題) - 🔥 加上 connectionType
       secondPageConnections.add(EthernetConnection(
-        speed: ssidInfo.ssidLabel, // SSID(2.4GHz), SSID(5GHz), etc.
-        status: ssidInfo.ssid,     // 實際的 SSID 名稱
+        speed: 'WiFi',
+        status: '', // 標題行
+        connectionType: 'wifi_title',
       ));
+
+      for (var ssidInfo in enabledWiFiSSIDs) {
+        secondPageConnections.add(EthernetConnection(
+          speed: ssidInfo.ssidLabel, // SSID(2.4GHz), SSID(5GHz), etc.
+          status: ssidInfo.ssid,     // 實際的 SSID 名稱
+          connectionType: 'wifi_ssid', // 🔥 重要：標記為 SSID 項目
+        ));
+      }
     }
 
     // Guest WiFi SSID (如果啟用)
     if (DashboardConfig.showGuestWiFi && dashboardData.guestWifiSSIDs.isNotEmpty) {
-      secondPageConnections.add(EthernetConnection(
-        speed: 'Guest WiFi',
-        status: '', // 標題行
-      ));
-
       final enabledGuestSSIDs = dashboardData.guestWifiSSIDs.where((ssid) => ssid.isEnabled).toList();
-      for (var ssidInfo in enabledGuestSSIDs) {
+
+      if (enabledGuestSSIDs.isNotEmpty) {
         secondPageConnections.add(EthernetConnection(
-          speed: ssidInfo.ssidLabel,
-          status: ssidInfo.ssid,
+          speed: 'Guest WiFi',
+          status: '', // 標題行
+          connectionType: 'guest_wifi_title',
         ));
+
+        for (var ssidInfo in enabledGuestSSIDs) {
+          secondPageConnections.add(EthernetConnection(
+            speed: ssidInfo.ssidLabel,
+            status: ssidInfo.ssid,
+            connectionType: 'guest_wifi_ssid', // 🔥 重要：標記為 Guest SSID 項目
+          ));
+        }
       }
     }
 
@@ -331,7 +346,7 @@ class _DashboardPageState extends State<DashboardPage>
     return pages;
   }
 
-  /// 備用的 EthernetPageData（API 失敗時使用）
+  /// 🔥 修正：備用的 EthernetPageData（使用正確的資料類別）
   List<EthernetPageData> _getFallbackEthernetPages() {
     print('⚠️ 使用備用的 EthernetPageData');
     return [
@@ -340,15 +355,15 @@ class _DashboardPageState extends State<DashboardPage>
         connections: [
           EthernetConnection(speed: "Model Name", status: "API Error"),
           EthernetConnection(speed: "Internet", status: "Unknown"),
-          EthernetConnection(speed: "WiFi", status: ""),
-          EthernetConnection(speed: "2.4GHz", status: "Unknown"),
-          EthernetConnection(speed: "5GHz", status: "Unknown"),
+          EthernetConnection(speed: "WiFi", status: "", connectionType: 'wifi_title'),
+          EthernetConnection(speed: "2.4GHz", status: "Unknown", connectionType: 'wifi_frequency'),
+          EthernetConnection(speed: "5GHz", status: "Unknown", connectionType: 'wifi_frequency'),
         ],
       ),
       EthernetPageData(
         pageTitle: "WiFi SSID",
         connections: [
-          EthernetConnection(speed: "WiFi", status: ""),
+          EthernetConnection(speed: "WiFi", status: "", connectionType: 'wifi_title'),
           EthernetConnection(speed: "No data", status: "available"),
         ],
       ),
@@ -359,7 +374,7 @@ class _DashboardPageState extends State<DashboardPage>
     ];
   }
 
-  /// 載入預設資料
+  /// 🔥 修正：載入預設資料（使用正確的資料類別）
   void _loadDefaultData() {
     setState(() {
       _ethernetPages = [
@@ -545,47 +560,89 @@ class _DashboardPageState extends State<DashboardPage>
     return _buildDashboardContent();
   }
 
-  /// 構建 Dashboard 內容（保持原有的三個元件結構）
+  /// 🔥 修正：構建 Dashboard 內容（使用 DashboardComponent）
   Widget _buildDashboardContent() {
     final screenSize = MediaQuery.of(context).size;
 
     return Stack(
       children: [
-        // ==================== 元件 1: Dashboard 標題 ====================
-        DashboardTitleComponent(
-          screenSize: screenSize,
-          topRatio: titleTopRatio,
-          bottomRatio: titleBottomRatio,
-          fontSizeRatio: titleFontSizeRatio,
+        // ==================== 標題區域 ====================
+        Positioned(
+          top: screenSize.height * titleTopRatio,
+          left: 0,
+          right: 0,
+          height: screenSize.height * (titleBottomRatio - titleTopRatio),
+          child: Center(
+            child: Text(
+              'Dashboard',
+              style: TextStyle(
+                fontSize: screenSize.height * titleFontSizeRatio,
+                fontWeight: FontWeight.normal,
+                color: Colors.white,
+              ),
+            ),
+          ),
         ),
 
-        // ==================== 元件 2: 分頁指示器 ====================
-        DashboardIndicatorComponent(
-          screenSize: screenSize,
-          topRatio: indicatorTopRatio,
-          bottomRatio: indicatorBottomRatio,
-          currentPageIndex: _currentPageIndex,
-          totalPages: _totalPages,
-          indicatorSize: indicatorSize,
-          indicatorSpacing: indicatorSpacing,
-          onIndicatorTapped: _handleIndicatorTapped,
+        // ==================== 分頁指示器 ====================
+        Positioned(
+          top: screenSize.height * indicatorTopRatio,
+          left: 0,
+          right: 0,
+          height: screenSize.height * (indicatorBottomRatio - indicatorTopRatio),
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_totalPages, (index) {
+                bool isActive = index == _currentPageIndex;
+
+                return GestureDetector(
+                  onTap: () => _handleIndicatorTapped(index),
+                  child: Container(
+                    width: indicatorSize,
+                    height: indicatorSize,
+                    margin: EdgeInsets.symmetric(horizontal: indicatorSpacing / 2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isActive ? Colors.white : Colors.transparent,
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 1.0,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
         ),
 
-        // ==================== 元件 3: 內容區域 ====================
-        DashboardContentComponent(
-          screenSize: screenSize,
-          topRatio: contentTopRatio,
-          bottomRatio: contentBottomRatio,
-          widthRatio: contentWidthRatio,
-          currentPageIndex: _currentPageIndex,
-          totalPages: _totalPages,
-          ethernetPages: _ethernetPages,
-          isLoading: _isLoading,
-          hasError: _hasError,
-          errorMessage: _errorMessage,
-          onPageChanged: _handlePageChanged,
-          onRefresh: _handleRefresh,
-          appTheme: _appTheme,
+        // ==================== DashboardComponent 區域 ====================
+        Positioned(
+          top: screenSize.height * contentTopRatio,
+          left: (screenSize.width - screenSize.width * contentWidthRatio) / 2,
+          width: screenSize.width * contentWidthRatio,
+          height: screenSize.height * (contentBottomRatio - contentTopRatio),
+          child: DashboardComponent(
+            // 基本配置
+            totalPages: _totalPages,
+            initialPageIndex: _currentPageIndex,
+
+            // 事件回調
+            onPageChanged: _handlePageChanged,
+            onRefresh: _handleRefresh,
+
+            // 尺寸配置
+            width: screenSize.width * contentWidthRatio,
+            height: screenSize.height * (contentBottomRatio - contentTopRatio),
+
+            // 資料傳入
+            ethernetPages: _ethernetPages,
+
+            // 停用自動切換
+            enableAutoSwitch: widget.enableAutoSwitch,
+            autoSwitchDuration: widget.autoSwitchDuration,
+          ),
         ),
       ],
     );
@@ -852,450 +909,6 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 }
-// 在 DashboardPage.dart 檔案的最底部添加這些類別（在最後的 } 之前）
-
-// ==================== 保持原有的三個 Dashboard 元件 ====================
-
-/// Dashboard 標題組件
-class DashboardTitleComponent extends StatelessWidget {
-  final Size screenSize;
-  final double topRatio;
-  final double bottomRatio;
-  final double fontSizeRatio;
-
-  const DashboardTitleComponent({
-    Key? key,
-    required this.screenSize,
-    required this.topRatio,
-    required this.bottomRatio,
-    required this.fontSizeRatio,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final screenHeight = screenSize.height;
-    final top = screenHeight * topRatio;
-    final height = screenHeight * (bottomRatio - topRatio);
-    final fontSize = screenHeight * fontSizeRatio;
-
-    return Positioned(
-      top: top,
-      left: 0,
-      right: 0,
-      height: height,
-      child: Container(
-        width: double.infinity,
-        child: Center(
-          child: Text(
-            'Dashboard',
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.normal,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 分頁指示器組件
-class DashboardIndicatorComponent extends StatelessWidget {
-  final Size screenSize;
-  final double topRatio;
-  final double bottomRatio;
-  final int currentPageIndex;
-  final int totalPages;
-  final double indicatorSize;
-  final double indicatorSpacing;
-  final Function(int) onIndicatorTapped;
-
-  const DashboardIndicatorComponent({
-    Key? key,
-    required this.screenSize,
-    required this.topRatio,
-    required this.bottomRatio,
-    required this.currentPageIndex,
-    required this.totalPages,
-    required this.indicatorSize,
-    required this.indicatorSpacing,
-    required this.onIndicatorTapped,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final screenHeight = screenSize.height;
-    final top = screenHeight * topRatio;
-    final height = screenHeight * (bottomRatio - topRatio);
-
-    return Positioned(
-      top: top,
-      left: 0,
-      right: 0,
-      height: height,
-      child: Center(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(totalPages, (index) {
-            bool isActive = index == currentPageIndex;
-
-            return GestureDetector(
-              onTap: () => onIndicatorTapped(index),
-              child: Container(
-                width: indicatorSize,
-                height: indicatorSize,
-                margin: EdgeInsets.symmetric(horizontal: indicatorSpacing / 2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isActive ? Colors.white : Colors.transparent,
-                  border: Border.all(
-                    color: Colors.white,
-                    width: 1.0,
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-}
-
-/// 內容區域組件
-class DashboardContentComponent extends StatefulWidget {
-  final Size screenSize;
-  final double topRatio;
-  final double bottomRatio;
-  final double widthRatio;
-  final int currentPageIndex;
-  final int totalPages;
-  final List<EthernetPageData>? ethernetPages;
-  final bool isLoading;
-  final bool hasError;
-  final String errorMessage;
-  final Function(int) onPageChanged;
-  final VoidCallback onRefresh;
-  final AppTheme appTheme;
-
-  const DashboardContentComponent({
-    Key? key,
-    required this.screenSize,
-    required this.topRatio,
-    required this.bottomRatio,
-    required this.widthRatio,
-    required this.currentPageIndex,
-    required this.totalPages,
-    this.ethernetPages,
-    required this.isLoading,
-    required this.hasError,
-    required this.errorMessage,
-    required this.onPageChanged,
-    required this.onRefresh,
-    required this.appTheme,
-  }) : super(key: key);
-
-  @override
-  State<DashboardContentComponent> createState() => _DashboardContentComponentState();
-}
-
-class _DashboardContentComponentState extends State<DashboardContentComponent> {
-  late PageController _pageController;
-  final ScrollController _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController(initialPage: widget.currentPageIndex);
-  }
-
-  @override
-  void didUpdateWidget(DashboardContentComponent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentPageIndex != widget.currentPageIndex) {
-      _pageController.animateToPage(
-        widget.currentPageIndex,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenHeight = widget.screenSize.height;
-    final screenWidth = widget.screenSize.width;
-    final top = screenHeight * widget.topRatio;
-    final height = screenHeight * (widget.bottomRatio - widget.topRatio);
-    final width = screenWidth * widget.widthRatio;
-    final left = (screenWidth - width) / 2;
-
-    return Positioned(
-      top: top,
-      left: left,
-      width: width,
-      height: height,
-      child: _buildContent(),
-    );
-  }
-
-  Widget _buildContent() {
-    // if (widget.isLoading && widget.ethernetPages == null) {
-    //   return _buildLoadingState();
-    // }
-    //
-    // if (widget.hasError && widget.ethernetPages == null) {
-    //   return _buildErrorState();
-    // }
-
-    return _buildNormalContent();
-  }
-
-  Widget _buildLoadingState() {
-    return widget.appTheme.whiteBoxTheme.buildStandardCard(
-      width: double.infinity,
-      height: double.infinity,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
-            SizedBox(height: 24),
-            Text(
-              'Loading Dashboard...',
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: Colors.white.withOpacity(0.8),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return widget.appTheme.whiteBoxTheme.buildStandardCard(
-      width: double.infinity,
-      height: double.infinity,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: Colors.red.shade300,
-                size: 48,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Failed to load data',
-                style: AppTextStyles.heading3.copyWith(
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 12),
-              Text(
-                widget.errorMessage.isNotEmpty ? widget.errorMessage : 'Unknown error occurred',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: Colors.white.withOpacity(0.7),
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-              SizedBox(height: 24),
-              widget.appTheme.whiteBoxTheme.buildStandardButton(
-                width: 120,
-                height: 40,
-                text: 'Retry',
-                onPressed: widget.onRefresh,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNormalContent() {
-    final ethernetPages = _getEthernetPages();
-
-    return widget.appTheme.whiteBoxTheme.buildStandardCard(
-      width: double.infinity,
-      height: double.infinity,
-      child: Padding(
-        padding: EdgeInsets.all(25),
-        child: PageView.builder(
-          controller: _pageController,
-          onPageChanged: (index) {
-            widget.onPageChanged(index);
-          },
-          itemCount: widget.totalPages,
-          itemBuilder: (context, index) {
-            if (index < ethernetPages.length) {
-              return _buildEthernetPage(ethernetPages[index]);
-            } else {
-              return _buildEmptyPage(index);
-            }
-          },
-        ),
-      ),
-    );
-  }
-
-  List<EthernetPageData> _getEthernetPages() {
-    if (widget.ethernetPages != null && widget.ethernetPages!.isNotEmpty) {
-      return widget.ethernetPages!;
-    }
-
-    return [
-      EthernetPageData(
-        pageTitle: "Ethernet Status - Page 1",
-        connections: [
-          EthernetConnection(speed: "10Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-        ],
-      ),
-      EthernetPageData(
-        pageTitle: "Ethernet Status - Page 2",
-        connections: [
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Disconnect"),
-        ],
-      ),
-      EthernetPageData(
-        pageTitle: "Ethernet Status - Page 3",
-        connections: [
-          EthernetConnection(speed: "10Gbps", status: "Connected"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-          EthernetConnection(speed: "10Gbps", status: "Disconnect"),
-          EthernetConnection(speed: "1Gbps", status: "Connected"),
-        ],
-      ),
-    ];
-  }
-
-  Widget _buildEthernetPage(EthernetPageData pageData) {
-    return ListView(
-      controller: _scrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        _buildSectionTitle('Ethernet'),
-        SizedBox(height: 20),
-
-        ...pageData.connections.asMap().entries.map((entry) {
-          int index = entry.key;
-          EthernetConnection connection = entry.value;
-          bool isLastItem = index == pageData.connections.length - 1;
-
-          return Column(
-            children: [
-              _buildConnectionItem(connection),
-              if (!isLastItem) _buildDivider(),
-            ],
-          );
-        }).toList(),
-      ],
-    );
-  }
-
-  Widget _buildEmptyPage(int pageIndex) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.wifi_off,
-            color: Colors.white.withOpacity(0.5),
-            size: 48,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Page ${pageIndex + 1}',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.white.withOpacity(0.7),
-            ),
-          ),
-          Text(
-            'No data available',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
-      ),
-    );
-  }
-
-  Widget _buildConnectionItem(EthernetConnection connection) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            connection.speed,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white,
-            ),
-          ),
-          Text(
-            connection.status,
-            style: TextStyle(
-              fontSize: 16,
-              color: connection.status == "Connected"
-                  ? Colors.green.shade300
-                  : Colors.red.shade300,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Divider(
-        height: 1,
-        thickness: 1,
-        color: AppColors.primary.withOpacity(0.3),
-      ),
-    );
-  }
-}
 
 // ==================== Painter 類別 ====================
 
@@ -1362,26 +975,4 @@ class BottomNavBarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ==================== 資料類別 ====================
-
-class EthernetPageData {
-  final String pageTitle;
-  final List<EthernetConnection> connections;
-
-  EthernetPageData({
-    required this.pageTitle,
-    required this.connections,
-  });
-}
-
-class EthernetConnection {
-  final String speed;
-  final String status;
-
-  EthernetConnection({
-    required this.speed,
-    required this.status,
-  });
 }
