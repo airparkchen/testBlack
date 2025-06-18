@@ -1,16 +1,62 @@
-// lib/shared/services/dashboard_data_service.dart - 重寫版本
+// lib/shared/services/dashboard_data_service.dart - Internet 狀態支援版本
 
 import 'dart:async';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 
-/// Dashboard 資料處理服務 - 重寫版本
+/// Internet 連線狀態數據類
+class InternetConnectionStatus {
+  final bool isConnected;
+  final String status;
+  final DateTime timestamp;
+
+  InternetConnectionStatus({
+    required this.isConnected,
+    required this.status,
+    required this.timestamp,
+  });
+
+  /// 創建未知狀態
+  factory InternetConnectionStatus.unknown() {
+    return InternetConnectionStatus(
+      isConnected: false,
+      status: 'unknown',
+      timestamp: DateTime.now(),
+    );
+  }
+
+  /// 是否應該顯示錯誤標記
+  bool get shouldShowError => !isConnected && status.toLowerCase() != 'unknown';
+
+  /// 格式化狀態顯示
+  String get formattedStatus {
+    switch (status.toLowerCase()) {
+      case 'connected':
+        return 'Connected';
+      case 'disconnected':
+        return 'Disconnected';
+      case 'timeout':
+        return 'Timeout';
+      case 'error':
+        return 'Error';
+      default:
+        return 'Unknown';
+    }
+  }
+}
+
+/// Dashboard 資料處理服務 - Internet 狀態支援版本
 class DashboardDataService {
   // 快取機制
   static DashboardData? _cachedData;
   static DateTime? _lastFetchTime;
-  static Duration get _cacheExpiry => NetworkTopoConfig.actualCacheDuration;  //api更新頻率
+  static Duration get _cacheExpiry => NetworkTopoConfig.actualCacheDuration;
+
+  // 🎯 新增：Internet 狀態快取
+  static InternetConnectionStatus? _cachedInternetStatus;
+  static DateTime? _lastInternetFetchTime;
+  static Map<String, dynamic>? _cachedDashboardData;
 
   /// 檢查快取是否有效
   static bool _isCacheValid() {
@@ -18,11 +64,85 @@ class DashboardDataService {
     return DateTime.now().difference(_lastFetchTime!) < _cacheExpiry;
   }
 
+  /// 🎯 新增：檢查 Internet 狀態快取是否有效
+  static bool _isInternetCacheValid() {
+    if (_lastInternetFetchTime == null || _cachedInternetStatus == null) return false;
+    return DateTime.now().difference(_lastInternetFetchTime!) < _cacheExpiry;
+  }
+
   /// 清除快取
   static void clearCache() {
     _cachedData = null;
     _lastFetchTime = null;
+    _cachedInternetStatus = null;
+    _lastInternetFetchTime = null;
+    _cachedDashboardData = null;
     print('🗑️ Dashboard 快取已清除');
+  }
+
+  /// 🎯 新增：獲取 Internet 連線狀態
+  static Future<InternetConnectionStatus> getInternetConnectionStatus() async {
+    try {
+      // 檢查快取
+      if (_isInternetCacheValid()) {
+        print('📋 使用快取的 Internet 狀態');
+        return _cachedInternetStatus!;
+      }
+
+      print('🌐 從 Dashboard API 獲取 Internet 連線狀態...');
+
+      // 呼叫 Dashboard API
+      final dashboardResult = await WifiApiService.getSystemDashboard();
+
+      if (dashboardResult.containsKey('error')) {
+        print('❌ Dashboard API 錯誤: ${dashboardResult['error']}');
+        return InternetConnectionStatus.unknown();
+      }
+
+      // 提取 Internet 狀態
+      final internetStatus = _extractInternetStatus(dashboardResult);
+
+      // 更新快取
+      _cachedInternetStatus = internetStatus;
+      _lastInternetFetchTime = DateTime.now();
+      _cachedDashboardData = dashboardResult;
+
+      return internetStatus;
+
+    } catch (e) {
+      print('❌ 獲取 Internet 狀態失敗: $e');
+      return InternetConnectionStatus.unknown();
+    }
+  }
+
+  /// 🎯 新增：從 Dashboard 數據中提取 Internet 狀態
+  static InternetConnectionStatus _extractInternetStatus(Map<String, dynamic> data) {
+    try {
+      // 根據 Dashboard API 結構提取 wan.pingstatus
+      final wan = data['wan'];
+      if (wan is List && wan.isNotEmpty) {
+        final wanData = wan[0] as Map<String, dynamic>;
+        final pingStatus = wanData['ping_status']?.toString() ?? '';
+
+        print('🔍 WAN Ping Status: $pingStatus');
+
+        // 判斷連線狀態
+        final bool isConnected = pingStatus.toLowerCase() == 'connected';
+
+        return InternetConnectionStatus(
+          isConnected: isConnected,
+          status: pingStatus.isNotEmpty ? pingStatus : 'unknown',
+          timestamp: DateTime.now(),
+        );
+      }
+
+      print('⚠️ Dashboard 數據中未找到 WAN 資訊');
+      return InternetConnectionStatus.unknown();
+
+    } catch (e) {
+      print('❌ 解析 Internet 狀態失敗: $e');
+      return InternetConnectionStatus.unknown();
+    }
   }
 
   /// 獲取完整的 Dashboard 資料
@@ -79,6 +199,9 @@ class DashboardDataService {
     // 解析 WiFi SSID 資訊（第二頁用）
     final wifiSSIDs = _parseWiFiSSIDs(dashboardInfo);
 
+    // 解析 LAN 埠資訊（第三頁用）
+    final lanPorts = _parseLANPorts(dashboardInfo);
+
     // Guest WiFi（目前空列表，由 config 控制）
     final guestWifiFrequencies = <WiFiFrequencyStatus>[];
     final guestWifiSSIDs = <WiFiSSIDInfo>[];
@@ -94,6 +217,7 @@ class DashboardDataService {
       wifiSSIDs: wifiSSIDs,
       guestWifiSSIDs: guestWifiSSIDs,
       ethernetStatus: ethernetStatus,
+      lanPorts: lanPorts,
     );
   }
 
@@ -217,6 +341,61 @@ class DashboardDataService {
     return ssidInfos;
   }
 
+  /// 解析 LAN 埠資訊（第三頁用）
+  static List<LANPortInfo> _parseLANPorts(Map<String, dynamic> dashboardInfo) {
+    final List<LANPortInfo> lanPorts = [];
+
+    try {
+      // 從 dashboard 的 lan 陣列解析 LAN 埠資訊
+      if (dashboardInfo.containsKey('lan') && dashboardInfo['lan'] is List) {
+        final List<dynamic> lanList = dashboardInfo['lan'];
+
+        print('🔍 發現 ${lanList.length} 個 LAN 項目');
+
+        for (int i = 0; i < lanList.length; i++) {
+          final lanData = lanList[i];
+
+          if (lanData is Map<String, dynamic>) {
+            final String name = lanData['name']?.toString() ?? 'LAN Port ${i + 1}';
+            final String connectedStatus = lanData['connected_status']?.toString() ?? 'Unknown';
+
+            lanPorts.add(LANPortInfo(
+              name: name,
+              connectedStatus: connectedStatus,
+            ));
+
+            print('✅ 解析 LAN 埠: $name → $connectedStatus');
+          } else {
+            print('⚠️ LAN 項目 $i 資料格式錯誤，跳過');
+          }
+        }
+      } else {
+        print('⚠️ 找不到 lan 陣列或格式錯誤');
+      }
+
+      // 如果沒有 LAN 資料，提供預設項目
+      if (lanPorts.isEmpty) {
+        print('📋 沒有找到 LAN 資料，使用預設項目');
+        lanPorts.add(LANPortInfo(
+          name: 'Ethernet Port',
+          connectedStatus: 'Unknown',
+        ));
+      }
+
+    } catch (e) {
+      print('❌ 解析 LAN 埠時發生錯誤: $e');
+
+      // 錯誤時提供預設項目
+      lanPorts.add(LANPortInfo(
+        name: 'Ethernet Port',
+        connectedStatus: 'Error',
+      ));
+    }
+
+    print('📊 總共解析到 ${lanPorts.length} 個 LAN 埠');
+    return lanPorts;
+  }
+
   /// 獲取備用資料（當 API 失敗時使用）- 更新版本
   static DashboardData _getFallbackData() {
     print('⚠️ 使用備用資料');
@@ -231,6 +410,12 @@ class DashboardDataService {
       wifiSSIDs: [],
       guestWifiSSIDs: [],
       ethernetStatus: EthernetStatus(),
+      lanPorts: [
+        LANPortInfo(
+          name: 'Ethernet Port',
+          connectedStatus: 'API Error',
+        ),
+      ],
     );
   }
 
@@ -255,6 +440,12 @@ class DashboardDataService {
     print('\nWiFi SSID 資訊:');
     for (var ssid in data.wifiSSIDs) {
       print('  ${ssid.ssidLabel}: ${ssid.ssid} (${ssid.isEnabled ? "ON" : "OFF"})');
+    }
+
+    // 🔥 新增：LAN 埠資訊輸出
+    print('\nLAN 埠資訊:');
+    for (var lanPort in data.lanPorts) {
+      print('  ${lanPort.name}: ${lanPort.formattedStatus}');
     }
 
     if (DashboardConfig.showGuestWiFi) {
@@ -283,6 +474,22 @@ class DashboardDataService {
       printParsedData(data);
     } catch (e) {
       print('❌ 測試解析失敗: $e');
+    }
+  }
+
+  /// 🎯 新增：測試 Internet 狀態
+  static Future<void> testInternetStatus() async {
+    try {
+      print('🧪 測試 Internet 狀態...');
+      final status = await getInternetConnectionStatus();
+      print('✅ Internet 狀態測試結果:');
+      print('   連接狀態: ${status.isConnected ? "已連接" : "未連接"}');
+      print('   狀態值: ${status.status}');
+      print('   格式化狀態: ${status.formattedStatus}');
+      print('   應顯示錯誤: ${status.shouldShowError}');
+      print('   時間戳: ${status.timestamp}');
+    } catch (e) {
+      print('❌ 測試 Internet 狀態失敗: $e');
     }
   }
 }

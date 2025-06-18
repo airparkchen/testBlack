@@ -11,6 +11,7 @@ import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart' as RealSpeedService;
 import 'package:whitebox/shared/services/real_data_integration_service.dart';
+import 'package:whitebox/shared/services/dashboard_data_service.dart';
 
 /// 智能單位格式化工具
 /// 根據速度數值自動選擇合適的單位顯示
@@ -74,6 +75,8 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
   // 🎯 新增：API 更新計時器（10秒一次）
   Timer? _apiUpdateTimer;
 
+  InternetConnectionStatus? _internetStatus;
+
   @override
   void initState() {
     super.initState();
@@ -106,6 +109,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
 
     // 🎯 新增：載入 Gateway 設備資料
     _loadGatewayDevice();
+    _loadInternetStatus();
   }
 
   @override
@@ -175,6 +179,30 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     }
   }
 
+  /// 🎯 新增：載入 Internet 連線狀態
+  Future<void> _loadInternetStatus() async {
+    if (!mounted) return;
+
+    try {
+      final status = await DashboardDataService.getInternetConnectionStatus();
+
+      if (mounted) {
+        setState(() {
+          _internetStatus = status;
+        });
+
+        print('✅ Internet 狀態載入完成: ${status.isConnected ? "已連接" : "未連接"} (${status.status})');
+      }
+    } catch (e) {
+      print('❌ 載入 Internet 狀態失敗: $e');
+      if (mounted) {
+        setState(() {
+          _internetStatus = InternetConnectionStatus.unknown();
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -215,6 +243,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
                 totalConnectedDevices: _calculateTotalConnectedDevices(),
                 height: screenSize.height * NetworkTopoConfig.topologyHeightRatio,
                 onDeviceSelected: widget.enableInteractions ? widget.onDeviceSelected : null,
+                internetStatus: _internetStatus,
               ),
             ),
           ),
@@ -325,6 +354,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
 
     if (NetworkTopoConfig.useRealData) {
       // 🎯 修改：現在調用插值更新，不是 API 更新
+      _loadInternetStatus();
       _realSpeedDataGenerator?.update().then((_) {
         if (mounted) {
           setState(() {

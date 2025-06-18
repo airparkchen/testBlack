@@ -6,7 +6,7 @@ class DashboardConfig {
   static const bool showGuestWiFi = false;
 
   // Ethernet 詳細資訊顯示控制（目前關閉）
-  static const bool showEthernetDetails = false;
+  static const bool showEthernetDetails = true;
 }
 
 /// Dashboard 完整資料模型 - 重新設計
@@ -18,6 +18,7 @@ class DashboardData {
   final List<WiFiSSIDInfo> wifiSSIDs;                    // 第二頁用的 SSID 資訊
   final List<WiFiSSIDInfo> guestWifiSSIDs;               // 預留，目前不使用
   final EthernetStatus ethernetStatus;
+  final List<LANPortInfo> lanPorts;                      // LAN 埠資訊
 
   DashboardData({
     required this.modelName,
@@ -27,7 +28,25 @@ class DashboardData {
     required this.wifiSSIDs,
     required this.guestWifiSSIDs,
     required this.ethernetStatus,
+    required this.lanPorts,
   });
+}
+
+/// LAN 埠資訊模型
+class LANPortInfo {
+  final String name;              // LAN 埠名稱，如 "2.5Gbps"
+  final String connectedStatus;   // 連接狀態，如 "Connected"
+
+  LANPortInfo({
+    required this.name,
+    required this.connectedStatus,
+  });
+
+  /// 格式化狀態顯示文字
+  String get formattedStatus {
+    // 根據 connected_status 進行格式化，保持原樣或可以自訂
+    return connectedStatus;
+  }
 }
 
 /// 網路連接狀態模型
@@ -83,7 +102,7 @@ class WiFiFrequencyStatus {
         return '5GHz';
       case 'wifi_6g':
         return '6GHz';
-      case 'wifi_mlo':           // 修正：加入 MLO 對應
+        case 'wifi_mlo':           // 修正：加入 MLO 對應
         return 'MLO';
       default:
         return radioName;
@@ -116,7 +135,7 @@ class WiFiSSIDInfo {
       case 'wifi_6g':
         return '6GHz';
       case 'wifi_mlo':
-        return 'OLM';              // 根據圖片，MLO 在 SSID 頁面顯示為 OLM
+        return 'MLO';              // 第二頁
       default:
         return radioName;
     }
@@ -220,6 +239,7 @@ class DashboardPageContentGenerator {
   static Map<String, dynamic> generateEthernetContent(DashboardData data) {
     return {
       'ethernetStatus': data.ethernetStatus,
+      'lanPorts': data.lanPorts,
     };
   }
 

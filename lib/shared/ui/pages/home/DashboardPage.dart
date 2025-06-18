@@ -206,6 +206,7 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   /// 🔥 修正：將 DashboardData 轉換為 DashboardComponent 中的 EthernetPageData 格式
+  /// 🔥 修正：將 DashboardData 轉換為 DashboardComponent 中的 EthernetPageData 格式（包含 LAN 支援）
   List<EthernetPageData> _convertDashboardDataToEthernetPages(DashboardData dashboardData) {
     final pages = <EthernetPageData>[];
 
@@ -319,23 +320,33 @@ class _DashboardPageState extends State<DashboardPage>
       connections: secondPageConnections,
     ));
 
-    // ==================== 第三頁：Ethernet ====================
+    // ==================== 🔥 修正：第三頁：Ethernet（包含 LAN 埠資料） ====================
     final thirdPageConnections = <EthernetConnection>[];
 
-    // 根據配置決定是否顯示詳細資訊
-    if (DashboardConfig.showEthernetDetails) {
-      // 如果要顯示詳細資訊，可以在這裡添加乙太網路相關的連接資料
-      thirdPageConnections.add(EthernetConnection(
-        speed: 'Port 1',
-        status: 'Connected',
-      ));
-      // ... 其他乙太網路連接
+    // 🔥 新增：根據配置和 LAN 資料決定顯示內容
+    if (DashboardConfig.showEthernetDetails && dashboardData.lanPorts.isNotEmpty) {
+      // 🔥 關鍵：將 LAN 埠資料轉換為連接項目
+      for (var lanPort in dashboardData.lanPorts) {
+        thirdPageConnections.add(EthernetConnection(
+          speed: lanPort.name,                    // 🔥 LAN 埠名稱（如 "2.5Gbps"）
+          status: lanPort.formattedStatus,        // 🔥 連接狀態（如 "Connected"）
+          connectionType: 'lan_port',             // 🔥 標記為 LAN 埠項目
+        ));
+      }
+
+      print('📋 第三頁：轉換了 ${dashboardData.lanPorts.length} 個 LAN 埠');
+      for (var lanPort in dashboardData.lanPorts) {
+        print('   - ${lanPort.name}: ${lanPort.formattedStatus}');
+      }
+    } else {
+      print('📋 第三頁：沒有 LAN 資料或被配置隱藏');
+      print('   showEthernetDetails: ${DashboardConfig.showEthernetDetails}');
+      print('   lanPorts.length: ${dashboardData.lanPorts.length}');
     }
-    // 如果不顯示詳細資訊，connections 保持空列表，只顯示 "Ethernet" 標題
 
     pages.add(EthernetPageData(
       pageTitle: "Ethernet",
-      connections: thirdPageConnections,
+      connections: thirdPageConnections, // 🔥 可能包含 LAN 資料，也可能為空
     ));
 
     print('📋 轉換完成：');
@@ -369,7 +380,9 @@ class _DashboardPageState extends State<DashboardPage>
       ),
       EthernetPageData(
         pageTitle: "Ethernet",
-        connections: [], // 空列表，只顯示標題
+        connections: [
+          EthernetConnection(speed: "Ethernet Port", status: "API Error", connectionType: 'lan_port'),
+        ],
       ),
     ];
   }

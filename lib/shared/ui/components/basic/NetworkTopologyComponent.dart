@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/services/real_data_integration_service.dart';
+import 'package:whitebox/shared/services/dashboard_data_service.dart';
 import 'dart:math' as math;
 
 /// 裝置連接資訊類別
@@ -49,6 +50,9 @@ class NetworkTopologyComponent extends StatefulWidget {
   /// 當設備被點擊時的回調
   final Function(NetworkDevice)? onDeviceSelected;
 
+  /// 🎯 新增：Internet 連線狀態
+  final InternetConnectionStatus? internetStatus;
+
   const NetworkTopologyComponent({
     Key? key,
     this.gatewayDevice,
@@ -60,6 +64,7 @@ class NetworkTopologyComponent extends StatefulWidget {
     this.width = double.infinity,
     this.height = 400,
     this.onDeviceSelected,
+    this.internetStatus,
   }) : super(key: key);
 
   @override
@@ -125,6 +130,7 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
                 containerWidth: actualWidth,
                 containerHeight: actualHeight,
                 gatewayDevice: widget.gatewayDevice, // 🎯 新增：傳入 Gateway 資料
+                internetStatus: widget.internetStatus,
               ),
             ),
           ),
@@ -546,6 +552,7 @@ class CorrectedConnectionLinesPainter extends CustomPainter {
   final double containerHeight;
   final Offset Function(NetworkDevice, double, double) calculateDevicePosition;
   final NetworkDevice? gatewayDevice; // 🎯 新增：Gateway 設備資料
+  final InternetConnectionStatus? internetStatus;
 
   CorrectedConnectionLinesPainter({
     required this.devices,
@@ -556,13 +563,14 @@ class CorrectedConnectionLinesPainter extends CustomPainter {
     required this.containerHeight,
     required this.calculateDevicePosition,
     this.gatewayDevice, // 🎯 新增參數
+    this.internetStatus,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     // 繪製互聯網到網關的連線
     if (showInternet && internetPosition != null) {
-      _drawConnection(canvas, internetPosition!, gatewayPosition, ConnectionType.wired);
+      _drawInternetConnection(canvas, internetPosition!, gatewayPosition);
     }
 
     // 🎯 修正：根據真實的父節點關係繪製連線
@@ -709,8 +717,101 @@ class CorrectedConnectionLinesPainter extends CustomPainter {
     }
   }
 
+  /// 繪製 Internet 到 Gateway 的狀態連線
+  void _drawInternetConnection(Canvas canvas, Offset start, Offset end) {
+    final bool isConnected = internetStatus?.isConnected ?? true;
+    final bool shouldShowError = internetStatus?.shouldShowError ?? false;
+
+    print('🌐 繪製 Internet 連線: isConnected=$isConnected, shouldShowError=$shouldShowError');
+
+    // 計算連線路徑
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final distance = math.sqrt(dx * dx + dy * dy);
+
+    if (distance < 0.001) return;
+
+    final unitX = dx / distance;
+    final unitY = dy / distance;
+
+    // 調整起始和結束點（避免覆蓋圖標）
+    final adjustedStart = Offset(
+      start.dx + unitX * 8.0,  // Internet 圖標半徑
+      start.dy + unitY * 8.0,
+    );
+    final adjustedEnd = Offset(
+      end.dx - unitX * 42.0,   // Gateway 圖標半徑
+      end.dy - unitY * 42.0,
+    );
+
+    // 根據連線狀態選擇顏色  internet-gateway線
+    final connectionColor = isConnected ? Colors.white : Colors.white.withOpacity(1.0);
+
+    // 繪製連線
+    final paint = Paint()
+      ..color = connectionColor
+      ..strokeWidth = 2.0;
+
+    canvas.drawLine(adjustedStart, adjustedEnd, paint);
+
+    // 如果需要顯示錯誤，在連線中間繪製紅色叉叉
+    if (shouldShowError) {
+      _drawErrorCross(canvas, adjustedStart, adjustedEnd);
+    }
+  }
+
+  /// 在連線中間繪製紅色叉叉
+  void _drawErrorCross(Canvas canvas, Offset start, Offset end) {
+    // 計算連線中點
+    final midPoint = Offset(
+      (start.dx + end.dx) / 2,
+      (start.dy + end.dy) / 2,
+    );
+
+    // 叉叉的大小
+    const crossSize = 8.0;
+
+    // 繪製白色背景圓圈
+    final bgPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(midPoint, crossSize, bgPaint);
+
+    // 繪製紅色邊框
+    final borderPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    canvas.drawCircle(midPoint, crossSize, borderPaint);
+
+    // 繪製紅色叉叉
+    final crossPaint = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+
+    // 左上到右下的線
+    canvas.drawLine(
+      Offset(midPoint.dx - crossSize * 0.4, midPoint.dy - crossSize * 0.4),
+      Offset(midPoint.dx + crossSize * 0.4, midPoint.dy + crossSize * 0.4),
+      crossPaint,
+    );
+
+    // 右上到左下的線
+    canvas.drawLine(
+      Offset(midPoint.dx + crossSize * 0.4, midPoint.dy - crossSize * 0.4),
+      Offset(midPoint.dx - crossSize * 0.4, midPoint.dy + crossSize * 0.4),
+      crossPaint,
+    );
+  }
+
   @override
-  bool shouldRepaint(covariant CorrectedConnectionLinesPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CorrectedConnectionLinesPainter oldDelegate) {
+    return oldDelegate.internetStatus?.isConnected != internetStatus?.isConnected ||
+        oldDelegate.internetStatus?.status != internetStatus?.status;
+  }
 }
 
 /// 網絡設備類

@@ -1,4 +1,4 @@
-// lib/shared/ui/components/basic/DashboardComponent.dart - 修正版本
+// lib/shared/ui/components/basic/DashboardComponent.dart - 保持原布局顯示LAN版本
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -215,7 +215,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     return _getDefaultEthernetPages();
   }
 
-  /// 重寫：將新 API 資料轉換為 EthernetPageData 格式
+  /// 🔥 修正：將新 API 資料轉換為 EthernetPageData 格式（保持原布局）
   List<EthernetPageData> _convertApiDataToEthernetPages(DashboardData apiData) {
     final pages = <EthernetPageData>[];
 
@@ -317,10 +317,30 @@ class _DashboardComponentState extends State<DashboardComponent>
       connections: secondPageConnections,
     ));
 
-    // ==================== 第三頁：Ethernet ====================
+    // ==================== 🔥 修正：第三頁：Ethernet（保持原布局，恢復標題顯示） ====================
+    final thirdPageConnections = <EthernetConnection>[];
+
+    // 🔥 關鍵修正：不在這裡添加 "Ethernet" 標題，讓 _buildEthernetPage 特殊處理
+    // 只轉換 LAN 埠資料，標題由 _buildEthernetPage 中的 _buildSectionTitle 處理
+
+    // 🔥 將 LAN 埠資料轉換為連接項目（如果有的話）
+    if (DashboardConfig.showEthernetDetails && apiData.lanPorts.isNotEmpty) {
+      for (var lanPort in apiData.lanPorts) {
+        thirdPageConnections.add(EthernetConnection(
+            speed: lanPort.name,                    // LAN 埠名稱（如 "2.5Gbps"）
+            status: lanPort.formattedStatus,        // 連接狀態（如 "Connected"）
+            connectionType: 'ethernet_port'         // 🔥 標記為 Ethernet 埠項目
+        ));
+      }
+
+      print('✅ 第三頁：添加了 ${apiData.lanPorts.length} 個 Ethernet 埠');
+    } else {
+      print('📋 第三頁：沒有 LAN 資料，將顯示空的 Ethernet 區域');
+    }
+
     pages.add(EthernetPageData(
       pageTitle: "Ethernet",
-      connections: [], // 🎯 空的連接列表，只顯示標題
+      connections: thirdPageConnections,
     ));
 
     return pages;
@@ -407,7 +427,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 重寫：頁面構建方法（符合新的版面需求） ====================
+  // ==================== 🔥 修正：頁面構建方法（恢復原本的 Ethernet 頁面特殊處理） ====================
 
   Widget _buildEthernetPage(
       EthernetPageData pageData,
@@ -420,22 +440,74 @@ class _DashboardComponentState extends State<DashboardComponent>
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          // 🎯 修正：根據頁面類型決定是否顯示內容
+          // 🔥 修正：恢復原本的 Ethernet 頁面特殊處理
           if (pageData.pageTitle.contains("Ethernet")) ...[
-            // 第三頁：只顯示 Ethernet 標題，其他內容隱藏
+            // 🔥 第三頁：顯示 Ethernet 標題
             _buildSectionTitle("Ethernet", bottomInset),
-            SizedBox(height: 40),
-            Center(
-              child: Text(
-                'Details hidden',
-                style: TextStyle(
-                  fontSize: bottomInset > 0 ? 14 : 16,
-                  color: Colors.white.withOpacity(0.5),
+
+            // 🔥 加上橫線分隔（跟 WiFi 一樣）
+            _buildDivider(bottomInset),
+
+            // 🔥 根據是否有 LAN 資料決定顯示內容
+            if (pageData.connections.isNotEmpty) ...[
+              // 有 LAN 資料：顯示 LAN 埠列表（跟 WiFi 頻段一樣的排版）
+              ...pageData.connections.map((connection) {
+                return Padding(
+                  padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 6 : 8),
+                  child: Row(
+                    children: [
+                      // 左側空間（讓 LAN 埠名稱看起來居中）
+                      Expanded(flex: 1, child: SizedBox()),
+
+                      // 中間：LAN 埠名稱（如 "2.5Gbps"）
+                      Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: Text(
+                            connection.speed,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white.withOpacity(0.7),
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 右側：連接狀態（如 "Connected"）
+                      Expanded(
+                        flex: 1,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            connection.status,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: _getStatusColor(connection.status),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ] else ...[
+              // 沒有 LAN 資料：顯示提示訊息
+              SizedBox(height: 40),
+              Center(
+                child: Text(
+                  'No LAN data available',
+                  style: TextStyle(
+                    fontSize: bottomInset > 0 ? 14 : 16,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
                 ),
               ),
-            ),
+            ],
           ] else ...[
-            // 第一頁和第二頁：顯示連接項目
+            // 第一頁和第二頁：顯示連接項目（保持原有邏輯）
             ...pageData.connections.asMap().entries.map((entry) {
               int index = entry.key;
               EthernetConnection connection = entry.value;
@@ -459,10 +531,10 @@ class _DashboardComponentState extends State<DashboardComponent>
                   if (!isLastItem && !needsDividerAfter) ...[
                     if (pageData.pageTitle.contains("SSID"))
                       SizedBox(height: 2) // SSID頁面的小間距
-                    else if (!_isWiFiRelatedItem(connection.speed))
+                    else if (!_isWiFiOrEthernetRelatedItem(connection.speed))
                       _buildDivider(bottomInset) // 第一頁非WiFi項目的橫線
                     else
-                      SizedBox(height: 2), // 第一頁WiFi項目的小間距
+                      SizedBox(height: 2), // WiFi/Ethernet項目的小間距
                   ],
                 ],
               );
@@ -477,24 +549,25 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  /// 🎯 新增：判斷是否為 WiFi 相關項目
-  bool _isWiFiRelatedItem(String speed) {
-    // WiFi 頻段相關項目：WiFi 標題、各頻段、Guest WiFi 標題等
-    final wifiRelatedItems = [
-      'WiFi', 'Guest WiFi',
-      '2.4GHz', '5GHz', '6GHz', 'MLO'
+  /// 🎯 修正：判斷是否為 WiFi 或 Ethernet 相關項目
+  bool _isWiFiOrEthernetRelatedItem(String speed) {
+    // WiFi/Ethernet 相關項目：標題、各頻段、LAN埠等
+    final relatedItems = [
+      'WiFi', 'Guest WiFi', 'Ethernet',
+      '2.4GHz', '5GHz', '6GHz', 'MLO',
+      '2.5Gbps', '1Gbps', '10Gbps' // 常見的 Ethernet 速度
     ];
-    return wifiRelatedItems.contains(speed);
+    return relatedItems.contains(speed) || speed.contains('Gbps') || speed.contains('Mbps');
   }
 
-  // ==================== 🔥 重寫：連接項目構建（完全重新設計） ====================
+  // ==================== 🔥 重寫：連接項目構建（保持原排版邏輯） ====================
 
-  /// 修正：連接項目構建，支援多種排版格式
+  /// 🔥 修正：連接項目構建，保持原有的排版格式
   Widget _buildConnectionItem(EthernetConnection connection, double bottomInset, bool isFirstItem) {
     String connectionType = connection.connectionType ?? '';
 
-    // 🔥 情況1：標題行（如 "WiFi", "Guest WiFi"）
-    if (connection.status.isEmpty) {
+    // 🔥 情況1：標題行（如 "WiFi", "Guest WiFi", "Ethernet"）
+    if (connection.status.isEmpty || connectionType.contains('title')) {
       return Padding(
         padding: EdgeInsets.only(
           top: isFirstItem ? 0 : (bottomInset > 0 ? 15 : 20),
@@ -582,15 +655,16 @@ class _DashboardComponentState extends State<DashboardComponent>
       );
     }
 
-    // 🔥 情況4：WiFi頻段項目（第一頁的 2.4GHz, 5GHz 等 - 頻段居中，狀態右對齊）
+    // 🔥 情況4：WiFi頻段項目和Ethernet埠項目（統一排版：名稱居中，狀態右對齊）
+    // 這包括 WiFi 頻段（2.4GHz, 5GHz等）和 Ethernet 埠（2.5Gbps等）
     return Padding(
       padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 6 : 8),
       child: Row(
         children: [
-          // 左側空間（讓頻段名稱看起來居中）
+          // 左側空間（讓名稱看起來居中）
           Expanded(flex: 1, child: SizedBox()),
 
-          // 中間：頻段名稱
+          // 中間：名稱（WiFi 頻段或 Ethernet 埠）
           Expanded(
             flex: 2,
             child: Center(
