@@ -130,7 +130,7 @@ class WifiApiService {
 
     if (bypassCertificateVerification) {
       client.badCertificateCallback = (X509Certificate cert, String host, int port) {
-        print('繞過 SSL 憑證驗證 for $host:$port');
+        // print('繞過 SSL 憑證驗證 for $host:$port')
         return true; // 允許所有憑證
       };
     }

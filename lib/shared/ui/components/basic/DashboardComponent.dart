@@ -461,7 +461,7 @@ class _DashboardComponentState extends State<DashboardComponent>
 
                       // 中間：LAN 埠名稱（如 "2.5Gbps"）
                       Expanded(
-                        flex: 2,
+                        flex: 3,
                         child: Center(
                           child: Text(
                             connection.speed,
@@ -476,7 +476,7 @@ class _DashboardComponentState extends State<DashboardComponent>
 
                       // 右側：連接狀態（如 "Connected"）
                       Expanded(
-                        flex: 1,
+                        flex: 2,
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: Text(
