@@ -36,6 +36,39 @@ class SpeedUnitFormatter {
   static String formatSpeedInt(int speedMbps) {
     return formatSpeed(speedMbps.toDouble());
   }
+
+  /// 將 Mbps 數值格式化為 TextSpan，以便分別設定數字和單位的樣式
+  static TextSpan formatSpeedToTextSpan(
+      double speedMbps, {
+        required TextStyle numberStyle, // 用於數字部分的樣式
+        required TextStyle unitStyle,   // 用於單位部分的樣式
+      }) {
+    String numberPart;
+    String unitPart;
+
+    if (speedMbps >= 100) {
+      // >= 100 Mbps 顯示為 Gbps
+      final gbps = speedMbps / 1000.0;
+      numberPart = gbps.toStringAsFixed(2);
+      unitPart = ' Gb/s'; // 注意前面有一個空格
+    } else if (speedMbps >= 0.1) {
+      // >= 0.1 Mbps 顯示為 Mbps
+      numberPart = speedMbps.toStringAsFixed(2);
+      unitPart = ' Mb/s'; // 注意前面有一個空格
+    } else {
+      // < 0.1 Mbps 顯示為 Kbps
+      final kbps = speedMbps * 1000.0;
+      numberPart = kbps.toStringAsFixed(1);
+      unitPart = ' Kb/s'; // 注意前面有一個空格
+    }
+
+    return TextSpan(
+      children: [
+        TextSpan(text: numberPart, style: numberStyle), // 數字套用傳入的數字樣式
+        TextSpan(text: unitPart, style: unitStyle),     // 單位套用傳入的單位樣式
+      ],
+    );
+  }
 }
 
 /// 拓樸圖和速度圖組合組件
@@ -274,7 +307,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     }
   }
 
-  /// 建構速度區域
+  //速度區域
   Widget _buildSpeedArea(Size screenSize) {
     final screenWidth = screenSize.width;
 
@@ -283,18 +316,145 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
       child: _appTheme.whiteBoxTheme.buildStandardCard(
         width: screenWidth - 36,
         height: 150,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            if (NetworkTopoConfig.useRealData)
-              _buildRealSpeedChart()
-            else
-              _buildFakeSpeedChart(),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final chartWidth = constraints.maxWidth * 1;
+            final labelWidth = constraints.maxWidth * 0.3;
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // 🎯 羽化分界線：移到最底層
+                _buildDividerLine(constraints, chartWidth),
+
+                // 🎯 左側 70% 區域：速度圖（包含圓點）- 放在羽化線之上
+                Positioned(
+                  left: 0,
+                  width: chartWidth,
+                  top: 0,
+                  bottom: 0,
+                  child: NetworkTopoConfig.useRealData
+                      ? _buildRealSpeedChart()
+                      : _buildFakeSpeedChart(),
+                ),
+
+                // 🎯 右側 30% 區域：速度標籤
+                Positioned(
+                  right: 0,
+                  width: labelWidth,
+                  bottom: 0, // 保持在底部
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      // 讓 Column 的內容垂直方向靠下對齊
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      // 讓整個 Column 的內容水平置中
+                      crossAxisAlignment: CrossAxisAlignment.center, // <-- 這裡改為置中
+                      children: [
+                        // Download 標籤
+                        Column(
+                          // 讓 Download 區塊的內容水平置中
+                          crossAxisAlignment: CrossAxisAlignment.center, // <-- 這裡改為置中
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.start, // 保持靠左對齊，只影響圖標和文字行
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.only(top: 2.0), // 🎯 向下調整 2 像素
+                                  child: Image.asset(
+                                    'assets/images/icon/download@2x.png',
+                                    width: 12,
+                                    height: 12,
+                                  ),
+                                ),
+                                SizedBox(width: 2),
+                                Text(
+                                  'Download',
+                                  style: TextStyle(color: Color(0xFF00EEFF).withOpacity(1), fontSize: 14),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 1),
+                            // 使用 Text.rich 來分別設定數字和單位的樣式
+                            Text.rich(
+                              SpeedUnitFormatter.formatSpeedToTextSpan(
+                                NetworkTopoConfig.useRealData
+                                    ? _realSpeedDataGenerator?.currentDownload ?? 0
+                                    : _fakeSpeedDataGenerator?.currentSpeed ?? 0,
+                                numberStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold, // 數字粗體
+                                ),
+                                unitStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.normal, // 單位正常字重
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.white38, height: 24, thickness: 0.6),
+                        // Upload 標籤
+                        Column(
+                          // 讓 Upload 區塊的內容水平置中
+                          crossAxisAlignment: CrossAxisAlignment.center, // <-- 這裡改為置中
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.start, // 保持靠左對齊，只影響圖標和文字行
+                              children: [
+                                // 🎯 修改：使用自定義上傳圖片
+                                Padding(
+                                  padding: EdgeInsets.only(top: 2.0), // 🎯 向下調整 2 像素
+                                  child: Image.asset(
+                                    'assets/images/icon/upload@2x.png',
+                                    width: 12,
+                                    height: 12,
+                                    color: Colors.orange, // 🎯 可選：為圖片添加顏色濾鏡
+                                  ),
+                                ),
+                                SizedBox(width: 2),
+                                Text(
+                                  'Upload',
+                                  style: TextStyle(color: Colors.orange, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 1),
+                            // 使用 Text.rich 來分別設定數字和單位的樣式
+                            Text.rich(
+                              SpeedUnitFormatter.formatSpeedToTextSpan(
+                                NetworkTopoConfig.useRealData
+                                    ? _realSpeedDataGenerator?.currentUpload ?? 0
+                                    : 0,
+                                numberStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold, // 數字粗體
+                                ),
+                                unitStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.normal, // 單位正常字重
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
+
+
 
   /// 建構假資料速度圖表
   Widget _buildFakeSpeedChart() {
@@ -370,6 +530,46 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
       }
     }
   }
+}
+
+// 🎯 新增：建構白色羽化分界線的方法
+Widget _buildDividerLine(BoxConstraints constraints, double chartWidth) {
+  // 計算分界線的 X 位置（70% 的位置）
+  final double dividerX = constraints.maxWidth * 0.7;
+
+  return Positioned(
+    left: dividerX - 1, // 線條寬度的一半，讓線條居中
+    top: 0,
+    bottom: 0,
+    child: Container(
+      width: 1.5,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            // 🎯 頂部：透明
+            Colors.white.withOpacity(0.0),
+            // 🎯 中間：白色（最亮的部分）
+            Colors.white.withOpacity(0.4),
+            Colors.white.withOpacity(1.0),
+            Colors.white.withOpacity(0.4),
+            // 🎯 底部：漸變至透明
+            Colors.white.withOpacity(0.0),
+          ],
+          stops: [0.0, 0.3, 0.5, 0.7, 1.0], // 控制漸變的分佈
+        ),
+        // 🎯 可選：添加羽化效果的模糊
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.2),
+            blurRadius: 2,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// 假數據速度圖表小部件
@@ -465,11 +665,11 @@ class SpeedChartWidget extends StatelessWidget {
               ),
 
               // 速度標籤
-              Positioned(
-                top: dotY - 50,
-                left: chartEndX - 44,
-                child: _buildSpeedLabel(speedValue),
-              ),
+              // Positioned(
+              //   top: dotY - 50,
+              //   left: chartEndX - 44,
+              //   child: _buildSpeedLabel(speedValue),
+              // ),
             ],
           ],
         );
@@ -791,6 +991,7 @@ class DualSpeedCurvePainter extends CustomPainter {
 }
 
 /// 🎯 真實數據速度圖表小部件（雙線版本 + 重疊處理）
+/// 🎯 真實數據速度圖表小部件（雙線版本 + 重疊處理）
 class RealSpeedChartWidget extends StatelessWidget {
   final RealSpeedService.RealSpeedDataGenerator dataGenerator;
   final AnimationController animationController;
@@ -818,8 +1019,8 @@ class RealSpeedChartWidget extends StatelessWidget {
         final double chartEndX = actualWidth * endAtPercent;
 
         // 🎯 可調整的圓點位置參數
-        final double uploadDotOffset = -3.0;    // 🎯 上傳圓點左右偏移（負數向左，正數向右）
-        final double downloadDotOffset = 3.0;   // 🎯 下載圓點左右偏移（負數向左，正數向右）
+        final double uploadDotOffset = -1.0;    // 🎯 上傳圓點左右偏移（負數向左，正數向右）
+        final double downloadDotOffset = -1.0;   // 🎯 下載圓點左右偏移（負數向左，正數向右）
         final double overlapDotOffset = 0.0;    // 🎯 重疊時圓點的偏移
 
         // 🎯 可調整的垂直線位置參數
@@ -836,7 +1037,7 @@ class RealSpeedChartWidget extends StatelessWidget {
         final double downloadDotY = (1.0 - downloadNormalized) * actualHeight;
 
         // 檢查是否重疊
-        final bool isOverlapping = (uploadDotY - downloadDotY).abs() < 12;
+        final bool isOverlapping = (uploadDotY - downloadDotY).abs() < 6;
 
         return Stack(
           clipBehavior: Clip.none,
@@ -863,65 +1064,65 @@ class RealSpeedChartWidget extends StatelessWidget {
               ),
             ),
 
-            // 🎯 垂直線：重疊時只顯示藍色
-            if (!isOverlapping) ...[
-              // 上傳速度垂直線（橙色）
-              if (uploadData.isNotEmpty)
-                Positioned(
-                  top: uploadDotY + 8,
-                  bottom: 0,
-                  left: chartEndX + uploadLineOffset,  // 🎯 使用可調整參數
-                  child: Container(
-                    width: 1,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.orange.withOpacity(0.8),
-                          Colors.orange.withOpacity(0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+            // 🎯 註解掉垂直線：移除圓點底下的線條
+            // if (!isOverlapping) ...[
+            //   // 上傳速度垂直線（橙色）
+            //   if (uploadData.isNotEmpty)
+            //     Positioned(
+            //       top: uploadDotY + 8,
+            //       bottom: 0,
+            //       left: chartEndX + uploadLineOffset,  // 🎯 使用可調整參數
+            //       child: Container(
+            //         width: 1,
+            //         decoration: BoxDecoration(
+            //           gradient: LinearGradient(
+            //             begin: Alignment.topCenter,
+            //             end: Alignment.bottomCenter,
+            //             colors: [
+            //               Colors.orange.withOpacity(0.8),
+            //               Colors.orange.withOpacity(0),
+            //             ],
+            //           ),
+            //         ),
+            //       ),
+            //     ),
+            // ],
 
-            // 下載速度垂直線（藍色）
-            if (downloadData.isNotEmpty)
-              Positioned(
-                top: downloadDotY + 8,
-                bottom: 0,
-                left: chartEndX + (isOverlapping ? overlapLineOffset : downloadLineOffset), // 🎯 使用可調整參數
-                child: Container(
-                  width: 1,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0xFF00EEFF).withOpacity(0.8),
-                        Color(0xFF00EEFF).withOpacity(0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+            // // 下載速度垂直線（藍色）
+            // if (downloadData.isNotEmpty)
+            //   Positioned(
+            //     top: downloadDotY + 8,
+            //     bottom: 0,
+            //     left: chartEndX + (isOverlapping ? overlapLineOffset : downloadLineOffset), // 🎯 使用可調整參數
+            //     child: Container(
+            //       width: 1,
+            //       decoration: BoxDecoration(
+            //         gradient: LinearGradient(
+            //           begin: Alignment.topCenter,
+            //           end: Alignment.bottomCenter,
+            //           colors: [
+            //             Color(0xFF00EEFF).withOpacity(0.8),
+            //             Color(0xFF00EEFF).withOpacity(0),
+            //           ],
+            //         ),
+            //       ),
+            //     ),
+            //   ),
 
-            // 🎯 圓點：使用可調整的偏移參數
+            // 🎯 圓點：縮小尺寸，外框改為與內部顏色一致
             if (!isOverlapping) ...[
               // 上傳速度圓點（橙色）
               if (uploadData.isNotEmpty)
                 Positioned(
-                  top: uploadDotY - 6,
-                  left: chartEndX - 6 + uploadDotOffset,  // 🎯 使用可調整參數
+                  top: uploadDotY - 4,  // 🎯 調整位置以配合縮小的尺寸
+                  left: chartEndX - 4 + uploadDotOffset,  // 🎯 調整位置以配合縮小的尺寸
                   child: Container(
-                    width: 12,
-                    height: 12,
+                    width: 8,   // 🎯 從 12 縮小到 8
+                    height: 8,  // 🎯 從 12 縮小到 8
                     decoration: BoxDecoration(
                       color: Colors.orange,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1),
+                      border: Border.all(color: Colors.orange, width: 1), // 🎯 外框改為橙色
                     ),
                   ),
                 ),
@@ -930,29 +1131,29 @@ class RealSpeedChartWidget extends StatelessWidget {
             // 下載速度圓點（藍色）
             if (downloadData.isNotEmpty)
               Positioned(
-                top: downloadDotY - 6,
-                left: chartEndX - 6 + (isOverlapping ? overlapDotOffset : downloadDotOffset), // 🎯 使用可調整參數
+                top: downloadDotY - 4,  // 🎯 調整位置以配合縮小的尺寸
+                left: chartEndX - 4 + (isOverlapping ? overlapDotOffset : downloadDotOffset), // 🎯 調整位置以配合縮小的尺寸
                 child: Container(
-                  width: 12,
-                  height: 12,
+                  width: 8,   // 🎯 從 12 縮小到 8
+                  height: 8,  // 🎯 從 12 縮小到 8
                   decoration: BoxDecoration(
                     color: Color(0xFF00EEFF),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1),
+                    border: Border.all(color: Color(0xFF00EEFF), width: 1), // 🎯 外框改為藍色
                   ),
                 ),
               ),
 
-            // 雙線速度標籤
-            if (uploadData.isNotEmpty && downloadData.isNotEmpty)
-              Positioned(
-                top: math.min(uploadDotY, downloadDotY) - 60,
-                left: chartEndX - 60,
-                child: DualSpeedLabelWidget(
-                  uploadSpeed: currentUpload,
-                  downloadSpeed: currentDownload,
-                ),
-              ),
+            // 🎯 註解掉：雙線速度標籤
+            // if (uploadData.isNotEmpty && downloadData.isNotEmpty)
+            //   Positioned(
+            //     top: math.min(uploadDotY, downloadDotY) - 60,
+            //     left: chartEndX - 60,
+            //     child: DualSpeedLabelWidget(
+            //       uploadSpeed: currentUpload,
+            //       downloadSpeed: currentDownload,
+            //     ),
+            //   ),
           ],
         );
       },

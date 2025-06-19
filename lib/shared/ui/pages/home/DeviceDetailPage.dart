@@ -539,7 +539,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                   : _clientDevices.isEmpty
                   ? const Center(
                 child: Text(
-                  '沒有連接的設備',
+                  'No Detected Device',
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
               )

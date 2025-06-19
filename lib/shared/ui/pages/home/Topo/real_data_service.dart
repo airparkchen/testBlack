@@ -458,7 +458,7 @@ class RealDataService {
     } else if (name.contains('xbox') || name.contains('playstation') || name.contains('game')) {
       return ClientType.xbox;
     } else if (name.contains('iphone') || name.contains('phone') || name.contains('mobile') ||
-        name.contains('oppo') || name.contains('samsung') || name.contains('pixel') || name.contains('huawei') ||
+        name.contains('oppo') || name.contains('samsung') || name.contains('Pixel') || name.contains('huawei') ||
         name.contains('xiaomi')) {
       return ClientType.iphone;
     } else if (name.contains('laptop') || name.contains('computer') || name.contains('DESK') || name.contains('pc') ||
