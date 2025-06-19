@@ -10,7 +10,7 @@ import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/services/dashboard_data_service.dart';
-// 🔥 重要：移除重複的 import，使用 DashboardComponent 中的資料類別
+import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 
 class DashboardPage extends StatefulWidget {
   // ==================== 配置參數 ====================
@@ -407,8 +407,10 @@ class _DashboardPageState extends State<DashboardPage>
   /// 啟動定期重新整理
   void _startPeriodicRefresh() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(widget.refreshInterval, (timer) {
+    // 🟢 修改：使用13秒間隔，避免與其他API衝突
+    _refreshTimer = Timer.periodic(Duration(seconds: NetworkTopoConfig.dashboardApiCacheSeconds), (timer) {
       if (mounted && !_isLoading) {
+        print('⏰ Dashboard API 更新觸發 (${NetworkTopoConfig.dashboardApiCacheSeconds}秒間隔)');
         _loadDashboardData();
       }
     });

@@ -722,7 +722,7 @@ class CorrectedConnectionLinesPainter extends CustomPainter {
     final bool isConnected = internetStatus?.isConnected ?? true;
     final bool shouldShowError = internetStatus?.shouldShowError ?? false;
 
-    print('🌐 繪製 Internet 連線: isConnected=$isConnected, shouldShowError=$shouldShowError');
+    // print('🌐 繪製 Internet 連線: isConnected=$isConnected, shouldShowError=$shouldShowError');
 
     // 計算連線路徑
     final dx = end.dx - start.dx;
@@ -809,8 +809,11 @@ class CorrectedConnectionLinesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CorrectedConnectionLinesPainter oldDelegate) {
-    return oldDelegate.internetStatus?.isConnected != internetStatus?.isConnected ||
-        oldDelegate.internetStatus?.status != internetStatus?.status;
+    // 🟢 只在真正需要重繪時才返回 true
+    final bool connectionChanged = oldDelegate.internetStatus?.isConnected != internetStatus?.isConnected;
+    final bool shouldShowErrorChanged = oldDelegate.internetStatus?.shouldShowError != internetStatus?.shouldShowError;
+
+    return connectionChanged || shouldShowErrorChanged;
   }
 }
 

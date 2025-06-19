@@ -108,6 +108,10 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
   // 🎯 新增：API 更新計時器（10秒一次）
   Timer? _apiUpdateTimer;
 
+  Timer? _clientCountUpdateTimer;
+  List<DeviceConnection> _latestConnections = [];
+  NetworkDevice? _latestGatewayDevice;
+
   InternetConnectionStatus? _internetStatus;
 
   @override
@@ -143,13 +147,60 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     // 🎯 新增：載入 Gateway 設備資料
     _loadGatewayDevice();
     _loadInternetStatus();
+    if (NetworkTopoConfig.useRealData) {
+      _startClientCountUpdates();
+    }
   }
 
   @override
   void dispose() {
     // 🎯 新增：清理 API 更新計時器
-    _apiUpdateTimer?.cancel();
+    _clientCountUpdateTimer?.cancel();
     super.dispose();
+  }
+
+  /// 🟢 新增：啟動客戶端數量更新
+  void _startClientCountUpdates() {
+    _clientCountUpdateTimer?.cancel();
+
+    // 使用與Mesh API相同的間隔（12秒）
+    _clientCountUpdateTimer = Timer.periodic(Duration(seconds: NetworkTopoConfig.meshApiCacheSeconds), (_) {
+      if (mounted && NetworkTopoConfig.useRealData) {
+        _updateClientCountsOnly();
+      }
+    });
+
+    print('🔄 啟動客戶端數量更新，間隔: ${NetworkTopoConfig.meshApiCacheSeconds}秒');
+  }
+
+  /// 🟢 新增：只更新客戶端數量，不重建拓樸結構
+  Future<void> _updateClientCountsOnly() async {
+    try {
+      print('🔄 更新客戶端數量中...');
+
+      // 並行獲取最新的連接數據和Gateway設備
+      final results = await Future.wait([
+        RealDataIntegrationService.getDeviceConnections(),
+        RealDataIntegrationService.getGatewayDevice(),
+      ]);
+
+      final newConnections = results[0] as List<DeviceConnection>;
+      final newGatewayDevice = results[1] as NetworkDevice?;
+
+      if (mounted) {
+        setState(() {
+          _latestConnections = newConnections;
+          _latestGatewayDevice = newGatewayDevice;
+        });
+
+        print('✅ 客戶端數量已更新: ${newConnections.length} 個連接');
+        for (final conn in newConnections) {
+          print('   - ${conn.deviceId}: ${conn.connectedDevicesCount} 個客戶端');
+        }
+      }
+    } catch (e) {
+      print('❌ 更新客戶端數量失敗: $e');
+    }
   }
 
   /// 🎯 新增：啟動 API 更新計時器（10秒一次）
@@ -269,10 +320,12 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
           Expanded(
             child: Center(
               child: NetworkTopologyComponent(
-                gatewayDevice: _gatewayDevice,
+                // 🟢 修改：優先使用最新的Gateway設備數據
+                gatewayDevice: _latestGatewayDevice ?? _gatewayDevice,
                 gatewayName: widget.gatewayName,
                 devices: widget.devices,
-                deviceConnections: widget.deviceConnections,
+                // 🟢 修改：優先使用最新的連接數據
+                deviceConnections: _latestConnections.isNotEmpty ? _latestConnections : widget.deviceConnections,
                 totalConnectedDevices: _calculateTotalConnectedDevices(),
                 height: screenSize.height * NetworkTopoConfig.topologyHeightRatio,
                 onDeviceSelected: widget.enableInteractions ? widget.onDeviceSelected : null,
@@ -514,7 +567,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
 
     if (NetworkTopoConfig.useRealData) {
       // 🎯 修改：現在調用插值更新，不是 API 更新
-      _loadInternetStatus();
+      // _loadInternetStatus();
       _realSpeedDataGenerator?.update().then((_) {
         if (mounted) {
           setState(() {

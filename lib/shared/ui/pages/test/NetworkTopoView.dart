@@ -92,11 +92,15 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
     );
 
     // 新增：載入數據
-    _loadTopologyData();        // 替換 _loadData()
-    _initializeSpeedData();     // 新增：獨立初始化速度數據
-    // 啟動數據更新
-    _startDataUpdates();
-    //啟動自動重新載入
+    _loadTopologyData();
+    Future.delayed(Duration(milliseconds: 500), () {
+      if (mounted) {
+        _initializeSpeedData();
+        _startDataUpdates();
+      }
+    });
+
+    // 🟢 修改：使用新的36秒間隔啟動自動重新載入
     if (NetworkTopoConfig.enableAutoReload) {
       _startAutoReload();
     }
@@ -222,9 +226,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
 
     print('🔄 啟動自動重新載入，間隔: ${NetworkTopoConfig.autoReloadIntervalSeconds} 秒');
 
-    _autoReloadTimer = Timer.periodic(NetworkTopoConfig.autoReloadInterval, (_) {
+    // 🟢 修改：使用新的36秒間隔
+    _autoReloadTimer = Timer.periodic(Duration(seconds: NetworkTopoConfig.autoReloadIntervalSeconds), (_) {
       if (mounted && NetworkTopoConfig.useRealData) {
-        print('⏰ 自動重新載入觸發');
+        print('⏰ 自動重新載入觸發 (${NetworkTopoConfig.autoReloadIntervalSeconds}秒間隔)');
         _forceReloadData();
       }
     });
@@ -422,44 +427,52 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
   /// 建構主要內容
   /// 修正：建構主要內容（加入載入狀態和正確的數據源）
   Widget _buildMainContent() {
-    // 🎯 使用新的載入狀態
-    if (_isLoadingTopologyData && _topologyDevices.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 16),
-            Text('Loading topology...', style: TextStyle(color: Colors.white, fontSize: 16)),
-          ],
-        ),
-      );
-    }
-
     final devices = _getDevices();
     final connections = _getDeviceConnections(devices);
 
-    // 🎯 關鍵修改：使用 IndexedStack 代替條件式顯示
-    return IndexedStack(
-      index: _viewMode == 'topology' ? 0 : 1,
+    // 🟢 修改：使用 Stack + 覆蓋層，避免重建底層組件
+    return Stack(
       children: [
-        // 🎯 Topology 頁面（包含速度圖）- 始終存在但可能不可見
-        TopologyDisplayWidget(
-          key: _topologyDisplayKey,
-          devices: devices,
-          deviceConnections: connections,
-          gatewayName: _gatewayName,
-          enableInteractions: widget.enableInteractions,
-          animationController: _animationController,
-          onDeviceSelected: _handleDeviceSelected,
+        // 🟢 主要內容：始終存在，不會被重建
+        IndexedStack(
+          index: _viewMode == 'topology' ? 0 : 1,
+          children: [
+            // 🟢 TopologyDisplayWidget 始終存在，速度區域不會被重製
+            TopologyDisplayWidget(
+              key: _topologyDisplayKey,
+              devices: devices,
+              deviceConnections: connections,
+              gatewayName: _gatewayName,
+              enableInteractions: widget.enableInteractions,
+              animationController: _animationController,
+              onDeviceSelected: _handleDeviceSelected,
+            ),
+            DeviceListWidget(
+              devices: devices,
+              enableInteractions: widget.enableInteractions,
+              onDeviceSelected: _handleDeviceSelected,
+            ),
+          ],
         ),
 
-        // 🎯 List 頁面 - 始終存在但可能不可見
-        DeviceListWidget(
-          devices: devices,
-          enableInteractions: widget.enableInteractions,
-          onDeviceSelected: _handleDeviceSelected,
-        ),
+        // 🟢 Loading 覆蓋層：只在載入時顯示，不影響底層組件
+        if (_isLoadingTopologyData && _topologyDevices.isEmpty)
+          Container(
+            color: Colors.black.withOpacity(0.7),
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 16),
+                  Text(
+                      'Loading topology...',
+                      style: TextStyle(color: Colors.white, fontSize: 16)
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
