@@ -69,8 +69,12 @@ class DeviceListWidget extends StatelessWidget {
                       } : null,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusS),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        // 🔥 關鍵修正：Extender 減少頂部 padding，讓文字可以更靠近頂部
+                        padding: isGateway
+                            ? const EdgeInsets.all(16)  // Gateway 保持原有 padding
+                            : const EdgeInsets.fromLTRB(16, 8, 16, 16), // 🔥 Extender 頂部只留 8px
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start, // 🔥 關鍵修正：從頂部開始對齊
                           children: [
                             // 左側圖標區域
                             _buildDeviceIcon(device, isGateway),
@@ -98,7 +102,7 @@ class DeviceListWidget extends StatelessWidget {
   /// 🎯 修正：建構設備圖標
   Widget _buildDeviceIcon(NetworkDevice device, bool isGateway) {
     if (isGateway) {
-      // Gateway 圖標 - 約束置中
+      // Gateway 圖標 - 保持置中
       return SizedBox(
         width: 60,
         height: 80, // 🎯 配合卡片高度調整
@@ -128,14 +132,17 @@ class DeviceListWidget extends StatelessWidget {
         ),
       );
     } else {
-      // Extender 圖標 - 約束置中
+      // 🔥 修正：Extender 圖標 - 重新計算置中位置
       return SizedBox(
         width: 60,
         height: 80, // 🎯 配合卡片高度調整
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // 🎯 垂直置中
+          mainAxisAlignment: MainAxisAlignment.center, // 🔥 修正：重新置中
           crossAxisAlignment: CrossAxisAlignment.center, // 🎯 水平置中
           children: [
+            // 🔥 新增：向上微調，補償 padding 減少的效果
+            const SizedBox(height: 4), // 🔥 微調位置
+
             Container(
               width: 50, // 🎯 固定圖標容器大小
               height: 50,
@@ -174,84 +181,87 @@ class DeviceListWidget extends StatelessWidget {
     final int clientCount = int.tryParse(clientsStr) ?? 0;
 
     if (isGateway) {
-      // Gateway 資訊顯示
+      // Gateway 資訊顯示（保持原有邏輯）
       return SizedBox(
           height: 80, // 🎯 配合圖標高度
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '${device.name} ${device.mac}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  height: 1.3,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Clients: $clientCount', // 🎯 使用正確的客戶端數量
+                style: TextStyle(
+                  color: Colors.white.withOpacity(1.0),
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          )
+      );
+    } else {
+      // 🔥 修正：Extender 資訊顯示 - 移除高度限制，從頂部開始
+      return Column( // 🔥 移除 SizedBox 高度限制
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start, // 🔥 從頂部開始
         children: [
           Text(
-            '${device.name} ${device.mac}',
+            'Agent ${device.mac}', // 🔥 修正：顯示 "Agent" + MAC 地址
             style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
-              fontWeight: FontWeight.normal,
+              fontWeight: FontWeight.w600,
               height: 1.3,
+            ),
+            maxLines: 2, // 🔥 允許兩行，防止 MAC 地址過長
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'IP Address: ${device.ip}',
+            style: TextStyle(
+              color: Colors.white.withOpacity(1.0),
+              fontSize: 12,
+              height: 1.2,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 1),
+          Text(
+            'RSSI: ${device.additionalInfo['rssi']}',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 11,
+              height: 1.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
           Text(
             'Clients: $clientCount', // 🎯 使用正確的客戶端數量
             style: TextStyle(
-              color: Colors.white.withOpacity(1.0),
-              fontSize: 12,
-              height: 1.3,
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 11,
+              height: 1.2,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
-      )
-    );
-    } else {
-      // Extender 資訊顯示
-      return SizedBox(
-        height: 80, // 🎯 配合圖標高度
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              device.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                height: 1.3,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              'IP Address: ${device.ip}',
-              style: TextStyle(
-                color: Colors.white.withOpacity(1.0),
-                fontSize: 12,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              'RSSI: ${device.additionalInfo['rssi']}',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 11,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Clients: $clientCount', // 🎯 使用正確的客戶端數量
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 11,
-                height: 1.2,
-              ),
-            ),
-          ],
-        ),
       );
     }
   }

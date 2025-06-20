@@ -377,7 +377,7 @@ class RealDataIntegrationService {
           deviceType: host.connectionInfo.description,
           mac: host.macAddress,
           ip: host.ipAddress,
-          connectionTime: '2h/15m/30s', // 暫時使用假資料
+          connectionTime: '', // 暫時使用假資料
           clientType: _inferClientType(host.deviceName, host.connectionInfo),
           rssi: host.rssiValues.join(','),
           status: host.rawData['linkstate']?.toString(),
@@ -471,28 +471,73 @@ class RealDataIntegrationService {
   /// 推斷客戶端設備類型
   static ClientType _inferClientType(String deviceName, ConnectionInfo connectionInfo) {
     final String name = deviceName.toLowerCase();
+    final String connectionDesc = connectionInfo.description.toLowerCase();
+    final String connectionType = connectionInfo.connectionType.toLowerCase();
 
-    if (name.contains('tv') || name.contains('television')) {
+    // 🎯 優先級1: 明確的電視關鍵字
+    if (name.contains('tv') || name.contains('television') ||
+        name.contains('smart tv') || name.contains('android tv')) {
       return ClientType.tv;
-    } else if (name.contains('xbox') || name.contains('playstation') || name.contains('game')) {
+    }
+
+    // 🎯 優先級2: 遊戲機關鍵字
+    if (name.contains('xbox') || name.contains('playstation') ||
+        name.contains('ps4') || name.contains('ps5') ||
+        name.contains('nintendo') || name.contains('switch') ||
+        name.contains('game')) {
       return ClientType.xbox;
-    } else if (name.contains('iphone') || name.contains('phone') || name.contains('mobile') ||
-        name.contains('oppo') || name.contains('samsung') || name.contains('huawei') ||
-        name.contains('xiaomi')) {
+    }
+
+    // 🎯 優先級3: 手機/平板關鍵字 - 加強 Pixel 識別
+    if (name.contains('iphone') || name.contains('ipad') ||
+        name.contains('phone') || name.contains('mobile') ||
+        name.contains('android') || name.contains('tablet') ||
+        // 🔥 手機品牌關鍵字
+        name.contains('pixel') ||     // 🎯 修正：Pixel 分類到手機
+        name.contains('samsung') ||
+        name.contains('galaxy') ||
+        name.contains('huawei') ||
+        name.contains('xiaomi') ||
+        name.contains('oppo') ||
+        name.contains('vivo') ||
+        name.contains('oneplus') ||
+        (name.contains('lg') && (name.contains('phone') || name.contains('mobile')))) {
       return ClientType.iphone;
-    } else if (name.contains('laptop') || name.contains('computer') || name.contains('pc') ||
-        name.contains('-nb') || name.contains('notebook') || name.contains('ppc')) {
+    }
+
+    // 🎯 優先級4: 電腦/筆電關鍵字 - 更精確的判斷
+    if (name.contains('laptop') || name.contains('notebook') ||
+        name.contains('macbook') || name.contains('thinkpad') ||
+        name.contains('computer') || name.contains('pc') ||
+        name.contains('desktop') || name.contains('workstation') ||
+        name.contains('dell') || name.contains('hp') || name.contains('lenovo') ||
+        name.contains('asus') || name.contains('acer') ||
+        name.contains('-nb') || name.contains('book') ||
+        // 🔥 常見電腦命名模式
+        (name.contains('win') && name.length < 10) ||
+        name.contains('desk') || name.contains('office')) {
       return ClientType.laptop;
-    } else {
-      // 根據連接類型推斷
-      if (connectionInfo.isWired) {
-        return ClientType.xbox; // 有線通常是遊戲機或電腦
+    }
+
+    // 🎯 優先級5: 根據連接方式判斷
+    if (connectionInfo.isWired) {
+      // 有線連接通常是：遊戲機 > 電腦 > 其他
+      if (name.contains('console') || connectionDesc.contains('ethernet')) {
+        return ClientType.xbox; // 有線通常是遊戲機
       } else {
-        return ClientType.laptop; // 無線通常是筆電或手機
+        return ClientType.laptop; // 或電腦
       }
     }
-  }
 
+    // 🎯 優先級6: 無線連接預設為手機
+    if (connectionInfo.isWireless) {
+      return ClientType.iphone; // 無線通常是手機
+    }
+
+    // 🎯 最後：未知設備
+    print('⚠️ 未能識別設備類型: "$deviceName", 連接: "${connectionInfo.description}"');
+    return ClientType.unknown;
+  }
   /// 檢查是否有可用的真實數據
   static Future<bool> isRealDataAvailable() async {
     try {

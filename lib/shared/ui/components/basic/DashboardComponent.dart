@@ -436,9 +436,8 @@ class _DashboardComponentState extends State<DashboardComponent>
       ) {
     return Padding(
       padding: contentPadding,
-      child: ListView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(  // 🎯 修改：從 ListView 改為 Column
+        crossAxisAlignment: CrossAxisAlignment.start,  // 🎯 靠左對齊
         children: [
           // 🔥 修正：恢復原本的 Ethernet 頁面特殊處理
           if (pageData.pageTitle.contains("Ethernet")) ...[
@@ -453,7 +452,7 @@ class _DashboardComponentState extends State<DashboardComponent>
               // 有 LAN 資料：顯示 LAN 埠列表（跟 WiFi 頻段一樣的排版）
               ...pageData.connections.map((connection) {
                 return Padding(
-                  padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 6 : 8),
+                  padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 4 : 6),
                   child: Row(
                     children: [
                       // 左側空間（讓 LAN 埠名稱看起來居中）
@@ -507,7 +506,7 @@ class _DashboardComponentState extends State<DashboardComponent>
               ),
             ],
           ] else ...[
-            // 第一頁和第二頁：顯示連接項目（保持原有邏輯）
+            // 🎯 修正：第一頁和第二頁 - 移除 Spacer，讓內容從頂部開始
             ...pageData.connections.asMap().entries.map((entry) {
               int index = entry.key;
               EthernetConnection connection = entry.value;
@@ -520,6 +519,7 @@ class _DashboardComponentState extends State<DashboardComponent>
               bool needsDividerAfter = isWiFiOrGuestTitle; // 只有WiFi/Guest WiFi標題後需要橫線
 
               return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,  // 🎯 靠左對齊
                 children: [
                   _buildConnectionItem(connection, bottomInset, index == 0),
 
@@ -541,9 +541,9 @@ class _DashboardComponentState extends State<DashboardComponent>
             }).toList(),
           ],
 
-          // 鍵盤彈出時的額外空間
-          if (bottomInset > 0)
-            SizedBox(height: bottomInset * 0.5),
+          // 🎯 移除額外的空間，讓內容緊湊排列
+          // if (bottomInset > 0)
+          //   SizedBox(height: bottomInset * 0.5),  // 🔥 註解掉這行
         ],
       ),
     );
@@ -570,8 +570,8 @@ class _DashboardComponentState extends State<DashboardComponent>
     if (connection.status.isEmpty || connectionType.contains('title')) {
       return Padding(
         padding: EdgeInsets.only(
-          top: isFirstItem ? 0 : (bottomInset > 0 ? 15 : 20),
-          bottom: bottomInset > 0 ? 8 : 12,
+          top: isFirstItem ? 0 : (bottomInset > 0 ? 8 : 10), //標題行距
+          bottom: bottomInset > 0 ? 4 : 6,
         ),
         child: Align(
           alignment: Alignment.centerLeft,
@@ -591,8 +591,8 @@ class _DashboardComponentState extends State<DashboardComponent>
     if (connectionType == 'wifi_ssid' || connectionType == 'guest_wifi_ssid') {
       return Padding(
         padding: EdgeInsets.only(
-          top: bottomInset > 0 ? 12 : 15,
-          bottom: bottomInset > 0 ? 12 : 15,
+          top: bottomInset > 0 ? 6: 8,   //SSID間距
+          bottom: bottomInset > 0 ? 6 : 8,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -630,7 +630,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     // 🔥 情況3：單行項目（Model Name, Internet）
     if (_isSingleLineItem(connection.speed)) {
       return Padding(
-        padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 8 : 12),
+        padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 4 : 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -658,7 +658,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     // 🔥 情況4：WiFi頻段項目和Ethernet埠項目（統一排版：名稱居中，狀態右對齊）
     // 這包括 WiFi 頻段（2.4GHz, 5GHz等）和 Ethernet 埠（2.5Gbps等）
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 6 : 8),
+      padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 2 : 4),
       child: Row(
         children: [
           // 左側空間（讓名稱看起來居中）
@@ -764,7 +764,7 @@ class _DashboardComponentState extends State<DashboardComponent>
 
   Widget _buildDivider(double bottomInset) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 5 : 8),
+      padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 2 : 4),
       child: Divider(
         height: 1,
         thickness: 1,

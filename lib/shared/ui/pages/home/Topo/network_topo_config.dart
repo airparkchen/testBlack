@@ -17,23 +17,23 @@ class NetworkTopoConfig {
   // ==================== 🎯 統一API更新頻率控制（全部改為10秒） ====================
 
   /// 🎯 主要更新頻率：統一為10秒
-  static const int unifiedApiUpdateSeconds = 13;
+  static const int unifiedApiUpdateSeconds = 11;
 
   /// Mesh API 資料快取時間（秒）
-  static const int meshApiCacheSeconds = 11;
+  static const int meshApiCacheSeconds = 9;
 
   /// Dashboard API 快取時間（秒）
   static const int dashboardApiCacheSeconds = 13;
 
   /// Throughput API 快取時間（秒）
-  static const int throughputApiCacheSeconds = 14;
+  static const int throughputApiCacheSeconds = 15;
 
   /// 速度圖表更新頻率（秒）
-  static const int speedChartUpdateSeconds = 5;
+  static const int speedChartUpdateSeconds = 6;
 
   /// 🎯 自動重新載入控制
   static const bool enableAutoReload = true; // 是否啟用自動重新載入
-  static const int autoReloadIntervalSeconds = 36; // 自動重新載入間隔（30秒，比API更新慢）
+  static const int autoReloadIntervalSeconds = 40; // 自動重新載入間隔（30秒，比API更新慢）
 
   /// 🎯 轉換為 Duration 格式
   static Duration get meshApiCacheDuration => Duration(seconds: meshApiCacheSeconds);

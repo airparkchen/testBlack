@@ -390,6 +390,7 @@ class RealDataService {
   }
 
   /// 將 API 資料轉換為 ClientDevice
+  // 🎯 修正：在 _convertToClientDevice 方法中正確調用
   static ClientDevice? _convertToClientDevice(Map<String, dynamic> data) {
     try {
       final String macAddr = data['macAddr'] ?? '';
@@ -401,9 +402,9 @@ class RealDataService {
       if (macAddr.isEmpty) return null;
 
       // 連接時間暫時用假資料
-      String connectionTime = '2h/15m/30s';
+      String connectionTime = '';
 
-      // 判斷設備類型
+      // 🔥 修正：直接傳入 connectionType 字串，而不是 ConnectionInfo 物件
       ClientType clientType = _inferClientType(deviceName, connectionType);
 
       // 處理 RSSI 資料
@@ -450,27 +451,74 @@ class RealDataService {
   }
 
   /// 推斷客戶端設備類型
+  /// 🎯 修正：推斷客戶端設備類型 - 改善分類邏輯
   static ClientType _inferClientType(String deviceName, String connectionType) {
     final String name = deviceName.toLowerCase();
+    final String connType = connectionType.toLowerCase();
 
-    if (name.contains('tv') || name.contains('television')) {
+    // 🎯 優先級1: 明確的電視關鍵字
+    if (name.contains('tv') || name.contains('television') ||
+        name.contains('smart tv') || name.contains('android tv')) {
       return ClientType.tv;
-    } else if (name.contains('xbox') || name.contains('playstation') || name.contains('game')) {
+    }
+
+    // 🎯 優先級2: 遊戲機關鍵字
+    if (name.contains('xbox') || name.contains('playstation') ||
+        name.contains('ps4') || name.contains('ps5') ||
+        name.contains('nintendo') || name.contains('switch') ||
+        name.contains('game')) {
       return ClientType.xbox;
-    } else if (name.contains('iphone') || name.contains('phone') || name.contains('mobile') ||
-        name.contains('oppo') || name.contains('samsung') || name.contains('Pixel') || name.contains('huawei') ||
-        name.contains('xiaomi')) {
+    }
+
+    // 🎯 優先級3: 手機/平板關鍵字 - 加強 Pixel 識別
+    if (name.contains('iphone') || name.contains('ipad') ||
+        name.contains('phone') || name.contains('mobile') ||
+        name.contains('android') || name.contains('tablet') ||
+        // 🔥 手機品牌關鍵字
+        name.contains('pixel') ||     // 🎯 修正：Pixel 分類到手機
+        name.contains('samsung') ||
+        name.contains('galaxy') ||
+        name.contains('huawei') ||
+        name.contains('xiaomi') ||
+        name.contains('oppo') ||
+        name.contains('vivo') ||
+        name.contains('oneplus') ||
+        (name.contains('lg') && (name.contains('phone') || name.contains('mobile')))) {
       return ClientType.iphone;
-    } else if (name.contains('laptop') || name.contains('computer') || name.contains('DESK') || name.contains('pc') ||
-        name.contains('-nb') || name.contains('notebook')) {
+    }
+
+    // 🎯 優先級4: 電腦/筆電關鍵字 - 更精確的判斷
+    if (name.contains('laptop') || name.contains('notebook') ||
+        name.contains('macbook') || name.contains('thinkpad') ||
+        name.contains('computer') || name.contains('pc') ||
+        name.contains('desktop') || name.contains('workstation') ||
+        name.contains('dell') || name.contains('hp') || name.contains('lenovo') ||
+        name.contains('asus') || name.contains('acer') ||
+        name.contains('-nb') || name.contains('book') ||
+        // 🔥 常見電腦命名模式
+        (name.contains('win') && name.length < 10) ||
+        name.contains('desk') || name.contains('office')) {
       return ClientType.laptop;
-    } else {
-      if (connectionType.toLowerCase().contains('ethernet')) {
-        return ClientType.xbox;
+    }
+
+    // 🎯 優先級5: 根據連接方式判斷
+    if (connType == 'ethernet' || connType.contains('ethernet')) {
+      // 有線連接通常是：遊戲機 > 電腦 > 其他
+      if (name.contains('console')) {
+        return ClientType.xbox; // 有線通常是遊戲機
       } else {
-        return ClientType.unknown;
+        return ClientType.laptop; // 或電腦
       }
     }
+
+    // 🎯 優先級6: 無線連接預設為手機
+    if (connType.contains('ghz') || connType == 'wireless' || connType.contains('wifi')) {
+      return ClientType.iphone; // 無線通常是手機
+    }
+
+    // 🎯 最後：未知設備
+    print('⚠️ 未能識別設備類型: "$deviceName", 連接: "$connectionType"');
+    return ClientType.unknown;
   }
 
   /// 輸出設備摘要資訊

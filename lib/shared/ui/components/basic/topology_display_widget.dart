@@ -21,14 +21,14 @@ class SpeedUnitFormatter {
     if (speedMbps >= 100) {
       // >= 100 Mbps 顯示為 Gbps
       final gbps = speedMbps / 1000.0;
-      return '${gbps.toStringAsFixed(2)} Gb/s';
+      return '${gbps.toStringAsFixed(2)} Gbps';
     } else if (speedMbps >= 0.1) {
       // >= 0.1 Mbps 顯示為 Mbps
-      return '${speedMbps.toStringAsFixed(2)} Mb/s';
+      return '${speedMbps.toStringAsFixed(2)} Mbps';
     } else {
       // < 0.1 Mbps 顯示為 Kbps
       final kbps = speedMbps * 1000.0;
-      return '${kbps.toStringAsFixed(1)} Kb/s';
+      return '${kbps.toStringAsFixed(1)} Kbps';
     }
   }
 
@@ -50,16 +50,16 @@ class SpeedUnitFormatter {
       // >= 100 Mbps 顯示為 Gbps
       final gbps = speedMbps / 1000.0;
       numberPart = gbps.toStringAsFixed(2);
-      unitPart = ' Gb/s'; // 注意前面有一個空格
+      unitPart = ' Gbps'; // 注意前面有一個空格
     } else if (speedMbps >= 0.1) {
       // >= 0.1 Mbps 顯示為 Mbps
       numberPart = speedMbps.toStringAsFixed(2);
-      unitPart = ' Mb/s'; // 注意前面有一個空格
+      unitPart = ' Mbps'; // 注意前面有一個空格
     } else {
       // < 0.1 Mbps 顯示為 Kbps
       final kbps = speedMbps * 1000.0;
       numberPart = kbps.toStringAsFixed(1);
-      unitPart = ' Kb/s'; // 注意前面有一個空格
+      unitPart = ' Kbps'; // 注意前面有一個空格
     }
 
     return TextSpan(
@@ -925,7 +925,7 @@ class DualSpeedCurvePainter extends CustomPainter {
 
     final double endX = size.width * endAtPercent;
 
-    // 🎯 繪製上傳速度曲線（橙色）
+    // 🎯 繪製上傳速度曲線（橘色）- 先繪製背景層
     _drawSpeedCurve(
       canvas,
       size,
@@ -933,11 +933,11 @@ class DualSpeedCurvePainter extends CustomPainter {
       range,
       endX,
       currentUpload,
-      Colors.orange,
-      Colors.orange.withOpacity(0.6),
+      Color(0xFFFF6D2F), // 🎯 修正：確保是橘色 #FF6D2F
+      'upload',
     );
 
-    // 🎯 繪製下載速度曲線（藍色）
+    // 🎯 繪製下載速度曲線（藍色）- 後繪製前景層，重疊時優先顯示
     _drawSpeedCurve(
       canvas,
       size,
@@ -945,8 +945,8 @@ class DualSpeedCurvePainter extends CustomPainter {
       range,
       endX,
       currentDownload,
-      Color(0xFF00EEFF),
-      Color(0xFF00EEFF).withOpacity(0.6),
+      Color(0xFF00EEFF), // 確保是藍色
+      'download',
     );
   }
 
@@ -958,79 +958,108 @@ class DualSpeedCurvePainter extends CustomPainter {
       double endX,
       double currentValue,
       Color primaryColor,
-      Color secondaryColor,
+      String curveType,
       ) {
-    final path = Path();
-
-    // 🎯 修正：繪製滑動窗口的歷史數據曲線
     if (data.isEmpty) return;
 
-    // 計算每個數據點之間的水平距離
+    final path = Path();
     final double stepX = endX / (data.length - 1);
-
-    // 🎯 從左到右繪製歷史數據（左邊是舊數據，右邊是新數據）
     final List<Offset> points = [];
 
+    // 🎯 計算曲線上的所有點
     for (int i = 0; i < data.length; i++) {
-      // X位置：從左到右排列
       final double x = i * stepX;
-
-      // Y位置：根據數據值計算
       final double normalizedValue = (data[i] - minSpeed) / range;
       final double y = size.height - (normalizedValue * size.height);
-
       points.add(Offset(x, y));
     }
 
     if (points.isEmpty) return;
 
-    // 🎯 使用貝茲曲線平滑連接點
+    // 🎯 建立平滑曲線路徑
     path.moveTo(points[0].dx, points[0].dy);
 
-    if (points.length > 2) {
-      for (int i = 0; i < points.length - 2; i++) {
+    if (points.length > 1) {
+      for (int i = 0; i < points.length - 1; i++) {
         final Offset current = points[i];
         final Offset next = points[i + 1];
 
-        // 計算控制點（平滑曲線）
-        final double controlX1 = current.dx + (next.dx - current.dx) * 0.5;
-        final double controlY1 = current.dy;
-        final double controlX2 = next.dx - (next.dx - current.dx) * 0.5;
-        final double controlY2 = next.dy;
+        // 使用平滑的貝茲曲線
+        final double controlDistance = (next.dx - current.dx) * 0.3;
+        final Offset cp1 = Offset(current.dx + controlDistance, current.dy);
+        final Offset cp2 = Offset(next.dx - controlDistance, next.dy);
 
-        // 使用三次貝茲曲線
-        path.cubicTo(controlX1, controlY1, controlX2, controlY2, next.dx, next.dy);
+        path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, next.dx, next.dy);
       }
-
-      // 連接最後兩個點
-      if (points.length >= 2) {
-        path.lineTo(points.last.dx, points.last.dy);
-      }
-    } else if (points.length == 2) {
-      // 只有兩個點，直接連線
-      path.lineTo(points[1].dx, points[1].dy);
     }
 
-    // 創建漸變畫筆
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..shader = LinearGradient(
-        colors: [primaryColor, secondaryColor],
-      ).createShader(Rect.fromLTWH(0, 0, endX, size.height));
+    // 🎯 創建從左到右的透明度漸變著色器
+    final Shader transparencyGradient = LinearGradient(
+      begin: Alignment.centerLeft,   // 從左邊開始
+      end: Alignment.centerRight,    // 到右邊結束
+      colors: [
+        primaryColor.withOpacity(0.0),  // 左邊完全透明 (0%)
+        primaryColor.withOpacity(0.2),  //
+        primaryColor.withOpacity(0.6),  //
+        primaryColor.withOpacity(1.0),  // 右邊完全不透明 (100%)
+      ],
+      stops: [0.0, 0.3, 0.7, 1.0],      // 控制漸變分布
+    ).createShader(Rect.fromLTWH(0, 0, endX, size.height));
 
-    // 發光效果
-    final glowPaint = Paint()
+    // 🎯 外層發光效果 - 大範圍模糊
+    final Paint outerGlowPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
+      ..strokeWidth = 3.0
       ..shader = LinearGradient(
-        colors: [primaryColor, secondaryColor],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          primaryColor.withOpacity(0.0),  // 左邊透明
+          primaryColor.withOpacity(0.1),
+          primaryColor.withOpacity(0.3),
+          primaryColor.withOpacity(0.5),  // 右邊發光
+        ],
+        stops: [0.0, 0.3, 0.7, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, endX, size.height))
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0)
+      ..strokeCap = StrokeCap.round;
 
-    // 繪製
-    canvas.drawPath(path, glowPaint);
-    canvas.drawPath(path, paint);
+    // 🎯 中層發光效果 - 中等模糊
+    final Paint middleGlowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          primaryColor.withOpacity(0.0),  // 左邊透明
+          primaryColor.withOpacity(0.2),
+          primaryColor.withOpacity(0.5),
+          primaryColor.withOpacity(0.8),  // 右邊更強發光
+        ],
+        stops: [0.0, 0.3, 0.7, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, endX, size.height))
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2.0)
+      ..strokeCap = StrokeCap.round;
+
+    // 🎯 主線條 - 清晰的線條
+    final Paint mainPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..shader = transparencyGradient
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // 🎯 繪製順序：從外到內，從模糊到清晰
+    canvas.drawPath(path, outerGlowPaint);   // 最外層發光
+    canvas.drawPath(path, middleGlowPaint);  // 中層發光
+    canvas.drawPath(path, mainPaint);        // 主線條
+
+    // 🎯 調試：印出顏色資訊確認
+    // print('🎨 繪製 $curveType 曲線:');
+    // print('   主要顏色: ${primaryColor.toString()}');
+    // print('   透明度: 0.0 -> 1.0 (左到右)');
+    // print('   數據點數: ${data.length}');
   }
 
   @override
@@ -1039,7 +1068,10 @@ class DualSpeedCurvePainter extends CustomPainter {
         oldDelegate.downloadData != downloadData ||
         oldDelegate.animationValue != animationValue ||
         oldDelegate.currentUpload != currentUpload ||
-        oldDelegate.currentDownload != currentDownload;
+        oldDelegate.currentDownload != currentDownload ||
+        oldDelegate.minSpeed != minSpeed ||
+        oldDelegate.maxSpeed != maxSpeed ||
+        oldDelegate.endAtPercent != endAtPercent;
   }
 }
 

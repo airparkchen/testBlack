@@ -456,36 +456,44 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   Widget _buildDeviceInfo() {
     // 根據設備類型動態生成名稱
     final bool isGatewayDevice = widget.selectedDevice.additionalInfo['type'] == 'gateway';
-
-    String deviceName;
-    if (isGatewayDevice) {
-      deviceName = 'Controller';
-    } else {
-      deviceName = widget.selectedDevice.name;
-    }
-
     final clientCount = _clientDevices.length;
+
+    // 🎯 修正：重新定義顯示邏輯
+    String labelText;      // 上方標籤
+    String deviceText;     // 下方設備資訊
+
+    if (isGatewayDevice) {
+      // Gateway: 標籤顯示 "Controller"，下方只顯示 MAC
+      labelText = 'Controller';
+      deviceText = _formatMacAddress(widget.selectedDevice.mac);
+    } else {
+      // Extender: 標籤顯示偵測到的設備名稱，下方顯示 "Agent" + MAC
+      final String detectedDeviceName = widget.selectedDevice.additionalInfo['devName']?.toString() ??
+          widget.selectedDevice.name;
+      labelText = detectedDeviceName.isNotEmpty ? detectedDeviceName : 'Agent';
+      deviceText = 'Agent ${_formatMacAddress(widget.selectedDevice.mac)}';
+    }
 
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // NAME 標籤
+          // 🎯 修正：動態標籤文字
           Text(
-            'NAME',
+            labelText,  // 🔥 Gateway 顯示 "Controller"，Extender 顯示偵測到的設備名稱
             style: TextStyle(
               color: Colors.white.withOpacity(1.0),
-              fontSize: 12,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               height: 1.3,
             ),
           ),
           const SizedBox(height: 4),
 
-          // 設備名稱 + MAC - 防止溢出
+          // 🎯 修正：動態設備資訊
           Text(
-            '$deviceName ${_formatMacAddress(widget.selectedDevice.mac)}',
+            deviceText,  // 🔥 Gateway 只顯示 MAC，Extender 顯示 "Agent" + MAC
             style: const TextStyle(
               color: Colors.white,
               fontSize: 11,
