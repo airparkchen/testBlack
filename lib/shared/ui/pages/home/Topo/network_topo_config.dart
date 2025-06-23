@@ -16,14 +16,14 @@ class NetworkTopoConfig {
 // ==================== 🎯 容錯式API更新頻率控制（快取=2倍呼叫頻率） ====================
 
   /// 🎯 API 呼叫間隔（實際觸發頻率）- 錯開時間避免競爭
-  static const int meshApiCallIntervalSeconds = 9;      // Mesh API 每 12 秒呼叫
-  static const int dashboardApiCallIntervalSeconds = 13; // Dashboard API 每 15 秒呼叫
-  static const int throughputApiCallIntervalSeconds = 15; // Throughput API 每 18 秒呼叫
+  static const int meshApiCallIntervalSeconds = 9;      // Mesh API 每 9 秒呼叫
+  static const int dashboardApiCallIntervalSeconds = 14; // Dashboard API 每 14 秒呼叫
+  static const int throughputApiCallIntervalSeconds = 6; // Throughput API 每 6 秒呼叫
 
   /// 🎯 API 快取時間（2倍呼叫間隔，提供容錯能力）
-  static const int meshApiCacheSeconds = meshApiCallIntervalSeconds * 2;      // 24 秒快取
-  static const int dashboardApiCacheSeconds = dashboardApiCallIntervalSeconds * 2; // 30 秒快取
-  static const int throughputApiCacheSeconds = throughputApiCallIntervalSeconds * 2; // 36 秒快取
+  static const int meshApiCacheSeconds = meshApiCallIntervalSeconds * 2;      //18 秒快取
+  static const int dashboardApiCacheSeconds = dashboardApiCallIntervalSeconds ; // 14 秒快取
+  static const int throughputApiCacheSeconds = throughputApiCallIntervalSeconds * 2; // 12 秒快取
 
   /// 速度圖表更新頻率（秒）
   static const int speedChartUpdateSeconds = 6;
