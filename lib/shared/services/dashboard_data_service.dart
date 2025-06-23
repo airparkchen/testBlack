@@ -176,12 +176,36 @@ class DashboardDataService {
   }
 
   /// 獲取 Dashboard 資訊
-  static Future<Map<String, dynamic>> _getSystemDashboard() async {
+  static Future<Map<String, dynamic>> _getSystemDashboard({int retryCount = 0}) async {
+    const int maxRetries = 2; // 最多重試 2 次
+    const List<int> retryDelays = [1, 2]; // 重試延遲：1秒, 2秒
+
     try {
-      return await WifiApiService.getSystemDashboard();
+      print('🌐 調用 Dashboard API (嘗試 ${retryCount + 1}/${maxRetries + 1})');
+
+      final result = await WifiApiService.getSystemDashboard();
+
+      if (retryCount > 0) {
+        print('✅ Dashboard API 重試成功 (第${retryCount + 1}次嘗試)');
+      }
+
+      return result;
+
     } catch (e) {
-      print('⚠️ 獲取 Dashboard 資訊失敗: $e');
-      return {'error': e.toString()};
+      print('❌ Dashboard API 調用失敗 (第${retryCount + 1}次): $e');
+
+      // 🔄 如果還有重試機會
+      if (retryCount < maxRetries) {
+        final delaySeconds = retryDelays[retryCount];
+        print('🔄 ${delaySeconds} 秒後進行第${retryCount + 2}次重試...');
+
+        await Future.delayed(Duration(seconds: delaySeconds));
+        return _getSystemDashboard(retryCount: retryCount + 1);
+      }
+
+      // 🚨 所有重試都失敗
+      print('🚨 Dashboard API 重試 ${maxRetries} 次後仍失敗');
+      rethrow;
     }
   }
 

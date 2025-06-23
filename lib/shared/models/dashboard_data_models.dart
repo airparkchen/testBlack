@@ -76,8 +76,13 @@ class InternetStatus {
       default:
         typeText = connectionType;
     }
+    final bool isConnected = pingStatus.toLowerCase() == 'connected';
 
-    return 'Connect($typeText)';
+    if (isConnected) {
+      return 'Connect($typeText)';
+    } else {
+      return 'Disconnect($typeText)';  // 🔥 修正：未連接時顯示 Disconnect  //dashboard internet
+    }
   }
 }
 

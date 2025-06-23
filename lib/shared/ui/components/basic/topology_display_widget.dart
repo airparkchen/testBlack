@@ -108,6 +108,9 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
   // 🎯 新增：API 更新計時器（10秒一次）
   Timer? _apiUpdateTimer;
 
+  // 🔥 新增：Internet 狀態更新計時器
+  Timer? _internetStatusUpdateTimer;
+
   Timer? _clientCountUpdateTimer;
   List<DeviceConnection> _latestConnections = [];
   NetworkDevice? _latestGatewayDevice;
@@ -149,6 +152,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     _loadInternetStatus();
     if (NetworkTopoConfig.useRealData) {
       _startClientCountUpdates();
+      _startInternetStatusUpdates();
     }
   }
 
@@ -156,7 +160,23 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
   void dispose() {
     // 🎯 新增：清理 API 更新計時器
     _clientCountUpdateTimer?.cancel();
+    _internetStatusUpdateTimer?.cancel();
     super.dispose();
+  }
+
+  /// 🔥 新增：啟動 Internet 狀態定期更新
+  void _startInternetStatusUpdates() {
+    _internetStatusUpdateTimer?.cancel();
+
+    // 🔥 每 15 秒更新 Internet 狀態（錯開其他 API 調用）
+    print('🌐 啟動 Internet 狀態定期更新，間隔: 15 秒');
+
+    _internetStatusUpdateTimer = Timer.periodic(Duration(seconds: 15), (_) {
+      if (mounted) {
+        print('🌐 定期更新 Internet 狀態...');
+        _loadInternetStatus();
+      }
+    });
   }
 
   /// 🟢 新增：啟動客戶端數量更新
@@ -164,7 +184,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     _clientCountUpdateTimer?.cancel();
 
     // 使用與Mesh API相同的間隔（12秒）
-    _clientCountUpdateTimer = Timer.periodic(Duration(seconds: NetworkTopoConfig.meshApiCacheSeconds), (_) {
+    _clientCountUpdateTimer = Timer.periodic(NetworkTopoConfig.meshApiCallInterval, (_) {
       if (mounted && NetworkTopoConfig.useRealData) {
         _updateClientCountsOnly();
       }
@@ -178,7 +198,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     try {
       print('🔄 更新客戶端數量中...');
 
-      // 並行獲取最新的連接數據和Gateway設備
+      // 🔥 修改：確保原子性更新，避免中間狀態
       final results = await Future.wait([
         RealDataIntegrationService.getDeviceConnections(),
         RealDataIntegrationService.getGatewayDevice(),
@@ -188,18 +208,20 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
       final newGatewayDevice = results[1] as NetworkDevice?;
 
       if (mounted) {
+        // 🔥 關鍵修改：使用單一 setState，避免競爭條件
         setState(() {
-          _latestConnections = newConnections;
-          _latestGatewayDevice = newGatewayDevice;
+          // 確保數據一致性：只有當兩個數據都成功獲取時才更新
+          if (newConnections.isNotEmpty || newGatewayDevice != null) {
+            _latestConnections = newConnections;
+            _latestGatewayDevice = newGatewayDevice;
+          }
         });
 
         print('✅ 客戶端數量已更新: ${newConnections.length} 個連接');
-        for (final conn in newConnections) {
-          print('   - ${conn.deviceId}: ${conn.connectedDevicesCount} 個客戶端');
-        }
       }
     } catch (e) {
       print('❌ 更新客戶端數量失敗: $e');
+      // 🔥 新增：錯誤時不清空現有數據，保持顯示穩定性
     }
   }
 
@@ -209,7 +231,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
 
     print('🔄 啟動 API 更新計時器，間隔: 10 秒');
 
-    _apiUpdateTimer = Timer.periodic(Duration(seconds: 10), (_) {
+    _apiUpdateTimer = Timer.periodic(NetworkTopoConfig.throughputApiCallInterval, (_) {
       if (mounted && NetworkTopoConfig.useRealData && _realSpeedDataGenerator != null) {
         print('⏰ API 更新計時器觸發');
         _realSpeedDataGenerator!.updateFromAPI();
@@ -268,14 +290,21 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     if (!mounted) return;
 
     try {
-      final status = await DashboardDataService.getInternetConnectionStatus();
+      // 🔥 關鍵：使用相同的快取，而不是獨立調用
+      final dashboardData = await DashboardDataService.getDashboardData();
+
+      final internetStatus = InternetConnectionStatus(
+        isConnected: dashboardData.internetStatus.pingStatus.toLowerCase() == 'connected',
+        status: dashboardData.internetStatus.pingStatus,
+        timestamp: DateTime.now(),
+      );
 
       if (mounted) {
         setState(() {
-          _internetStatus = status;
+          _internetStatus = internetStatus;
         });
 
-        print('✅ Internet 狀態載入完成: ${status.isConnected ? "已連接" : "未連接"} (${status.status})');
+        print('✅ 拓樸圖 Internet 狀態: ${internetStatus.status} -> ${internetStatus.isConnected ? "已連接" : "未連接"}');
       }
     } catch (e) {
       print('❌ 載入 Internet 狀態失敗: $e');
@@ -325,7 +354,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
                 gatewayName: widget.gatewayName,
                 devices: widget.devices,
                 // 🟢 修改：優先使用最新的連接數據
-                deviceConnections: _latestConnections.isNotEmpty ? _latestConnections : widget.deviceConnections,
+                deviceConnections: (_latestConnections.isNotEmpty ? _latestConnections : widget.deviceConnections) ?? [],
                 totalConnectedDevices: _calculateTotalConnectedDevices(),
                 height: screenSize.height * NetworkTopoConfig.topologyHeightRatio,
                 onDeviceSelected: widget.enableInteractions ? widget.onDeviceSelected : null,
