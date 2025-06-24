@@ -1,13 +1,13 @@
 import 'package:whitebox/shared/services/dashboard_data_service.dart';
 import 'package:whitebox/shared/services/real_data_integration_service.dart';
 import 'package:whitebox/shared/services/real_speed_data_service.dart';
-
+import 'package:whitebox/shared/utils/api_coordinator.dart';
 
 class ApiPreloaderService {
   static bool _isPreloading = false;
   static bool _isPreloaded = false;
 
-  /// 修改後的預載入方法
+  /// 🔥 修改：預載入時啟用協調器
   static Future<void> preloadAllAPIs() async {
     if (_isPreloading || _isPreloaded) {
       print('🔄 API 預載入已在進行中或已完成');
@@ -15,33 +15,30 @@ class ApiPreloaderService {
     }
 
     _isPreloading = true;
-    print('🚀 開始序列化預載入所有 API 資料...');
+    print('🚀 開始預載入所有 API 資料...');
 
     try {
-      // 🔥 序列化調用，智能延遲
-      print('📡 [1/3] 預載入 Mesh API...');
-      final meshResult = await _preloadMeshAPI();
+      // 🎯 關鍵：只在預載入時啟用協調器
+      await ApiCoordinator.withCoordination(() async {
+        print('📡 [1/3] 預載入 Dashboard API（協調模式）...');
+        final dashboardResult = await _preloadDashboardAPI();
 
-      await _smartDelay('Mesh API 完成');
+        print('🌐 [2/3] 預載入 Mesh API（協調模式）...');
+        final meshResult = await _preloadMeshAPI();
 
-      print('📊 [2/3] 預載入 Dashboard API...');
-      final dashboardResult = await _preloadDashboardAPI();
+        print('💨 [3/3] 預載入 Throughput API（協調模式）...');
+        final throughputResult = await _preloadThroughputAPI();
 
-      await _smartDelay('Dashboard API 完成');
+        // 統計結果
+        final results = [meshResult, dashboardResult, throughputResult];
+        final successCount = results.where((result) => result == true).length;
 
-      print('💨 [3/3] 預載入 Throughput API...');
-      final throughputResult = await _preloadThroughputAPI();
-
-      // 統計結果
-      final results = [meshResult, dashboardResult, throughputResult];
-      final successCount = results.where((result) => result == true).length;
-
-      print('✅ 序列化預載入完成：$successCount/3 個 API 成功載入');
-      print('📊 詳細結果:');
-      print('   Mesh API: ${meshResult ? "✅" : "❌"}');
-      print('   Dashboard API: ${dashboardResult ? "✅" : "❌"}');
-      print('   Throughput API: ${throughputResult ? "✅" : "❌"}');
-      print('⏱️ 總耗時約: ${3 + 2}秒 (含延遲)');
+        print('✅ 協調預載入完成：$successCount/3 個 API 成功載入');
+        print('📊 詳細結果:');
+        print('   Dashboard API: ${dashboardResult ? "✅" : "❌"}');
+        print('   Mesh API: ${meshResult ? "✅" : "❌"}');
+        print('   Throughput API: ${throughputResult ? "✅" : "❌"}');
+      });
 
       _isPreloaded = true;
 
@@ -49,6 +46,9 @@ class ApiPreloaderService {
       print('❌ API 預載入過程中發生錯誤: $e');
     } finally {
       _isPreloading = false;
+      // 🎯 預載入完成後確保協調器停用
+      ApiCoordinator.setEnabled(false);
+      print('🎛️ 預載入完成，協調器已停用，後續API調用恢復高速模式');
     }
   }
 
@@ -74,7 +74,6 @@ class ApiPreloaderService {
       print('🌐 預載入 Mesh API...');
       final startTime = DateTime.now();
 
-      // 強制重新載入（忽略快取）
       await RealDataIntegrationService.forceReload();
 
       final duration = DateTime.now().difference(startTime);
@@ -93,8 +92,7 @@ class ApiPreloaderService {
       print('📊 預載入 Dashboard API...');
       final startTime = DateTime.now();
 
-      // 🔥 修復：改為使用快取，而非強制刷新
-      await DashboardDataService.getDashboardData(forceRefresh: false);  // 改為 false
+      await DashboardDataService.getDashboardData(forceRefresh: true);
 
       final duration = DateTime.now().difference(startTime);
       print('✅ Dashboard API 預載入成功，耗時: ${duration.inMilliseconds}ms');
@@ -112,12 +110,10 @@ class ApiPreloaderService {
       print('💨 預載入 Throughput API...');
       final startTime = DateTime.now();
 
-      // 同時載入上傳和下載速度
       final uploadFuture = RealSpeedDataService.getCurrentUploadSpeed();
-      await Future.delayed(Duration(milliseconds: 100));
       final downloadFuture = RealSpeedDataService.getCurrentDownloadSpeed();
 
-      // await Future.wait([uploadFuture, downloadFuture]);
+      await Future.wait([uploadFuture, downloadFuture]);
 
       final duration = DateTime.now().difference(startTime);
       print('✅ Throughput API 預載入成功，耗時: ${duration.inMilliseconds}ms');

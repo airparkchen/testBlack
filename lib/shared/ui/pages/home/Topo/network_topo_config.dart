@@ -22,7 +22,7 @@ class NetworkTopoConfig {
 
   /// 🎯 API 快取時間（2倍呼叫間隔，提供容錯能力）
   static const int meshApiCacheSeconds = meshApiCallIntervalSeconds * 2;      //18 秒快取
-  static const int dashboardApiCacheSeconds = dashboardApiCallIntervalSeconds ; // 14 秒快取
+  static const int dashboardApiCacheSeconds = dashboardApiCallIntervalSeconds + 1; // 14 秒快取
   static const int throughputApiCacheSeconds = throughputApiCallIntervalSeconds * 2; // 12 秒快取
 
   /// 速度圖表更新頻率（秒）

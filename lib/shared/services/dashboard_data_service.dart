@@ -5,6 +5,7 @@ import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/utils/api_logger.dart';
+import 'package:whitebox/shared/utils/api_coordinator.dart';
 
 /// Internet 連線狀態數據類
 class InternetConnectionStatus {
@@ -149,7 +150,7 @@ class DashboardDataService {
   /// 獲取完整的 Dashboard 資料
   static Future<DashboardData> getDashboardData({bool forceRefresh = false}) async {
     try {
-      // 檢查快取
+      // 檢查快取（優先使用快取）
       if (!forceRefresh && _isCacheValid()) {
         print('📋 使用快取的 Dashboard 資料');
         return _cachedData!;
@@ -157,40 +158,57 @@ class DashboardDataService {
 
       print('🌐 開始載入 Dashboard 資料...');
 
-      // 只需要呼叫 Dashboard API，因為所有資料都在裡面
-      final dashboardInfo = await _getSystemDashboard();
+      // 嘗試獲取新資料
+      try {
+        final dashboardInfo = await _getSystemDashboard();
+        final dashboardData = _parseDashboardData(dashboardInfo);
 
-      // 解析資料
-      final dashboardData = _parseDashboardData(dashboardInfo);
+        // 更新快取
+        _cachedData = dashboardData;
+        _lastFetchTime = DateTime.now();
 
-      // 更新快取
-      _cachedData = dashboardData;
-      _lastFetchTime = DateTime.now();
+        print('✅ Dashboard 資料載入完成');
+        return dashboardData;
 
-      print('✅ Dashboard 資料載入完成');
-      return dashboardData;
+      } catch (e) {
+        // 🔥 新增：如果是協調器跳過，且有快取，則使用快取
+        if (e.toString().contains('frequency limit') && _cachedData != null) {
+          print('🕐 Dashboard API 被跳過，使用現有快取資料');
+          return _cachedData!;
+        }
+
+        // 🔥 新增：如果是API忙碌，且有快取，則使用快取
+        if (e.toString().contains('Another API request is busy') && _cachedData != null) {
+          print('⚠️ Dashboard API 忙碌，使用現有快取資料');
+          return _cachedData!;
+        }
+
+        // 其他錯誤才使用備用資料
+        print('❌ 載入 Dashboard 資料時發生錯誤: $e');
+        return _getFallbackData();
+      }
 
     } catch (e) {
       print('❌ 載入 Dashboard 資料時發生錯誤: $e');
       return _getFallbackData();
     }
   }
-
   /// 獲取 Dashboard 資訊
   static Future<Map<String, dynamic>> _getSystemDashboard({int retryCount = 0}) async {
-    const int maxRetries = 2; // 最多重試 2 次
-    const List<int> retryDelays = [1, 2]; // 重試延遲：1秒, 2秒
+    const int maxRetries = 2;
 
     try {
       print('🌐 調用 Dashboard API (嘗試 ${retryCount + 1}/${maxRetries + 1})');
 
-      // 🔥 使用包裝器添加日誌，但完全不改變現有邏輯
-      final result = await ApiLogger.wrapApiCall(
-        method: 'GET',
-        endpoint: '/api/v1/system/dashboard',
-        caller: 'DashboardDataService._getSystemDashboard',
-        apiCall: () => WifiApiService.getSystemDashboard(), // 🔥 保持原有調用不變
-      );
+      // 🔥 修改：條件式使用協調器
+      final result = await ApiCoordinator.coordinatedCall('dashboard', () async {
+        return await ApiLogger.wrapApiCall(
+          method: 'GET',
+          endpoint: '/api/v1/system/dashboard',
+          caller: 'DashboardDataService._getSystemDashboard',
+          apiCall: () => WifiApiService.getSystemDashboard(),
+        );
+      });
 
       if (retryCount > 0) {
         print('✅ Dashboard API 重試成功 (第${retryCount + 1}次嘗試)');
@@ -198,7 +216,20 @@ class DashboardDataService {
 
       return result;
     } catch (e) {
-      // 現有的錯誤處理完全不變...
+      // 🔥 修改：如果協調器停用且是頻率限制錯誤，直接重試
+      if (!ApiCoordinator.isEnabled && e.toString().contains('API call too frequent')) {
+        print('🚀 協調器已停用，忽略頻率限制，直接重試');
+        await Future.delayed(Duration(milliseconds: 500)); // 短暫延遲
+        return await _getSystemDashboard(retryCount: retryCount);
+      }
+
+      // 原有錯誤處理邏輯...
+      if (e.toString().contains('API call too frequent') && retryCount == 0) {
+        print('🕐 Dashboard API 被協調器跳過，等待後重試');
+        await Future.delayed(Duration(seconds: 3));
+        return await _getSystemDashboard(retryCount: retryCount + 1);
+      }
+
       if (retryCount < maxRetries) {
         print('⚠️ Dashboard API 調用失敗，準備重試... 錯誤: $e');
         await Future.delayed(Duration(seconds: 2));
@@ -209,7 +240,6 @@ class DashboardDataService {
       throw Exception('Dashboard API 調用失敗: $e');
     }
   }
-
 
   /// 解析 Dashboard 資料 - 重寫版本
   static DashboardData _parseDashboardData(Map<String, dynamic> dashboardInfo) {
@@ -426,7 +456,7 @@ class DashboardDataService {
   static DashboardData _getFallbackData() {
     print('⚠️ 使用備用資料');
     return DashboardData(
-      modelName: 'API Error',
+      modelName: 'Unknown',
       internetStatus: InternetStatus(
         pingStatus: 'Not Connected',
         connectionType: 'unknown',
@@ -439,7 +469,7 @@ class DashboardDataService {
       lanPorts: [
         LANPortInfo(
           name: 'Ethernet Port',
-          connectedStatus: 'API Error',
+          connectedStatus: 'Unknown',
         ),
       ],
     );
