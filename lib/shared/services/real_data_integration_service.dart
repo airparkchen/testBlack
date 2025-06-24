@@ -6,6 +6,8 @@ import 'package:whitebox/shared/models/mesh_data_models.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
+import 'package:whitebox/shared/utils/api_logger.dart';
+
 
 /// 🎯 正確修正：真實數據整合服務 - 拓樸圖只顯示 Extender，List 顯示 Gateway + Extender
 class RealDataIntegrationService {
@@ -58,8 +60,13 @@ class RealDataIntegrationService {
 
       final apiStartTime = DateTime.now();
 
-      // 1. 獲取原始 Mesh 數據
-      final meshResult = await WifiApiService.getMeshTopology();
+      // 1. 獲取原始 Mesh 數據（添加日誌包裝）
+      final meshResult = await ApiLogger.wrapApiCall(
+        method: 'GET',
+        endpoint: '/api/v1/system/mesh_topology',
+        caller: 'RealDataIntegrationService.getTopologyStructure',
+        apiCall: () => WifiApiService.getMeshTopology(),
+      );
 
       // 2. 使用分析器解析詳細設備資訊
       final detailedDevices = _analyzer.analyzeDetailedDeviceInfo(meshResult);

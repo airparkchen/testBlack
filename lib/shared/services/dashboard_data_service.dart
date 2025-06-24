@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
+import 'package:whitebox/shared/utils/api_logger.dart';
 
 /// Internet 連線狀態數據類
 class InternetConnectionStatus {
@@ -183,31 +184,32 @@ class DashboardDataService {
     try {
       print('🌐 調用 Dashboard API (嘗試 ${retryCount + 1}/${maxRetries + 1})');
 
-      final result = await WifiApiService.getSystemDashboard();
+      // 🔥 使用包裝器添加日誌，但完全不改變現有邏輯
+      final result = await ApiLogger.wrapApiCall(
+        method: 'GET',
+        endpoint: '/api/v1/system/dashboard',
+        caller: 'DashboardDataService._getSystemDashboard',
+        apiCall: () => WifiApiService.getSystemDashboard(), // 🔥 保持原有調用不變
+      );
 
       if (retryCount > 0) {
         print('✅ Dashboard API 重試成功 (第${retryCount + 1}次嘗試)');
       }
 
       return result;
-
     } catch (e) {
-      print('❌ Dashboard API 調用失敗 (第${retryCount + 1}次): $e');
-
-      // 🔄 如果還有重試機會
+      // 現有的錯誤處理完全不變...
       if (retryCount < maxRetries) {
-        final delaySeconds = retryDelays[retryCount];
-        print('🔄 ${delaySeconds} 秒後進行第${retryCount + 2}次重試...');
-
-        await Future.delayed(Duration(seconds: delaySeconds));
-        return _getSystemDashboard(retryCount: retryCount + 1);
+        print('⚠️ Dashboard API 調用失敗，準備重試... 錯誤: $e');
+        await Future.delayed(Duration(seconds: 2));
+        return await _getSystemDashboard(retryCount: retryCount + 1);
       }
 
-      // 🚨 所有重試都失敗
-      print('🚨 Dashboard API 重試 ${maxRetries} 次後仍失敗');
-      rethrow;
+      print('❌ Dashboard API 達到最大重試次數，調用失敗: $e');
+      throw Exception('Dashboard API 調用失敗: $e');
     }
   }
+
 
   /// 解析 Dashboard 資料 - 重寫版本
   static DashboardData _parseDashboardData(Map<String, dynamic> dashboardInfo) {

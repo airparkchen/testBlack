@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
+import 'package:whitebox/shared/utils/api_logger.dart';
 
 /// 真實速度資料整合服務
 class RealSpeedDataService {
@@ -32,7 +33,13 @@ class RealSpeedDataService {
   /// 🎯 從真實 Throughput API 獲取上傳速度
   static Future<double> getCurrentUploadSpeed() async {
     try {
-      final throughputResult = await WifiApiService.getSystemThroughput();
+      final throughputResult = await ApiLogger.wrapApiCall(
+        method: 'GET',
+        endpoint: '/api/v1/system/throughput',
+        caller: 'RealSpeedDataService.getCurrentUploadSpeed',
+        apiCall: () => WifiApiService.getSystemThroughput(),
+      );
+
       double uploadSpeed = 0.0;
 
       if (throughputResult is Map<String, dynamic>) {
@@ -74,7 +81,13 @@ class RealSpeedDataService {
   /// 🎯 修正：獲取下載速度 - 改善轉換邏輯
   static Future<double> getCurrentDownloadSpeed() async {
     try {
-      final throughputResult = await WifiApiService.getSystemThroughput();
+      final throughputResult = await ApiLogger.wrapApiCall(
+        method: 'GET',
+        endpoint: '/api/v1/system/throughput',
+        caller: 'RealSpeedDataService.getCurrentDownloadSpeed',
+        apiCall: () => WifiApiService.getSystemThroughput(),
+      );
+
       double downloadSpeed = 0.0;
 
       if (throughputResult is Map<String, dynamic>) {
