@@ -10,6 +10,7 @@ import 'package:srp/client.dart' as client;
 import 'wifi_api/login_process.dart';
 import 'wifi_api/password_service.dart';
 import '../utils/json_file_export_util.dart';
+import '../utils/jwt_auto_relogin.dart';
 
 // 保留原本的結果類
 class FirstLoginResult {
@@ -103,9 +104,11 @@ class WifiApiService {
     'postWizardStart': () => _post(_endpoints['wizardStart'] ?? '', {}),
     'postWizardFinish': () => _post(_endpoints['wizardFinish'] ?? '', {}),
     'postUserLogin': (data) => _post(_endpoints['userLogin'] ?? '', data),
-    'updateWirelessBasic': (data) => _put(_endpoints['wirelessBasic'] ?? '', data),
+    'updateWirelessBasic': (data) =>
+        _put(_endpoints['wirelessBasic'] ?? '', data),
     'updateWanEth': (data) => _put(_endpoints['wanEth'] ?? '', data),
-    'updateWizardChangePassword': (data) => _put(_endpoints['wizardChangePassword'] ?? '', data),
+    'updateWizardChangePassword': (data) =>
+        _put(_endpoints['wizardChangePassword'] ?? '', data),
     // 添加 mesh topology 相關方法
     'getMeshTopology': () => _get(_endpoints['meshTopology'] ?? ''),
     // 新增 Dashboard API 方法
@@ -129,7 +132,8 @@ class WifiApiService {
     HttpClient client = HttpClient();
 
     if (bypassCertificateVerification) {
-      client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+      client.badCertificateCallback =
+          (X509Certificate cert, String host, int port) {
         // print('繞過 SSL 憑證驗證 for $host:$port')
         return true; // 允許所有憑證
       };
@@ -187,7 +191,20 @@ class WifiApiService {
 
           if (responseBody.isNotEmpty) {
             try {
-              return json.decode(responseBody);
+              final jsonResponse = json.decode(responseBody);
+
+              // 🔥 新增：檢查回應中的 JWT 錯誤
+              if (_containsJwtError(jsonResponse)) {
+                print('🚨 檢測到回應中的 JWT 錯誤: $jsonResponse');
+                return {
+                  'error': 'JWT token has expired',
+                  'status_code': '401',
+                  'response_body': responseBody,
+                  'jwt_error': true
+                };
+              }
+
+              return jsonResponse;
             } catch (e) {
               print('解析 HTTPS GET 響應JSON時出錯: $e');
               return {'error': '解析JSON失敗'};
@@ -198,7 +215,20 @@ class WifiApiService {
         } else {
           print('HTTPS GET 請求失敗: ${response.statusCode}');
           final errorBody = await response.transform(utf8.decoder).join();
-          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
+
+          // 🔥 修正：明確指定類型
+          final Map<String, dynamic> errorResponse = {
+            'error': '請求失敗，狀態碼: ${response.statusCode}',
+            'response_body': errorBody
+          };
+
+          if (_containsJwtErrorInString(errorBody) ||
+              response.statusCode == 401 ||
+              response.statusCode == 403) {
+            errorResponse['jwt_error'] = true;
+          }
+
+          return errorResponse;
         }
       } finally {
         client.close();
@@ -215,8 +245,34 @@ class WifiApiService {
     }
   }
 
+  static bool _containsJwtError(dynamic jsonResponse) {
+    if (jsonResponse is Map<String, dynamic>) {
+      // 檢查常見的錯誤欄位
+      final message = jsonResponse['message']?.toString().toLowerCase() ?? '';
+      final statusCode = jsonResponse['status_code']?.toString() ?? '';
+      final error = jsonResponse['error']?.toString().toLowerCase() ?? '';
+
+      return (message.contains('jwt') && message.contains('expired')) ||
+          (message.contains('token') && message.contains('expired')) ||
+          statusCode == '401' || statusCode == '403' ||
+          error.contains('jwt') || error.contains('token') ||
+          error.contains('unauthorized');
+    }
+    return false;
+  }
+
+  /// 🔥 新增：檢查字串是否包含 JWT 錯誤
+  static bool _containsJwtErrorInString(String text) {
+    final lowerText = text.toLowerCase();
+    return lowerText.contains('jwt token has expired') ||
+        lowerText.contains('jwt') && lowerText.contains('expired') ||
+        lowerText.contains('token') && lowerText.contains('expired') ||
+        lowerText.contains('unauthorized');
+  }
+
   /// 發送 POST 請求（HTTPS 版本）
-  static Future<Map<String, dynamic>> _post(String endpoint, Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> _post(String endpoint,
+      Map<String, dynamic> data) async {
     try {
       if (endpoint.isEmpty) {
         print('POST 請求錯誤: 端點為空');
@@ -260,7 +316,10 @@ class WifiApiService {
             return {'error': '認證錯誤', 'needReAuthentication': true};
           }
 
-          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'errorBody': errorBody};
+          return {
+            'error': '請求失敗，狀態碼: ${response.statusCode}',
+            'errorBody': errorBody
+          };
         }
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -279,7 +338,10 @@ class WifiApiService {
         } else {
           print('HTTPS POST 請求失敗: ${response.statusCode}');
           final errorBody = await response.transform(utf8.decoder).join();
-          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
+          return {
+            'error': '請求失敗，狀態碼: ${response.statusCode}',
+            'response_body': errorBody
+          };
         }
       } finally {
         client.close();
@@ -291,7 +353,8 @@ class WifiApiService {
   }
 
   /// 發送 PUT 請求（HTTPS 版本）
-  static Future<Map<String, dynamic>> _put(String endpoint, Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> _put(String endpoint,
+      Map<String, dynamic> data) async {
     try {
       if (endpoint.isEmpty) {
         print('PUT 請求錯誤: 端點為空');
@@ -335,7 +398,10 @@ class WifiApiService {
             return {'error': '認證錯誤', 'needReAuthentication': true};
           }
 
-          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'errorBody': errorBody};
+          return {
+            'error': '請求失敗，狀態碼: ${response.statusCode}',
+            'errorBody': errorBody
+          };
         }
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -354,7 +420,10 @@ class WifiApiService {
         } else {
           print('HTTPS PUT 請求失敗: ${response.statusCode}');
           final errorBody = await response.transform(utf8.decoder).join();
-          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
+          return {
+            'error': '請求失敗，狀態碼: ${response.statusCode}',
+            'response_body': errorBody
+          };
         }
       } finally {
         client.close();
@@ -366,7 +435,8 @@ class WifiApiService {
   }
 
   /// 動態調用方法 - 保留原有的 call 功能
-  static Future<Map<String, dynamic>> call(String methodName, [dynamic params]) async {
+  static Future<Map<String, dynamic>> call(String methodName,
+      [dynamic params]) async {
     if (!_dynamicMethods.containsKey(methodName)) {
       throw Exception('方法 "$methodName" 不存在');
     }
@@ -379,30 +449,35 @@ class WifiApiService {
   }
 
 
-
   // ============ 簡化的 API 方法 ============
 
   /// 獲取系統資訊（增強錯誤處理版本）
+  /// 獲取系統資訊（增強錯誤處理版本）- 整合自動重新登入
   static Future<Map<String, dynamic>> getSystemInfo() async {
-    try {
-      // 先檢查連接
-      if (!await _isApiReachable()) {
-        throw Exception('Unable to connect to router. Please check network connection');
-      }
+    return await JwtAutoRelogin.instance.wrapApiCall(() async {
+      try {
+        // 先檢查連接
+        if (!await _isApiReachable()) {
+          throw Exception(
+              'Unable to connect to router. Please check network connection');
+        }
 
-      return await _get(_endpoints['systemInfo']!);
-    } catch (e) {
-      print('Failed to get system information: $e');
+        return await _get(_endpoints['systemInfo']!);
+      } catch (e) {
+        print('Failed to get system information: $e');
 
-      // 提供更具體的錯誤信息
-      if (e.toString().contains('Connection timed out')) {
-        throw Exception('Connection to router timed out. Please check if connected to the correct WiFi network');
-      } else if (e.toString().contains('Connection refused')) {
-        throw Exception('Router refused connection. Please check router status');
-      } else {
-        throw Exception('Unable to get system information: $e');
+        // 提供更具體的錯誤信息
+        if (e.toString().contains('Connection timed out')) {
+          throw Exception(
+              'Connection to router timed out. Please check if connected to the correct WiFi network');
+        } else if (e.toString().contains('Connection refused')) {
+          throw Exception(
+              'Router refused connection. Please check router status');
+        } else {
+          throw Exception('Unable to get system information: $e');
+        }
       }
-    }
+    }, debugInfo: 'SystemInfo API');
   }
 
   /// 獲取網路狀態
@@ -416,7 +491,8 @@ class WifiApiService {
   }
 
   /// 更新無線基本設定
-  static Future<Map<String, dynamic>> updateWirelessBasic(Map<String, dynamic> config) async {
+  static Future<Map<String, dynamic>> updateWirelessBasic(
+      Map<String, dynamic> config) async {
     return await _put(_endpoints['wirelessBasic']!, config);
   }
 
@@ -426,82 +502,91 @@ class WifiApiService {
   }
 
   /// 更新以太網廣域網路設定
-  static Future<Map<String, dynamic>> updateWanEth(Map<String, dynamic> config) async {
+  static Future<Map<String, dynamic>> updateWanEth(
+      Map<String, dynamic> config) async {
     return await _put(_endpoints['wanEth']!, config);
   }
 
   /// 獲取 Mesh 網路拓撲資訊（HTTPS 版本）
+  /// 獲取 Mesh 網路拓撲資訊（HTTPS 版本）- 整合自動重新登入
   static Future<dynamic> getMeshTopology() async {
-    print('正在使用 HTTPS 獲取 Mesh 網路拓撲資訊...');
-    try {
-      // 直接使用 HttpClient 來避免類型轉換問題
-      final client = _createHttpClient();
-
+    return await JwtAutoRelogin.instance.wrapApiCall(() async {
+      print('正在使用 HTTPS 獲取 Mesh 網路拓撲資訊...');
       try {
-        final request = await client.getUrl(Uri.parse('$baseUrl${_endpoints['meshTopology']}'));
+        // 直接使用 HttpClient 來避免類型轉換問題
+        final client = _createHttpClient();
 
-        // 添加 headers
-        final headers = _getHeaders();
-        headers.forEach((key, value) {
-          request.headers.set(key, value);
-        });
+        try {
+          final request = await client.getUrl(
+              Uri.parse('$baseUrl${_endpoints['meshTopology']}'));
 
-        final response = await request.close().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw Exception('Request timeout (10 seconds)');
-          },
-        );
+          // 添加 headers
+          final headers = _getHeaders();
+          headers.forEach((key, value) {
+            request.headers.set(key, value);
+          });
 
-        print('HTTPS GET 請求響應狀態碼: ${response.statusCode}');
+          final response = await request.close().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw Exception('Request timeout (10 seconds)');
+            },
+          );
 
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          final responseBody = await response.transform(utf8.decoder).join();
+          print('HTTPS GET 請求響應狀態碼: ${response.statusCode}');
 
-          if (responseBody.isNotEmpty) {
-            try {
-              // 解析 JSON，可能是 List 或 Map
-              final jsonData = json.decode(responseBody);
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            final responseBody = await response.transform(utf8.decoder).join();
 
-              // 改善日誌輸出 - 分段顯示大型 JSON
-              print('=== Mesh 拓撲 API 成功響應 ===');
-              _printLargeJson('Mesh 拓撲完整響應', jsonData);
-
+            if (responseBody.isNotEmpty) {
               try {
-                print('📁 正在將 Mesh Topology raw data 輸出到 JSON 檔案...');
-                final filePath = await JsonFileExportUtil.exportMeshTopologyData(jsonData);
-                if (filePath != null) {
-                  print('🎉 Mesh Topology raw data 已成功輸出到檔案！');
-                  print('📂 檔案位置: $filePath');
-                }
-              } catch (e) {
-                print('⚠️ 輸出 JSON 檔案時發生錯誤: $e');
-              }
+                // 解析 JSON，可能是 List 或 Map
+                final jsonData = json.decode(responseBody);
 
-              return jsonData;
-            } catch (e) {
-              print('解析 HTTPS JSON 時出錯: $e');
-              print('原始響應體長度: ${responseBody.length}');
-              _printInChunks('原始響應體', responseBody);
-              return {'error': '解析JSON失敗', 'raw_response': responseBody};
+                // 改善日誌輸出 - 分段顯示大型 JSON
+                print('=== Mesh 拓撲 API 成功響應 ===');
+                _printLargeJson('Mesh 拓撲完整響應', jsonData);
+
+                try {
+                  print('📁 正在將 Mesh Topology raw data 輸出到 JSON 檔案...');
+                  final filePath = await JsonFileExportUtil
+                      .exportMeshTopologyData(jsonData);
+                  if (filePath != null) {
+                    print('🎉 Mesh Topology raw data 已成功輸出到檔案！');
+                    print('📂 檔案位置: $filePath');
+                  }
+                } catch (e) {
+                  print('⚠️ 輸出 JSON 檔案時發生錯誤: $e');
+                }
+
+                return jsonData;
+              } catch (e) {
+                print('解析 HTTPS JSON 時出錯: $e');
+                print('原始響應體長度: ${responseBody.length}');
+                _printInChunks('原始響應體', responseBody);
+                return {'error': '解析JSON失敗', 'raw_response': responseBody};
+              }
+            } else {
+              print('HTTPS 響應體為空');
+              return {'message': '響應體為空'};
             }
           } else {
-            print('HTTPS 響應體為空');
-            return {'message': '響應體為空'};
+            print('HTTPS GET 請求失敗: ${response.statusCode}');
+            final errorBody = await response.transform(utf8.decoder).join();
+            print('錯誤響應體: $errorBody');
+            return {
+              'error': '請求失敗，狀態碼: ${response.statusCode}',
+              'response_body': errorBody
+            };
           }
-        } else {
-          print('HTTPS GET 請求失敗: ${response.statusCode}');
-          final errorBody = await response.transform(utf8.decoder).join();
-          print('錯誤響應體: $errorBody');
-          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
+        } finally {
+          client.close();
         }
-      } finally {
-        client.close();
+      } catch (e) {
+        print('獲取 Mesh 拓撲 HTTPS 時發生錯誤: $e');
+        return {'error': '獲取 Mesh 拓撲 HTTPS 失敗: $e'};
       }
-    } catch (e) {
-      print('獲取 Mesh 拓撲 HTTPS 時發生錯誤: $e');
-      return {'error': '獲取 Mesh 拓撲 HTTPS 失敗: $e'};
-    }
+    }, debugInfo: 'MeshTopology API');
   }
 
   /// 分段輸出大型 JSON 數據
@@ -526,16 +611,19 @@ class WifiApiService {
             print('  - 類型: ${node['type'] ?? 'N/A'}');
             print('  - 設備名稱: ${node['devName'] ?? 'N/A'}');
 
-            if (node.containsKey('connectedDevices') && node['connectedDevices'] is List) {
+            if (node.containsKey('connectedDevices') &&
+                node['connectedDevices'] is List) {
               final devices = node['connectedDevices'] as List;
               print('  - 連接設備數: ${devices.length}');
 
               for (int j = 0; j < devices.length; j++) {
                 final device = devices[j];
                 if (device is Map) {
-                  print('    🔹 設備 ${j + 1}: ${device['devName'] ?? device['macAddr'] ?? 'Unknown'}');
+                  print('    🔹 設備 ${j + 1}: ${device['devName'] ??
+                      device['macAddr'] ?? 'Unknown'}');
                   print('      └ IP: ${device['ipAddress'] ?? 'N/A'}');
-                  print('      └ 連接方式: ${device['connectionType'] ?? 'N/A'}');
+                  print(
+                      '      └ 連接方式: ${device['connectionType'] ?? 'N/A'}');
                   if (device['rssi'] != null && device['rssi'] != 0) {
                     print('      └ 信號強度: ${device['rssi']} dBm');
                   }
@@ -568,7 +656,9 @@ class WifiApiService {
 
     for (int i = 0; i < totalChunks; i++) {
       final int start = i * chunkSize;
-      final int end = (start + chunkSize < totalLength) ? start + chunkSize : totalLength;
+      final int end = (start + chunkSize < totalLength)
+          ? start + chunkSize
+          : totalLength;
       final String chunk = content.substring(start, end);
 
       print('[$title-段落${i + 1}/$totalChunks]: $chunk');
@@ -603,13 +693,13 @@ class WifiApiService {
     required String newPassword,
   }) async {
     try {
-
       // 生成新的 Salt
       final newSalt = client.generateSalt();
       print('生成新的 Salt: $newSalt');
 
       // 根據新的 Salt 和密碼生成私鑰
-      final newPrivateKey = client.derivePrivateKey(newSalt, username, newPassword);
+      final newPrivateKey = client.derivePrivateKey(
+          newSalt, username, newPassword);
 
       // 根據私鑰生成驗證器
       final newVerifier = client.deriveVerifier(newPrivateKey);
@@ -626,7 +716,9 @@ class WifiApiService {
 
       // 發送請求到變更密碼的 API 端點
       print('發送變更密碼請求...');
-      final response = await _put(_endpoints['wizardChangePassword'] ?? '/api/v1/user/change_password', requestData);
+      final response = await _put(
+          _endpoints['wizardChangePassword'] ?? '/api/v1/user/change_password',
+          requestData);
 
       if (response.containsKey('error')) {
         print('變更密碼失敗: ${response['error']}');
@@ -696,7 +788,8 @@ class WifiApiService {
       final client = _createHttpClient();
 
       try {
-        final request = await client.getUrl(Uri.parse('$baseUrl/api/v1/system/info'));
+        final request = await client.getUrl(
+            Uri.parse('$baseUrl/api/v1/system/info'));
 
         // 添加 headers
         final headers = _getHeaders();
@@ -712,7 +805,8 @@ class WifiApiService {
         );
 
         print('HTTPS API 連接測試完成，狀態碼: ${response.statusCode}');
-        return response.statusCode >= 200 && response.statusCode < 500; // 包括4xx錯誤，因為至少表示服務可達
+        return response.statusCode >= 200 &&
+            response.statusCode < 500; // 包括4xx錯誤，因為至少表示服務可達
       } finally {
         client.close();
       }
@@ -746,21 +840,25 @@ class WifiApiService {
         // 檢查系統資訊是否包含必要欄位
         if (!systemInfo.containsKey('serial_number') ||
             systemInfo['serial_number'] == null ||
-            systemInfo['serial_number'].toString().isEmpty) {
+            systemInfo['serial_number']
+                .toString()
+                .isEmpty) {
           throw Exception('無法從系統資訊獲取序列號');
         }
 
         if (!systemInfo.containsKey('login_salt') ||
             systemInfo['login_salt'] == null ||
-            systemInfo['login_salt'].toString().isEmpty) {
+            systemInfo['login_salt']
+                .toString()
+                .isEmpty) {
           throw Exception('無法從系統資訊獲取登入鹽值');
         }
 
         serialNumber ??= systemInfo['serial_number'];
         loginSalt ??= systemInfo['login_salt'];
 
-        print('成功從系統資訊獲取: 序列號=${serialNumber}, 登入鹽值=${loginSalt}');
-
+        print(
+            '成功從系統資訊獲取: 序列號=${serialNumber}, 登入鹽值=${loginSalt}');
       } catch (e) {
         print('獲取系統資訊失敗: $e');
         throw Exception('無法獲取計算密碼所需的系統資訊: $e');
@@ -800,7 +898,8 @@ class WifiApiService {
         ssid = ssid.replaceAll('"', '');
 
         // 檢查這是否看起來像 MAC 地址 (六組冒號分隔的十六進制數)
-        bool isMacAddress = RegExp(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$').hasMatch(ssid);
+        bool isMacAddress = RegExp(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$')
+            .hasMatch(ssid);
 
         if (isMacAddress) {
           print("獲取到的是 MAC 地址而非 SSID，將使用預設 SSID");
@@ -870,7 +969,6 @@ class WifiApiService {
 
       print("成功計算初始密碼");
       return password;
-
     } catch (e) {
       print("計算初始密碼時出錯: $e");
       rethrow; // 重新拋出異常，保持錯誤信息
@@ -930,7 +1028,9 @@ class WifiApiService {
         );
 
         if (response.containsKey('token') || response.containsKey('jwt')) {
-          String token = response.containsKey('token') ? response['token'] : response['jwt'];
+          String token = response.containsKey('token')
+              ? response['token']
+              : response['jwt'];
           print("傳統方式登入成功");
 
           result['success'] = true;
@@ -939,7 +1039,8 @@ class WifiApiService {
           result['isAuthenticated'] = true;
 
           return result;
-        } else if (response.containsKey('status') && response['status'] == 'success') {
+        } else
+        if (response.containsKey('status') && response['status'] == 'success') {
           print("登入成功，但未獲取到令牌");
 
           result['success'] = true;
@@ -966,6 +1067,7 @@ class WifiApiService {
       return result;
     }
   }
+
   /// 開始精靈配置（帶安全檢查）
   static Future<Map<String, dynamic>> wizardStart() async {
     try {
@@ -1000,7 +1102,10 @@ class WifiApiService {
               : {'status_code': 'success', 'message': 'No response body'};
         } catch (e) {
           print('解析 wizardStart 響應JSON時出錯: $e');
-          return {'status_code': 'error', 'message': 'Failed to parse response'};
+          return {
+            'status_code': 'error',
+            'message': 'Failed to parse response'
+          };
         }
       } else {
         print('wizardStart 請求失敗，狀態碼: ${response.statusCode}');
@@ -1093,7 +1198,10 @@ class WifiApiService {
 
           if (response.statusCode >= 200 && response.statusCode < 300) {
             print('✅ wizardFinish 成功完成（空響應體）');
-            return {'status_code': 'success', 'message': 'Success with empty response'};
+            return {
+              'status_code': 'success',
+              'message': 'Success with empty response'
+            };
           } else if (response.statusCode == 500) {
             // 如果返回 500，可能是設備正在重啟
             print('⚠️ wizardFinish 返回 500，這可能是正常的（設備正在重啟）');
@@ -1187,6 +1295,10 @@ class WifiApiService {
     // 如果登入成功並獲取到 JWT 令牌，儲存它
     if (result.returnStatus && result.session.jwtToken != null) {
       setJwtToken(result.session.jwtToken!);
+
+      // 🔥 新增：儲存憑證到自動重新登入管理器
+      JwtAutoRelogin.instance.saveCredentials(username, password);
+      print('🔐 登入成功，已儲存憑證供自動重新登入使用');
     }
 
     // 返回轉換後的結果
@@ -1203,7 +1315,8 @@ class WifiApiService {
       final systemInfo = await getSystemInfo();
 
       // 檢查系統資訊是否完整
-      if (!systemInfo.containsKey('serial_number') || !systemInfo.containsKey('login_salt')) {
+      if (!systemInfo.containsKey('serial_number') ||
+          !systemInfo.containsKey('login_salt')) {
         return FirstLoginResult(
             success: false,
             message: '無法從系統資訊中獲取序列號或登入鹽值',
@@ -1245,7 +1358,8 @@ class WifiApiService {
         loginSuccess = true;
         message = '登入成功，獲取到 JWT 令牌';
         setJwtToken(loginResponse['jwt']);
-      } else if (loginResponse.containsKey('status') && loginResponse['status'] == 'success') {
+      } else if (loginResponse.containsKey('status') &&
+          loginResponse['status'] == 'success') {
         loginSuccess = true;
         message = '登入成功';
       }
@@ -1265,6 +1379,7 @@ class WifiApiService {
       );
     }
   }
+
   /// 獲取系統 Dashboard 資料
   static Future<Map<String, dynamic>> getSystemDashboard() async {
     try {
@@ -1287,62 +1402,69 @@ class WifiApiService {
       }
 
       return response;
-
     } catch (e) {
       print('❌ 獲取 Dashboard 資料時發生錯誤: $e');
       return {'error': '獲取 Dashboard 資料失敗: $e'};
     }
   }
+
   /// 獲取系統 Throughput 數據
+  /// 獲取系統 Throughput 數據 - 整合自動重新登入
   static Future<dynamic> getSystemThroughput() async {
-    print('正在使用 HTTPS 獲取 System Throughput 數據...');
-    try {
-      final client = _createHttpClient();
-
+    return await JwtAutoRelogin.instance.wrapApiCall(() async {
+      print('正在使用 HTTPS 獲取 System Throughput 數據...');
       try {
-        final request = await client.getUrl(Uri.parse('$baseUrl${_endpoints['systemThroughput']}'));
+        final client = _createHttpClient();
 
-        final headers = _getHeaders();
-        headers.forEach((key, value) {
-          request.headers.set(key, value);
-        });
+        try {
+          final request = await client.getUrl(
+              Uri.parse('$baseUrl${_endpoints['systemThroughput']}'));
 
-        final response = await request.close().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw Exception('Request timeout (10 seconds)');
-          },
-        );
+          final headers = _getHeaders();
+          headers.forEach((key, value) {
+            request.headers.set(key, value);
+          });
 
-        print('HTTPS GET 請求響應狀態碼: ${response.statusCode}');
+          final response = await request.close().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw Exception('Request timeout (10 seconds)');
+            },
+          );
 
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          final responseBody = await response.transform(utf8.decoder).join();
-          if (responseBody.isNotEmpty) {
-            try {
-              final jsonData = json.decode(responseBody);
-              print('✅ System Throughput API 成功響應');
-              _printLargeJson('System Throughput 完整響應', jsonData);
-              return jsonData;
-            } catch (e) {
-              print('解析 HTTPS JSON 時出錯: $e');
-              return {'error': '解析JSON失敗', 'raw_response': responseBody};
+          print('HTTPS GET 請求響應狀態碼: ${response.statusCode}');
+
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            final responseBody = await response.transform(utf8.decoder).join();
+            if (responseBody.isNotEmpty) {
+              try {
+                final jsonData = json.decode(responseBody);
+                print('✅ System Throughput API 成功響應');
+                _printLargeJson('System Throughput 完整響應', jsonData);
+                return jsonData;
+              } catch (e) {
+                print('解析 HTTPS JSON 時出錯: $e');
+                return {'error': '解析JSON失敗', 'raw_response': responseBody};
+              }
+            } else {
+              print('HTTPS 響應體為空');
+              return {'message': '響應體為空'};
             }
           } else {
-            print('HTTPS 響應體為空');
-            return {'message': '響應體為空'};
+            print('HTTPS GET 請求失敗: ${response.statusCode}');
+            final errorBody = await response.transform(utf8.decoder).join();
+            return {
+              'error': '請求失敗，狀態碼: ${response.statusCode}',
+              'response_body': errorBody
+            };
           }
-        } else {
-          print('HTTPS GET 請求失敗: ${response.statusCode}');
-          final errorBody = await response.transform(utf8.decoder).join();
-          return {'error': '請求失敗，狀態碼: ${response.statusCode}', 'response_body': errorBody};
+        } finally {
+          client.close();
         }
-      } finally {
-        client.close();
+      } catch (e) {
+        print('獲取 System Throughput HTTPS 時發生錯誤: $e');
+        return {'error': '獲取 System Throughput HTTPS 失敗: $e'};
       }
-    } catch (e) {
-      print('獲取 System Throughput HTTPS 時發生錯誤: $e');
-      return {'error': '獲取 System Throughput HTTPS 失敗: $e'};
-    }
+    }, debugInfo: 'Throughput API');
   }
 }

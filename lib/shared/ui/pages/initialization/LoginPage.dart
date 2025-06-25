@@ -3,6 +3,7 @@ import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/ui/pages/home/DashboardPage.dart';
 import 'package:whitebox/shared/services/api_preloader_service.dart';
+import 'package:whitebox/shared/utils/jwt_auto_relogin.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onLoginSuccess;
@@ -248,11 +249,15 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       if (loginResult.success == true && !shouldTreatAsFailure) {
-        // 真正的成功
-        WifiApiService.setJwtToken(loginResult.jwtToken!);
+        // 🔥 登入成功：JWT token 和憑證已由 WifiApiService.loginWithSRP 自動處理
 
-        print('✅ 登入成功！開始預載入 API 資料...');
+        print('✅ 登入成功！JWT 自動重新登入已啟用');
+        print('🔐 憑證已儲存，JWT 過期時將自動重新登入');
+
+        // 開始預載入 API 資料
+        print('📡 開始預載入 API 資料...');
         await ApiPreloaderService.preloadAllAPIs();
+
         setState(() {
           _isLoggingIn = false;
         });
@@ -271,7 +276,7 @@ class _LoginPageState extends State<LoginPage> {
         if (widget.onLoginSuccess != null) {
           widget.onLoginSuccess!();
         }
-      } else {
+      }else {
         // 登入失敗
         String errorMsg = 'Invalid username or password';
 
