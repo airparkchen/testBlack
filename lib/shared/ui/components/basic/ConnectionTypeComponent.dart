@@ -266,6 +266,9 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       if (_pppoeUsernameController.text.isEmpty) {
         _isPppoeUsernameError = true;
         _pppoeUsernameErrorText = 'Please enter a username';
+      } else if (!_isValidPppoeUsername(_pppoeUsernameController.text)) {
+        _isPppoeUsernameError = true;
+        _pppoeUsernameErrorText = 'Username can only contain letters, numbers, dots, underscores, hyphens, and @ symbol';
       } else {
         _isPppoeUsernameError = false;
         _pppoeUsernameErrorText = '';
@@ -279,6 +282,9 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       if (_pppoePasswordController.text.isEmpty) {
         _isPppoePasswordError = true;
         _pppoePasswordErrorText = 'Please enter a password';
+      } else if (!_isValidPppoePassword(_pppoePasswordController.text)) {
+        _isPppoePasswordError = true;
+        _pppoePasswordErrorText = 'Password contains invalid characters';
       } else {
         _isPppoePasswordError = false;
         _pppoePasswordErrorText = '';
@@ -288,63 +294,102 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
 
   // Validate IP format
   void _validateIpField(String ip, String fieldName) {
-    final bool isValid = _validateIpFormat(ip);
+    bool isValid = true;
+    String errorMessage = '';
+
+    if (ip.isNotEmpty) {
+      switch (fieldName) {
+        case 'Subnet Mask':
+          if (!_validateSubnetMask(ip)) {
+            isValid = false;
+            errorMessage = 'Please enter a valid subnet mask';
+          }
+          break;
+        default:
+          if (!_validateIpFormat(ip)) {
+            isValid = false;
+            errorMessage = 'Please enter a valid IP address';
+          }
+          break;
+      }
+    }
 
     setState(() {
       switch (fieldName) {
         case 'IP Address':
-          _isIpError = ip.isNotEmpty && !isValid;
-          _ipErrorText = _isIpError ? 'Please enter a valid IP address' : '';
+          _isIpError = !isValid;
+          _ipErrorText = errorMessage;
           break;
         case 'Subnet Mask':
-          _isSubnetError = ip.isNotEmpty && !isValid;
-          _subnetErrorText = _isSubnetError ? 'Please enter a valid subnet mask' : '';
+          _isSubnetError = !isValid;
+          _subnetErrorText = errorMessage;
           break;
         case 'Gateway':
-          _isGatewayError = ip.isNotEmpty && !isValid;
-          _gatewayErrorText = _isGatewayError ? 'Please enter a valid gateway address' : '';
+          _isGatewayError = !isValid;
+          _gatewayErrorText = errorMessage;
           break;
         case 'Primary DNS':
-          _isPrimaryDnsError = ip.isNotEmpty && !isValid;
-          _primaryDnsErrorText = _isPrimaryDnsError ? 'Please enter a valid DNS address' : '';
+          _isPrimaryDnsError = !isValid;
+          _primaryDnsErrorText = errorMessage;
           break;
         case 'Secondary DNS':
-          _isSecondaryDnsError = ip.isNotEmpty && !isValid;
-          _secondaryDnsErrorText = _isSecondaryDnsError ? 'Please enter a valid DNS address' : '';
+          _isSecondaryDnsError = !isValid;
+          _secondaryDnsErrorText = errorMessage;
           break;
       }
     });
   }
+
 
   // 驗證表單
   void _validateForm() {
     bool isValid = true;
 
     if (_selectedConnectionType == 'Static IP') {
-      // 檢查必填項是否為空
-      final bool hasEmptyFields =
+      // 檢查所有必填項是否已填寫
+      final bool hasEmptyRequiredFields =
           _staticIpConfig.ipAddress.isEmpty ||
               _staticIpConfig.subnetMask.isEmpty ||
               _staticIpConfig.gateway.isEmpty ||
               _staticIpConfig.primaryDns.isEmpty;
 
-      if (hasEmptyFields) {
+      if (hasEmptyRequiredFields) {
         isValid = false;
       } else {
         // 檢查所有必填項格式是否正確
-        isValid = _validateIpFormat(_staticIpConfig.ipAddress) &&
-            _validateIpFormat(_staticIpConfig.subnetMask) &&
-            _validateIpFormat(_staticIpConfig.gateway) &&
-            _validateIpFormat(_staticIpConfig.primaryDns);
+        bool ipValid = _validateIpFormat(_staticIpConfig.ipAddress);
+        bool subnetValid = _validateSubnetMask(_staticIpConfig.subnetMask);
+        bool gatewayValid = _validateIpFormat(_staticIpConfig.gateway);
+        bool primaryDnsValid = _validateIpFormat(_staticIpConfig.primaryDns);
+
+        // 檢查 IP 和 Gateway 是否在同一子網
+        bool sameSubnet = true;
+        if (ipValid && subnetValid && gatewayValid) {
+          sameSubnet = _isInSameSubnet(_staticIpConfig.ipAddress, _staticIpConfig.gateway, _staticIpConfig.subnetMask);
+        }
 
         // 次要 DNS 是選填的，只有填了才檢查格式
-        if (_staticIpConfig.secondaryDns.isNotEmpty && !_validateIpFormat(_staticIpConfig.secondaryDns)) {
-          isValid = false;
+        bool secondaryDnsValid = true;
+        if (_staticIpConfig.secondaryDns.isNotEmpty) {
+          secondaryDnsValid = _validateIpFormat(_staticIpConfig.secondaryDns);
+        }
+
+        isValid = ipValid && subnetValid && gatewayValid && primaryDnsValid && secondaryDnsValid && sameSubnet;
+
+        // 如果 IP 和 Gateway 不在同一子網，顯示錯誤
+        if (!sameSubnet && ipValid && subnetValid && gatewayValid) {
+          setState(() {
+            _isGatewayError = true;
+            _gatewayErrorText = 'Gateway must be in the same subnet as IP address';
+          });
         }
       }
     } else if (_selectedConnectionType == 'PPPoE') {
       // 驗證 PPPoE 配置
-      isValid = _pppoeConfig.username.isNotEmpty && _pppoeConfig.password.isNotEmpty;
+      bool usernameValid = _isValidPppoeUsername(_pppoeConfig.username);
+      bool passwordValid = _isValidPppoePassword(_pppoeConfig.password);
+
+      isValid = usernameValid && passwordValid;
     }
 
     if (isValid != _isFormComplete) {
@@ -359,19 +404,87 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   bool _validateIpFormat(String ip) {
     if (ip.isEmpty) return false;
 
-    // 確認格式為 xxx.xxx.xxx.xxx
-    RegExp ipRegex = RegExp(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$');
+    // 基本格式檢查：四個用點分隔的數字
+    final RegExp ipRegex = RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$');
+
     if (!ipRegex.hasMatch(ip)) return false;
 
-    // 檢查每個部分是否在 0-255 範圍內
-    List<String> parts = ip.split('.');
-    for (String part in parts) {
-      int? value = int.tryParse(part);
+    // 額外檢查：確保每個段都在 0-255 範圍內
+    List<String> segments = ip.split('.');
+    if (segments.length != 4) return false;
+
+    for (String segment in segments) {
+      int? value = int.tryParse(segment);
       if (value == null || value < 0 || value > 255) return false;
     }
 
     return true;
   }
+
+
+
+  // 子網掩碼驗證方法
+  bool _validateSubnetMask(String mask) {
+    if (!_validateIpFormat(mask)) return false;
+
+    // 檢查是否為有效的子網掩碼
+    List<String> segments = mask.split('.');
+    List<int> bytes = segments.map((s) => int.parse(s)).toList();
+
+    // 轉換為二進制並檢查是否為連續的1後跟連續的0
+    String binary = '';
+    for (int byte in bytes) {
+      binary += byte.toRadixString(2).padLeft(8, '0');
+    }
+
+    // 檢查模式：應該是1...10...0或全1或全0
+    if (!RegExp(r'^1*0*$').hasMatch(binary)) return false;
+
+    return true;
+  }
+
+  // 檢查 IP 是否在同一子網
+  bool _isInSameSubnet(String ip1, String ip2, String mask) {
+    if (!_validateIpFormat(ip1) || !_validateIpFormat(ip2) || !_validateSubnetMask(mask)) {
+      return false;
+    }
+
+    List<int> ip1Bytes = ip1.split('.').map((s) => int.parse(s)).toList();
+    List<int> ip2Bytes = ip2.split('.').map((s) => int.parse(s)).toList();
+    List<int> maskBytes = mask.split('.').map((s) => int.parse(s)).toList();
+
+    for (int i = 0; i < 4; i++) {
+      if ((ip1Bytes[i] & maskBytes[i]) != (ip2Bytes[i] & maskBytes[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+// PPPoE 用戶名驗證（返回布爾值的版本）
+  bool _isValidPppoeUsername(String username) {
+    if (username.isEmpty) return false;
+    if (username.length > 64) return false;
+
+    // PPPoE 用戶名通常允許字母、數字、點、下劃線、連字符和@符號
+    final RegExp usernameRegex = RegExp(r'^[a-zA-Z0-9._@-]+$');
+    return usernameRegex.hasMatch(username);
+  }
+
+// PPPoE 密碼驗證（返回布爾值的版本）
+  bool _isValidPppoePassword(String password) {
+    if (password.isEmpty) return false;
+    if (password.length > 64) return false;
+
+    // PPPoE 密碼允許大部分可打印字符，使用十六進制範圍定義
+    // 包含: 空格(0x20) + 所有可打印字符(0x21-0x7E)
+    final RegExp passwordRegex = RegExp(
+        r'^[\x20-\x7E]+$'
+    );
+    return passwordRegex.hasMatch(password);
+  }
+
 
   void _notifySelectionChanged() {
     if (widget.onSelectionChanged != null) {

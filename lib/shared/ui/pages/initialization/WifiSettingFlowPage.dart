@@ -37,6 +37,8 @@ class WifiSettingFlowPage extends StatefulWidget {
 class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   final AppTheme _appTheme = AppTheme();
 
+  //追蹤用戶是否已經修改過設置(DHCP/Static_IP/PPPOE)
+  bool _userHasModifiedWanSettings = false;
   // ==================== 模型與步驟控制 ====================
   String currentModel = 'Micky';
   int currentStepIndex = 0;
@@ -354,6 +356,12 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   }
 
   Future<void> _loadCurrentWanSettings() async {
+    // 如果用戶已經修改過設置，不要覆蓋用戶的選擇
+    if (_userHasModifiedWanSettings) {
+      print('用戶已修改 WAN 設置，跳過 API 重新載入');
+      return;
+    }
+
     try {
       setState(() {
         _updateStatus("Getting network settings...");
@@ -362,52 +370,44 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       // 調用API獲取當前網絡設置
       final wanSettings = await WifiApiService.getWanEth();
 
+      print('GET 獲取的完整 WAN 設置: ${json.encode(wanSettings)}');
+
+      // 完整保存 GET 到的設置（包含所有字段和結構）
+      _currentWanSettings = Map<String, dynamic>.from(wanSettings);
+
       String apiConnectionType = wanSettings['connection_type'] ?? 'dhcp';
 
-      // 正確轉換為UI使用的格式
+      // 轉換為UI使用的格式
       String uiConnectionType;
       if (apiConnectionType == 'dhcp') {
         uiConnectionType = 'DHCP';
-      } else if (apiConnectionType == 'static_ip') {
+      } else if (apiConnectionType == 'static') {
         uiConnectionType = 'Static IP';
       } else if (apiConnectionType == 'pppoe') {
         uiConnectionType = 'PPPoE';
       } else {
-        uiConnectionType = 'DHCP'; // 預設值
+        uiConnectionType = 'DHCP';
       }
 
-      // 添加詳細的 debug 輸出
-      print('API返回的連接類型: $apiConnectionType');
-      print('轉換後的UI連接類型: $uiConnectionType');
-      print('獲取到的網絡設置: ${json.encode(wanSettings)}');
-
       setState(() {
-        _currentWanSettings = wanSettings;
         _updateStatus("Network settings obtained");
-
-        // 使用轉換後的UI格式
         connectionType = uiConnectionType;
 
-        print('設置連接類型為: $connectionType');
-
-        // 如果是靜態IP，則設置相關參數
-        if (apiConnectionType == 'static_ip') {
-          staticIpConfig.ipAddress = wanSettings['static_ip_addr'] ?? '';
-          staticIpConfig.subnetMask = wanSettings['static_ip_mask'] ?? '';
-          staticIpConfig.gateway = wanSettings['static_ip_gateway'] ?? '';
-          staticIpConfig.primaryDns = wanSettings['dns_1'] ?? '';
-          staticIpConfig.secondaryDns = wanSettings['dns_2'] ?? '';
-
-          print('靜態IP配置: IP=${staticIpConfig.ipAddress}, 子網掩碼=${staticIpConfig.subnetMask}, 網關=${staticIpConfig.gateway}, DNS1=${staticIpConfig.primaryDns}, DNS2=${staticIpConfig.secondaryDns}');
-        }
-        // 如果是PPPoE，則設置相關參數
-        else if (apiConnectionType == 'pppoe' && wanSettings.containsKey('pppoe')) {
-          pppoeUsername = wanSettings['pppoe']['username'] ?? '';
-          pppoePassword = wanSettings['pppoe']['password'] ?? '';
-
-          print('PPPoE配置: 用戶名=$pppoeUsername, 密碼=${pppoePassword.isEmpty ? "空" : "已設置"}');
+        // 根據API返回的設置更新UI狀態
+        if (apiConnectionType == 'static') {
+          staticIpConfig.ipAddress = wanSettings['static_ip']?['static_ip_addr'] ?? '';
+          staticIpConfig.subnetMask = wanSettings['static_ip']?['static_ip_mask'] ?? '';
+          staticIpConfig.gateway = wanSettings['static_ip']?['static_ip_gateway'] ?? '';
+          staticIpConfig.primaryDns = wanSettings['dns']?['dns_1'] ?? '';
+          staticIpConfig.secondaryDns = wanSettings['dns']?['dns_2'] ?? '';
+        } else if (apiConnectionType == 'pppoe') {
+          pppoeUsername = wanSettings['pppoe']?['username'] ?? '';
+          pppoePassword = wanSettings['pppoe']?['password'] ?? '';
         }
       });
+
+      print('UI 狀態已更新: connectionType=$connectionType');
+
     } catch (e) {
       print('獲取WAN設置時出錯: $e');
       setState(() {
@@ -489,6 +489,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       setState(() {
         _updateStatus("正在更新網絡設置...");
       });
+
+      // 確保使用最新準備的設置
+      _prepareWanSettingsForSubmission();
 
       print('即將提交的網絡設置: ${json.encode(_currentWanSettings)}');
 
@@ -816,71 +819,242 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
   // 準備用於提交的WAN設置
   void _prepareWanSettingsForSubmission() {
-    Map<String, dynamic> wanSettings = {};
+    // 如果沒有獲取到當前設置，先獲取
+    if (_currentWanSettings.isEmpty) {
+      print('警告: 沒有當前的 WAN 設置，使用預設結構');
+      _currentWanSettings = {
+        'connection_type': 'dhcp',
+        'static_ip': {'static_ip_addr': '', 'static_ip_mask': '', 'static_ip_gateway': ''},
+        'pppoe': {'username': '', 'password': ''},
+        'dns': {'dns_1': '', 'dns_2': ''}
+      };
+    }
 
-    // 根據連接類型設置不同的參數 - 轉換為API格式
+    // 複製當前設置作為基礎（保持所有原有字段和結構）
+    Map<String, dynamic> wanSettings = Map<String, dynamic>.from(_currentWanSettings);
+
+    // 移除不需要 PUT 回去的字段（如果有的話）
+    wanSettings.remove('message');
+    wanSettings.remove('status_code');
+    wanSettings.remove('wait_time');
+
+    print('原始 WAN 設置: ${json.encode(wanSettings)}');
+
+    // 根據用戶選擇，只修改需要更改的字段
     if (connectionType == 'DHCP') {
-      wanSettings['connection_type'] = 'dhcp'; // 轉換為小寫
+      // 修改連接類型為 DHCP
+      wanSettings['connection_type'] = 'dhcp';
+
+      // 清空 static_ip 配置
+      wanSettings['static_ip'] = {
+        'static_ip_addr': '',
+        'static_ip_mask': '',
+        'static_ip_gateway': '',
+      };
+
+      // 清空 pppoe 配置
+      wanSettings['pppoe'] = {
+        'username': '',
+        'password': '',
+      };
+
+      // DNS 設定（可選）
+      if (staticIpConfig.primaryDns.isNotEmpty || staticIpConfig.secondaryDns.isNotEmpty) {
+        wanSettings['dns'] = {
+          'dns_1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '',
+          'dns_2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '',
+        };
+      }
+
     } else if (connectionType == 'Static IP') {
-      wanSettings['connection_type'] = 'static_ip'; // 轉換為API格式
-      wanSettings['static_ip_addr'] = staticIpConfig.ipAddress;
-      wanSettings['static_ip_mask'] = staticIpConfig.subnetMask;
-      wanSettings['static_ip_gateway'] = staticIpConfig.gateway;
-      wanSettings['dns_1'] = staticIpConfig.primaryDns;
-      wanSettings['dns_2'] = staticIpConfig.secondaryDns;
+      // 修改連接類型為 static
+      wanSettings['connection_type'] = 'static';
+
+      // 更新 static_ip 配置
+      wanSettings['static_ip'] = {
+        'static_ip_addr': staticIpConfig.ipAddress,
+        'static_ip_mask': staticIpConfig.subnetMask,
+        'static_ip_gateway': staticIpConfig.gateway,
+      };
+
+      // 清空 pppoe 配置
+      wanSettings['pppoe'] = {
+        'username': '',
+        'password': '',
+      };
+
+      // 更新 DNS 設定
+      wanSettings['dns'] = {
+        'dns_1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '8.8.8.8',
+        'dns_2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '8.8.4.4',
+      };
+
     } else if (connectionType == 'PPPoE') {
-      wanSettings['connection_type'] = 'pppoe'; // 轉換為小寫
+      // 修改連接類型為 pppoe
+      wanSettings['connection_type'] = 'pppoe';
+
+      // 清空 static_ip 配置
+      wanSettings['static_ip'] = {
+        'static_ip_addr': '',
+        'static_ip_mask': '',
+        'static_ip_gateway': '',
+      };
+
+      // 更新 pppoe 配置
       wanSettings['pppoe'] = {
         'username': pppoeUsername,
-        'password': pppoePassword
+        'password': pppoePassword,
       };
+
+      // DNS 設定（可選）
+      if (staticIpConfig.primaryDns.isNotEmpty || staticIpConfig.secondaryDns.isNotEmpty) {
+        wanSettings['dns'] = {
+          'dns_1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '',
+          'dns_2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '',
+        };
+      }
     }
 
     // 保存設置以便後續提交
     _currentWanSettings = wanSettings;
 
-    print('準備提交的WAN設置: ${json.encode(wanSettings)}');
+    print('修改後的 WAN 設置 (GET-修改-PUT模式): ${json.encode(wanSettings)}');
   }
 
   // 處理連接類型變更（增強版本）
-  void _handleConnectionTypeChanged(String type, bool isComplete, StaticIpConfig? config, PPPoEConfig? pppoeConfig) {
+  void _handleConnectionTypeChanged(String type, bool isComplete, StaticIpConfig? config, dynamic pppoeConfig) {
     setState(() {
-      // 檢查類型是否改變
+      // 標記用戶已經修改過設置
+      _userHasModifiedWanSettings = true;
+
       bool isTypeChanged = connectionType != type;
 
-      // 只有當值真正改變時才更新
-      if (isTypeChanged || isCurrentStepComplete != isComplete) {
-        connectionType = type;
-        isCurrentStepComplete = isComplete;
+      connectionType = type;
 
-        if (config != null) {
-          staticIpConfig = config;
-        } else if (isTypeChanged && type != 'Static IP') {
-          // 如果不是靜態IP，重置靜態IP配置
-          staticIpConfig = StaticIpConfig();
-        }
+      if (config != null) {
+        staticIpConfig = config;
+      } else if (isTypeChanged && type != 'Static IP') {
+        staticIpConfig = StaticIpConfig();
+      }
 
-        if (pppoeConfig != null) {
+      if (pppoeConfig != null) {
+        // 使用動態類型處理 PPPoE 配置
+        if (pppoeConfig.runtimeType.toString().contains('PPPoEConfig')) {
           pppoeUsername = pppoeConfig.username;
           pppoePassword = pppoeConfig.password;
-        } else if (isTypeChanged && type != 'PPPoE') {
-          // 如果不是PPPoE，重置PPPoE配置
-          pppoeUsername = '';
-          pppoePassword = '';
         }
+      } else if (isTypeChanged && type != 'PPPoE') {
+        pppoeUsername = '';
+        pppoePassword = '';
+      }
 
-        // 準備API提交格式
-        _prepareWanSettingsForSubmission();
+      // 重新驗證當前配置
+      bool isCurrentConfigValid = false;
+      if (type == 'DHCP') {
+        isCurrentConfigValid = true; // DHCP 不需要額外配置
+      } else if (type == 'Static IP') {
+        isCurrentConfigValid = _isStaticIpConfigValid();
+      } else if (type == 'PPPoE') {
+        isCurrentConfigValid = _isPppoeConfigValid();
+      }
 
-        // Debug 輸出
-        print('連接類型更新: 類型=$connectionType, 有效=$isCurrentStepComplete');
-        if (type == 'Static IP') {
-          print('靜態IP配置: ${staticIpConfig.ipAddress}');
-        } else if (type == 'PPPoE') {
-          print('PPPoE配置: 用戶名=$pppoeUsername');
-        }
+      isCurrentStepComplete = isCurrentConfigValid;
+
+      // 準備API提交格式
+      _prepareWanSettingsForSubmission();
+
+      print('連接類型更新 (用戶修改): 類型=$connectionType, 有效=$isCurrentStepComplete');
+      if (type == 'Static IP') {
+        print('靜態IP配置: IP=${staticIpConfig.ipAddress}, 子網掩碼=${staticIpConfig.subnetMask}, 網關=${staticIpConfig.gateway}');
+      } else if (type == 'PPPoE') {
+        print('PPPoE配置: 用戶名=$pppoeUsername');
       }
     });
+  }
+
+  // 增強的輸入驗證方法
+  bool _isValidIpAddress(String ip) {
+    if (ip.isEmpty) return false;
+
+    // 使用 IPv4 正則表達式驗證
+    final RegExp ipRegex = RegExp(
+        r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+    );
+
+    if (!ipRegex.hasMatch(ip)) return false;
+
+    // 額外檢查：確保每個段都在 0-255 範圍內
+    List<String> segments = ip.split('.');
+    if (segments.length != 4) return false;
+
+    for (String segment in segments) {
+      int? value = int.tryParse(segment);
+      if (value == null || value < 0 || value > 255) return false;
+    }
+
+    return true;
+  }
+
+// 子網掩碼驗證方法
+  bool _isValidSubnetMask(String mask) {
+    if (!_isValidIpAddress(mask)) return false;
+
+    // 檢查是否為有效的子網掩碼
+    List<String> segments = mask.split('.');
+    List<int> bytes = segments.map((s) => int.parse(s)).toList();
+
+    // 轉換為二進制並檢查是否為連續的1後跟連續的0
+    String binary = '';
+    for (int byte in bytes) {
+      binary += byte.toRadixString(2).padLeft(8, '0');
+    }
+
+    // 檢查模式：應該是1...10...0或全1或全0
+    if (!RegExp(r'^1*0*$').hasMatch(binary)) return false;
+
+    return true;
+  }
+
+// 檢查 IP 是否在同一子網
+  bool _isInSameSubnet(String ip1, String ip2, String mask) {
+    if (!_isValidIpAddress(ip1) || !_isValidIpAddress(ip2) || !_isValidSubnetMask(mask)) {
+      return false;
+    }
+
+    List<int> ip1Bytes = ip1.split('.').map((s) => int.parse(s)).toList();
+    List<int> ip2Bytes = ip2.split('.').map((s) => int.parse(s)).toList();
+    List<int> maskBytes = mask.split('.').map((s) => int.parse(s)).toList();
+
+    for (int i = 0; i < 4; i++) {
+      if ((ip1Bytes[i] & maskBytes[i]) != (ip2Bytes[i] & maskBytes[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+// PPPoE 用戶名驗證
+  bool _isValidPppoeUsername(String username) {
+    if (username.isEmpty) return false;
+    if (username.length > 64) return false;
+
+    // PPPoE 用戶名通常允許字母、數字、點、下劃線、連字符和@符號
+    final RegExp usernameRegex = RegExp(r'^[a-zA-Z0-9._@-]+$');
+    return usernameRegex.hasMatch(username);
+  }
+
+// PPPoE 密碼驗證
+  bool _isValidPppoePassword(String password) {
+    if (password.isEmpty) return false;
+    if (password.length > 64) return false;
+
+    // PPPoE 密碼允許大部分可打印字符，使用十六進制範圍定義
+    // 包含: 空格(0x20) + 所有可打印字符(0x21-0x7E)
+    final RegExp passwordRegex = RegExp(
+        r'^[\x20-\x7E]+$'
+    );
+    return passwordRegex.hasMatch(password);
   }
 
 //!!!!!!流程寫死的部分/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1271,22 +1445,62 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     if (connectionType == 'Static IP') {
       if (staticIpConfig.ipAddress.isEmpty) {
         return 'Please enter an IP address';
+      } else if (!_isValidIpAddress(staticIpConfig.ipAddress)) {
+        return 'Please enter a valid IP address (e.g., 192.168.1.100)';
       } else if (staticIpConfig.subnetMask.isEmpty) {
         return 'Please enter a subnet mask';
+      } else if (!_isValidSubnetMask(staticIpConfig.subnetMask)) {
+        return 'Please enter a valid subnet mask (e.g., 255.255.255.0)';
       } else if (staticIpConfig.gateway.isEmpty) {
         return 'Please enter a gateway address';
+      } else if (!_isValidIpAddress(staticIpConfig.gateway)) {
+        return 'Please enter a valid gateway address';
+      } else if (!_isInSameSubnet(staticIpConfig.ipAddress, staticIpConfig.gateway, staticIpConfig.subnetMask)) {
+        return 'IP address and gateway must be in the same subnet';
       } else if (staticIpConfig.primaryDns.isEmpty) {
-        return 'Please enter a DNS server address';
+        return 'Please enter a primary DNS server address';
+      } else if (!_isValidIpAddress(staticIpConfig.primaryDns)) {
+        return 'Please enter a valid primary DNS server address';
+      } else if (staticIpConfig.secondaryDns.isNotEmpty && !_isValidIpAddress(staticIpConfig.secondaryDns)) {
+        return 'Please enter a valid secondary DNS server address';
       }
     } else if (connectionType == 'PPPoE') {
       if (pppoeUsername.isEmpty) {
         return 'Please enter a PPPoE username';
+      } else if (!_isValidPppoeUsername(pppoeUsername)) {
+        return 'Username can only contain letters, numbers, dots, underscores, hyphens, and @ symbol';
       } else if (pppoePassword.isEmpty) {
         return 'Please enter a PPPoE password';
+      } else if (!_isValidPppoePassword(pppoePassword)) {
+        return 'Password contains invalid characters';
       }
     }
 
-    return 'Please complete all required fields';
+    return 'Please complete all required fields correctly';
+  }
+
+  bool _isStaticIpConfigValid() {
+    if (connectionType != 'Static IP') return true;
+
+    return staticIpConfig.ipAddress.isNotEmpty &&
+        _isValidIpAddress(staticIpConfig.ipAddress) &&
+        staticIpConfig.subnetMask.isNotEmpty &&
+        _isValidSubnetMask(staticIpConfig.subnetMask) &&
+        staticIpConfig.gateway.isNotEmpty &&
+        _isValidIpAddress(staticIpConfig.gateway) &&
+        _isInSameSubnet(staticIpConfig.ipAddress, staticIpConfig.gateway, staticIpConfig.subnetMask) &&
+        staticIpConfig.primaryDns.isNotEmpty &&
+        _isValidIpAddress(staticIpConfig.primaryDns) &&
+        (staticIpConfig.secondaryDns.isEmpty || _isValidIpAddress(staticIpConfig.secondaryDns));
+  }
+
+  bool _isPppoeConfigValid() {
+    if (connectionType != 'PPPoE') return true;
+
+    return pppoeUsername.isNotEmpty &&
+        _isValidPppoeUsername(pppoeUsername) &&
+        pppoePassword.isNotEmpty &&
+        _isValidPppoePassword(pppoePassword);
   }
 
   // 獲取 SSID 錯誤訊息
@@ -1382,12 +1596,12 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   void _reloadStepData(int stepIndex) {
     final components = _getCurrentStepComponents(stepIndex: stepIndex);
 
-    // 重新載入連接類型資料
-    if (components.contains('ConnectionTypeComponent')) {
+    // 重新載入連接類型資料 - 只在用戶未修改時
+    if (components.contains('ConnectionTypeComponent') && !_userHasModifiedWanSettings) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadCurrentWanSettings();
       });
-      print('重新載入連接類型資料');
+      print('重新載入連接類型資料 (僅限首次)');
     }
 
     // 重新載入無線設置資料
@@ -1467,23 +1681,31 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   // 修改 _createComponentByName 方法，為所有組件傳遞高度
   Widget? _createComponentByName(String componentName) {
     List<String> detailOptions = _getStepDetailOptions();
-    final screenSize = MediaQuery.of(context).size;
+    final screenSize = MediaQuery
+        .of(context)
+        .size;
 
     // 為所有組件設置的共同高度比例
-    final componentHeightRatio = 0.45; // 使用螢幕高度的 45%
+    final componentHeightRatio = 0.45;
     final componentHeight = screenSize.height * componentHeightRatio;
 
     switch (componentName) {
       case 'AccountPasswordComponent':
         return AccountPasswordComponent(
-          displayOptions: detailOptions.isNotEmpty ? detailOptions : const ['User', 'Password', 'Confirm Password'],
+          displayOptions: detailOptions.isNotEmpty ? detailOptions : const [
+            'User',
+            'Password',
+            'Confirm Password'
+          ],
           onFormChanged: _handleFormChanged,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
-          height: componentHeight, // 使用共同的比例高度
+          height: componentHeight,
         );
 
       case 'ConnectionTypeComponent':
+      // *** 為 ConnectionTypeComponent 明確指定連接類型選項，不使用 detailOptions ***
+
       // 在創建組件前，確保已調用獲取網絡設置的方法
         if (_currentWanSettings.isEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1491,23 +1713,19 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           });
         }
 
-        // 確保連接類型選項標準化且唯一
-        List<String> validConnectionTypes = ['DHCP', 'Static IP', 'PPPoE'];
+        // 明確指定連接類型選項，不依賴 detailOptions
+        List<String> connectionTypeOptions = ['DHCP', 'Static IP', 'PPPoE'];
 
-        // 使用 LinkedHashSet 保持順序且去除重複
-        List<String> uniqueConnectionTypes = LinkedHashSet<String>.from(
-            detailOptions.isNotEmpty ? detailOptions : validConnectionTypes
-        ).toList();
-
-        // 如果當前 connectionType 不在有效選項中，重置為預設值
-        if (!uniqueConnectionTypes.contains(connectionType)) {
-          connectionType = 'DHCP';
-        }
+        // print('創建 ConnectionTypeComponent - 當前類型: $connectionType');
+        // print('ConnectionType 固定選項: $connectionTypeOptions');
 
         return ConnectionTypeComponent(
-          displayOptions: uniqueConnectionTypes,
+          displayOptions: connectionTypeOptions,
+          // 使用固定的連接類型選項
           initialConnectionType: connectionType,
-          initialStaticIpConfig: connectionType == 'Static IP' ? staticIpConfig : null,
+          initialStaticIpConfig: connectionType == 'Static IP'
+              ? staticIpConfig
+              : null,
           initialPppoeUsername: pppoeUsername,
           initialPppoePassword: pppoePassword,
           onSelectionChanged: _handleConnectionTypeChanged,
@@ -1517,6 +1735,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         );
 
       case 'SetSSIDComponent':
+      // *** 為 SetSSIDComponent 明確指定安全選項，不使用 detailOptions ***
+
       // 在創建組件前，確保已調用獲取無線設置的方法
         if (_currentWirelessSettings.isEmpty && !_isLoadingWirelessSettings) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1524,8 +1744,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           });
         }
 
-        // 確保安全選項有效且唯一 - 去除重複並檢查當前值
-        List<String> validSecurityOptions = [
+        // 明確指定安全選項，不依賴 detailOptions
+        List<String> securityOptions = [
           'no authentication',
           'Enhanced Open (OWE)',
           'WPA2 Personal',
@@ -1534,18 +1754,19 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           'WPA2 Enterprise'
         ];
 
-        // 使用 LinkedHashSet 保持順序且去除重複
-        List<String> uniqueOptions = LinkedHashSet<String>.from(
-            detailOptions.isNotEmpty ? detailOptions : validSecurityOptions
-        ).toList();
-
         // 如果當前 securityOption 不在有效選項中，重置為預設值
-        if (!uniqueOptions.contains(securityOption)) {
+        if (!securityOptions.contains(securityOption)) {
+          print(
+              '當前安全選項 "$securityOption" 不在安全選項中，重置為 WPA3 Personal');
           securityOption = 'WPA3 Personal';
         }
 
+        // print('創建 SetSSIDComponent - 當前安全選項: $securityOption');
+        // print('Security 固定選項: $securityOptions');
+
         return SetSSIDComponent(
-          displayOptions: uniqueOptions,
+          displayOptions: securityOptions,
+          // 使用固定的安全選項
           initialSsid: ssid,
           initialSecurityOption: securityOption,
           initialPassword: ssidPassword,
@@ -1561,14 +1782,15 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           connectionType: connectionType,
           ssid: ssid,
           securityOption: securityOption,
-          password: ssidPassword,
+          password: password,
           staticIpConfig: connectionType == 'Static IP' ? staticIpConfig : null,
           pppoeUsername: connectionType == 'PPPoE' ? pppoeUsername : null,
           pppoePassword: connectionType == 'PPPoE' ? pppoePassword : null,
           onNextPressed: _handleNext,
           onBackPressed: _handleBack,
-          height: componentHeight, // 添加比例高度
+          height: componentHeight,
         );
+
       default:
         print('不支援的組件名稱: $componentName');
         return null;

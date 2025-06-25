@@ -144,7 +144,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         final info = NetworkInfo();
         final currentSSID = await info.getWifiName();
 
-        print('原始獲取的 SSID: "$currentSSID"');
+        // print('原始獲取的 SSID: "$currentSSID"');
 
         // 詳細的清理和格式化 SSID
         if (currentSSID != null && currentSSID.isNotEmpty) {
@@ -155,7 +155,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
               .replaceAll('>', '')           // 移除 > 符號
               .trim();                       // 移除前後空白
 
-          print('清理後的 SSID: "$cleanedSSID"');
+          // print('清理後的 SSID: "$cleanedSSID"');
 
           return cleanedSSID.isEmpty ? null : cleanedSSID;
         }
@@ -190,10 +190,10 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         .trim()
         .toLowerCase();
 
-    print('比較 SSID:');
-    print('  當前清理後: "$cleanedCurrent"');
-    print('  選擇清理後: "$cleanedSelected"');
-    print('  是否相同: ${cleanedCurrent == cleanedSelected}');
+    // print('比較 SSID:');
+    // print('  當前清理後: "$cleanedCurrent"');
+    // print('  選擇清理後: "$cleanedSelected"');
+    // print('  是否相同: ${cleanedCurrent == cleanedSelected}');
 
     return cleanedCurrent == cleanedSelected;
   }
