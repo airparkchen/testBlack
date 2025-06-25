@@ -6,6 +6,7 @@ import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/utils/api_logger.dart';
 import 'package:whitebox/shared/utils/api_coordinator.dart';
+import '../utils/jwt_auto_relogin.dart';
 
 /// Internet 連線狀態數據類
 class InternetConnectionStatus {
@@ -200,45 +201,82 @@ class DashboardDataService {
     try {
       print('🌐 調用 Dashboard API (嘗試 ${retryCount + 1}/${maxRetries + 1})');
 
-      // 🔥 修改：條件式使用協調器
-      final result = await ApiCoordinator.coordinatedCall('dashboard', () async {
-        return await ApiLogger.wrapApiCall(
-          method: 'GET',
-          endpoint: '/api/v1/system/dashboard',
-          caller: 'DashboardDataService._getSystemDashboard',
-          apiCall: () => WifiApiService.getSystemDashboard(),
-        );
-      });
+      // 🔥 簡化：使用原有的 JWT 自動重新登入，但不強制使用快取
+      final result = await JwtAutoRelogin.instance.wrapApiCall(
+            () async {
+          return await ApiLogger.wrapApiCall(
+            method: 'GET',
+            endpoint: '/api/v1/system/dashboard',
+            caller: 'DashboardDataService._getSystemDashboard',
+            apiCall: () => WifiApiService.getSystemDashboard(),
+          );
+        },
+        debugInfo: 'Dashboard API',
+      );
 
-      if (retryCount > 0) {
-        print('✅ Dashboard API 重試成功 (第${retryCount + 1}次嘗試)');
+      // 🔥 關鍵：只有成功且非錯誤回應才更新快取
+      if (result != null &&
+          !result.containsKey('error') &&
+          !_isApiErrorResponse(result)) {
+        _cachedDashboardData = result;
+        print('💾 Dashboard 資料更新成功');
+        return result;
+      } else {
+        print('⚠️ Dashboard API 返回錯誤，保持現有資料不變');
+        // 如果有快取，返回快取；否則返回錯誤
+        if (_cachedDashboardData != null) {
+          print('📋 使用現有 Dashboard 資料');
+          return _cachedDashboardData!;
+        } else {
+          print('❌ 無現有資料，返回錯誤結果');
+          return result;
+        }
       }
 
-      return result;
     } catch (e) {
-      // 🔥 修改：如果協調器停用且是頻率限制錯誤，直接重試
-      if (!ApiCoordinator.isEnabled && e.toString().contains('API call too frequent')) {
-        print('🚀 協調器已停用，忽略頻率限制，直接重試');
-        await Future.delayed(Duration(milliseconds: 500)); // 短暫延遲
-        return await _getSystemDashboard(retryCount: retryCount);
+      print('❌ Dashboard API 調用異常: $e');
+
+      // 🔥 異常時：有快取就用快取，沒快取就重試
+      if (_cachedDashboardData != null) {
+        print('📋 使用現有 Dashboard 資料（異常時）');
+        return _cachedDashboardData!;
       }
 
-      // 原有錯誤處理邏輯...
-      if (e.toString().contains('API call too frequent') && retryCount == 0) {
-        print('🕐 Dashboard API 被協調器跳過，等待後重試');
-        await Future.delayed(Duration(seconds: 3));
-        return await _getSystemDashboard(retryCount: retryCount + 1);
-      }
-
+      // 沒有快取且在重試次數內，則重試
       if (retryCount < maxRetries) {
-        print('⚠️ Dashboard API 調用失敗，準備重試... 錯誤: $e');
+        print('🔄 Dashboard API 重試中... (${retryCount + 1}/$maxRetries)');
         await Future.delayed(Duration(seconds: 2));
         return await _getSystemDashboard(retryCount: retryCount + 1);
       }
 
-      print('❌ Dashboard API 達到最大重試次數，調用失敗: $e');
       throw Exception('Dashboard API 調用失敗: $e');
     }
+  }
+
+  /// 🔥 新增：檢查是否為 API 錯誤回應
+  static bool _isApiErrorResponse(Map<String, dynamic> response) {
+    // 檢查是否包含錯誤訊息
+    if (response.containsKey('error')) return true;
+
+    // 檢查 response_body 中的錯誤
+    if (response.containsKey('response_body')) {
+      final responseBody = response['response_body'].toString().toLowerCase();
+      if (responseBody.contains('error') ||
+          responseBody.contains('busy') ||
+          responseBody.contains('failed')) {
+        return true;
+      }
+    }
+
+    // 檢查狀態碼
+    if (response.containsKey('status_code')) {
+      final statusCode = response['status_code'].toString();
+      if (statusCode != '000' && statusCode != '200') {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /// 解析 Dashboard 資料 - 重寫版本

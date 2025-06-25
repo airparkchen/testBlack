@@ -4,7 +4,8 @@ import 'dart:async';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/utils/api_logger.dart';
-import 'package:whitebox/shared/utils/api_coordinator.dart'; // 🔥 新增導入
+import 'package:whitebox/shared/utils/api_coordinator.dart'; //
+import '../utils/jwt_auto_relogin.dart';
 
 /// 真實速度資料整合服務
 class RealSpeedDataService {
@@ -39,23 +40,33 @@ class RealSpeedDataService {
   }
 
   /// 🎯 從真實 Throughput API 獲取上傳速度（添加協調器）
+  /// 🎯 獲取上傳速度 - 簡化版本（失敗時不更新）
   static Future<double> getCurrentUploadSpeed() async {
-    // 🔥 快取檢查在協調器之前
+    // 🔥 快取檢查
     if (_isUploadCacheValid() && _cachedUploadSpeed != null) {
       print('📋 使用快取的上傳速度: ${_cachedUploadSpeed!.toStringAsFixed(6)} Mbps');
       return _cachedUploadSpeed!;
     }
 
     try {
-      // 🔥 使用協調器包裝API調用
-      final throughputResult = await ApiCoordinator.coordinatedCall('throughput', () async {
-        return await ApiLogger.wrapApiCall(
-          method: 'GET',
-          endpoint: '/api/v1/system/throughput',
-          caller: 'RealSpeedDataService.getCurrentUploadSpeed',
-          apiCall: () => WifiApiService.getSystemThroughput(),
-        );
-      });
+      // 🔥 簡化：使用原有的 JWT 自動重新登入
+      final throughputResult = await JwtAutoRelogin.instance.wrapApiCall(
+            () async {
+          return await ApiLogger.wrapApiCall(
+            method: 'GET',
+            endpoint: '/api/v1/system/throughput',
+            caller: 'RealSpeedDataService.getCurrentUploadSpeed',
+            apiCall: () => WifiApiService.getSystemThroughput(),
+          );
+        },
+        debugInfo: 'Throughput API (Upload)',
+      );
+
+      // 🔥 關鍵：檢查 API 回應是否有錯誤
+      if (_isThroughputApiErrorResponse(throughputResult)) {
+        print('⚠️ Throughput API 返回錯誤，保持現有上傳速度不變');
+        return _cachedUploadSpeed ?? 0.0;
+      }
 
       double uploadSpeed = 0.0;
 
@@ -84,41 +95,47 @@ class RealSpeedDataService {
         }
       }
 
-      // 🔥 更新快取
+      // 🔥 只有解析成功才更新快取
       _cachedUploadSpeed = uploadSpeed;
       _lastUploadFetchTime = DateTime.now();
+      print('💾 上傳速度更新成功');
 
       return uploadSpeed;
     } catch (e) {
-      // 🔥 處理協調器特殊錯誤
-      if (e.toString().contains('API call too frequent')) {
-        print('🕐 上傳速度API調用過於頻繁，使用快取值');
-        return _cachedUploadSpeed ?? 0.0;
-      }
-
       print('❌ 獲取上傳速度時發生錯誤: $e');
-      return _cachedUploadSpeed ?? 0.0; // 出錯時返回快取值
+      // 🔥 異常時：保持現有速度
+      return _cachedUploadSpeed ?? 0.0;
     }
   }
 
   /// 🎯 從真實 Throughput API 獲取下載速度（添加協調器）
+  /// 🎯 從真實 Throughput API 獲取下載速度（增強快取回退版本）
   static Future<double> getCurrentDownloadSpeed() async {
-    // 🔥 快取檢查在協調器之前
+    // 🔥 快取檢查
     if (_isDownloadCacheValid() && _cachedDownloadSpeed != null) {
       print('📋 使用快取的下載速度: ${_cachedDownloadSpeed!.toStringAsFixed(6)} Mbps');
       return _cachedDownloadSpeed!;
     }
 
     try {
-      // 🔥 使用協調器包裝API調用
-      final throughputResult = await ApiCoordinator.coordinatedCall('throughput', () async {
-        return await ApiLogger.wrapApiCall(
-          method: 'GET',
-          endpoint: '/api/v1/system/throughput',
-          caller: 'RealSpeedDataService.getCurrentDownloadSpeed',
-          apiCall: () => WifiApiService.getSystemThroughput(),
-        );
-      });
+      // 🔥 簡化：使用原有的 JWT 自動重新登入
+      final throughputResult = await JwtAutoRelogin.instance.wrapApiCall(
+            () async {
+          return await ApiLogger.wrapApiCall(
+            method: 'GET',
+            endpoint: '/api/v1/system/throughput',
+            caller: 'RealSpeedDataService.getCurrentDownloadSpeed',
+            apiCall: () => WifiApiService.getSystemThroughput(),
+          );
+        },
+        debugInfo: 'Throughput API (Download)',
+      );
+
+      // 🔥 關鍵：檢查 API 回應是否有錯誤
+      if (_isThroughputApiErrorResponse(throughputResult)) {
+        print('⚠️ Throughput API 返回錯誤，保持現有下載速度不變');
+        return _cachedDownloadSpeed ?? 0.0;
+      }
 
       double downloadSpeed = 0.0;
 
@@ -147,21 +164,44 @@ class RealSpeedDataService {
         }
       }
 
-      // 🔥 更新快取
+      // 🔥 只有解析成功才更新快取
       _cachedDownloadSpeed = downloadSpeed;
       _lastDownloadFetchTime = DateTime.now();
+      print('💾 下載速度更新成功');
 
       return downloadSpeed;
     } catch (e) {
-      // 🔥 處理協調器特殊錯誤
-      if (e.toString().contains('API call too frequent')) {
-        print('🕐 下載速度API調用過於頻繁，使用快取值');
-        return _cachedDownloadSpeed ?? 0.0;
+      print('❌ 獲取下載速度時發生錯誤: $e');
+      // 🔥 異常時：保持現有速度
+      return _cachedDownloadSpeed ?? 0.0;
+    }
+  }
+
+  /// 🔥 新增：檢查 Throughput API 是否返回錯誤
+  static bool _isThroughputApiErrorResponse(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      // 檢查是否包含錯誤
+      if (response.containsKey('error')) return true;
+
+      // 檢查 response_body 中的錯誤
+      if (response.containsKey('response_body')) {
+        final responseBody = response['response_body'].toString().toLowerCase();
+        if (responseBody.contains('error') ||
+            responseBody.contains('busy') ||
+            responseBody.contains('failed')) {
+          return true;
+        }
       }
 
-      print('❌ 獲取下載速度時發生錯誤: $e');
-      return _cachedDownloadSpeed ?? 0.0; // 出錯時返回快取值
+      // 檢查是否沒有 wan 資料
+      if (!response.containsKey('wan') ||
+          response['wan'] is! List ||
+          (response['wan'] as List).isEmpty) {
+        return true;
+      }
     }
+
+    return false;
   }
 
   /// 🎯 獲取上傳速度歷史數據（保持不變）

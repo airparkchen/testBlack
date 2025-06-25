@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
+import 'package:wifi_iot/wifi_iot.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:app_settings/app_settings.dart';
 
 class QrCodeScannerPage extends StatefulWidget {
   const QrCodeScannerPage({super.key});
@@ -15,11 +18,25 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
   String qrResult = '';
   bool isScanning = true;
   bool _isCameraInitFailed = false;
+  bool _permissionsRequested = false;
 
   @override
   void initState() {
     super.initState();
     _initializeScanner();
+    _requestPermissionsQuietly(); // 預先靜默請求權限
+  }
+
+  // 靜默請求權限，避免在連接時彈窗
+  Future<void> _requestPermissionsQuietly() async {
+    if (!_permissionsRequested) {
+      try {
+        await Permission.location.request();
+        _permissionsRequested = true;
+      } catch (e) {
+        print('預先權限請求失敗: $e');
+      }
+    }
   }
 
   void _initializeScanner() {
@@ -40,6 +57,79 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
   void dispose() {
     _controller?.dispose();
     super.dispose();
+  }
+
+  // 新增：最簡單的 WiFi QR Code 處理
+  void _handleWiFiQR(String qrCode) {
+    print('QR Code: $qrCode');
+
+    // 解析 SSID, Password 和 Security
+    String ssid = '';
+    String password = '';
+    String security = '';
+
+    // 用正則表達式提取所有參數
+    RegExp ssidRegex = RegExp(r'S:([^;]+)');
+    RegExp passwordRegex = RegExp(r'P:([^;]+)');
+    RegExp securityRegex = RegExp(r'T:([^;]+)');
+
+    var ssidMatch = ssidRegex.firstMatch(qrCode);
+    var passwordMatch = passwordRegex.firstMatch(qrCode);
+    var securityMatch = securityRegex.firstMatch(qrCode);
+
+    if (ssidMatch != null) {
+      ssid = ssidMatch.group(1) ?? '';
+    }
+
+    if (passwordMatch != null) {
+      password = passwordMatch.group(1) ?? '';
+    }
+
+    if (securityMatch != null) {
+      security = securityMatch.group(1) ?? '';
+    }
+
+    print('SSID: "$ssid"');
+    print('Password: "$password"');
+    print('Security: "$security"');
+
+    if (ssid.isNotEmpty) {
+      _connectToWiFi(ssid, password, security);
+    } else {
+      print('SSID 解析失敗');
+    }
+  }
+
+  Future<void> _connectToWiFi(String ssid, String password, String security) async {
+    print('=== 使用範例方法連接 WiFi ===');
+
+    bool isConnected = await WiFiForIoTPlugin.connect(
+      ssid,
+      password: password,
+      security: NetworkSecurity.WPA,
+    );
+
+    if (isConnected) {
+      debugPrint('Connected to: $ssid');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connected to $ssid'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      debugPrint("Failed to connect to $ssid");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to connect to $ssid'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -229,11 +319,18 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage> {
           onDetect: (capture) {
             final List<Barcode> barcodes = capture.barcodes;
             if (barcodes.isNotEmpty && isScanning) {
+              final String rawValue = barcodes.first.rawValue ?? 'Unable to read';
+
               setState(() {
-                qrResult = barcodes.first.rawValue ?? 'Unable to read';
+                qrResult = rawValue;
                 isScanning = false;
                 _controller!.stop();
               });
+
+              // 檢查是否為 WiFi QR Code
+              if (rawValue.startsWith('WIFI:')) {
+                _handleWiFiQR(rawValue);
+              }
             }
           },
         ),

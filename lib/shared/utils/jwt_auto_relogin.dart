@@ -1,12 +1,12 @@
 // lib/shared/utils/jwt_auto_relogin.dart
-// JWT 自動重新登入管理器 - 使用現有 LoginProcess 的最小修改版本
+// JWT 自動重新登入管理器 + API 錯誤容錯處理
 
 import 'dart:async';
 import 'dart:convert';
 import 'package:whitebox/shared/api/wifi_api/login_process.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 
-/// 輕量級 JWT 自動重新登入管理器
+/// 增強型 JWT 自動重新登入管理器 + API 容錯處理
 class JwtAutoRelogin {
   static JwtAutoRelogin? _instance;
   static JwtAutoRelogin get instance => _instance ??= JwtAutoRelogin._();
@@ -41,6 +41,58 @@ class JwtAutoRelogin {
         errorStr.contains('認證錯誤');
   }
 
+  /// 檢查是否為臨時性錯誤（應該使用快取而非重新登入）
+  bool isTemporaryError(dynamic error) {
+    final errorStr = error.toString().toLowerCase();
+    return errorStr.contains('another api request is busy') ||
+        errorStr.contains('api request is busy') ||
+        errorStr.contains('busy') ||
+        errorStr.contains('timeout') ||
+        errorStr.contains('connection') ||
+        errorStr.contains('network') ||
+        errorStr.contains('請求超時') ||
+        errorStr.contains('連線超時');
+  }
+
+  /// 檢查 API 回應是否包含臨時性錯誤
+  bool isTemporaryErrorResponse(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      // 檢查 error 欄位
+      if (response.containsKey('error')) {
+        final errorStr = response['error'].toString().toLowerCase();
+        if (errorStr.contains('api request is busy') ||
+            errorStr.contains('another api request is busy') ||
+            errorStr.contains('busy') ||
+            errorStr.contains('timeout') ||
+            errorStr.contains('connection')) {
+          return true;
+        }
+      }
+
+      // 檢查 response_body 欄位中的錯誤
+      if (response.containsKey('response_body')) {
+        final responseBodyStr = response['response_body'].toString().toLowerCase();
+        if (responseBodyStr.contains('another api request is busy') ||
+            responseBodyStr.contains('api request is busy') ||
+            responseBodyStr.contains('busy')) {
+          return true;
+        }
+      }
+
+      // 檢查 message 欄位
+      if (response.containsKey('message')) {
+        final messageStr = response['message'].toString().toLowerCase();
+        if (messageStr.contains('another api request is busy') ||
+            messageStr.contains('api request is busy') ||
+            messageStr.contains('busy')) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   /// 檢查 API 回應是否包含 JWT 錯誤
   bool isJwtErrorResponse(dynamic response) {
     if (response is Map<String, dynamic>) {
@@ -58,8 +110,8 @@ class JwtAutoRelogin {
       if (response.containsKey('response_body')) {
         final responseBodyStr = response['response_body'].toString().toLowerCase();
         if (responseBodyStr.contains('jwt token has expired') ||
-            responseBodyStr.contains('jwt') && responseBodyStr.contains('expired') ||
-            responseBodyStr.contains('token') && responseBodyStr.contains('expired')) {
+            (responseBodyStr.contains('jwt') && responseBodyStr.contains('expired')) ||
+            (responseBodyStr.contains('token') && responseBodyStr.contains('expired'))) {
           return true;
         }
       }
@@ -76,8 +128,58 @@ class JwtAutoRelogin {
     return false;
   }
 
-  /// 包裝 API 調用，自動處理 JWT 過期
-  Future<T> wrapApiCall<T>(Future<T> Function() apiCall, {String? debugInfo}) async {
+  /// 記錄 API 原始資料
+  void logApiRawData(String apiName, dynamic rawData, {String? status}) {
+    try {
+      print('[API_DATA] 📊 $apiName ${status ?? "RAW_DATA"}');
+
+      if (rawData == null) {
+        print('[API_DATA]   💀 NULL_RESPONSE');
+        return;
+      }
+
+      // 格式化輸出
+      if (rawData is Map || rawData is List) {
+        final jsonStr = const JsonEncoder.withIndent('  ').convert(rawData);
+        _printApiDataInChunks(apiName, jsonStr);
+      } else {
+        final str = rawData.toString();
+        if (str.length > 1000) {
+          _printApiDataInChunks(apiName, str);
+        } else {
+          print('[API_DATA]   📄 $str');
+        }
+      }
+
+      print('[API_DATA] 🏁 $apiName END');
+    } catch (e) {
+      print('[API_DATA] ❌ $apiName FORMAT_ERROR: $e');
+    }
+  }
+
+  /// 分段輸出大型 API 資料
+  void _printApiDataInChunks(String apiName, String content) {
+    const int chunkSize = 800; // 每段 800 字符
+    final int totalLength = content.length;
+    final int totalChunks = (totalLength / chunkSize).ceil();
+
+    print('[API_DATA]   📏 LENGTH: $totalLength, CHUNKS: $totalChunks');
+
+    for (int i = 0; i < totalChunks; i++) {
+      final int start = i * chunkSize;
+      final int end = (start + chunkSize < totalLength) ? start + chunkSize : totalLength;
+      final String chunk = content.substring(start, end);
+
+      print('[API_DATA]   📋 CHUNK_${i + 1}/$totalChunks: $chunk');
+    }
+  }
+
+  /// 包裝 API 調用，自動處理 JWT 過期和臨時錯誤，支援快取回退
+  Future<T> wrapApiCallWithFallback<T>(
+      Future<T> Function() apiCall,
+      T? Function()? getCachedData,
+      {String? debugInfo}
+      ) async {
     // 如果正在重新登入，等待完成
     if (_isRelogging) {
       print('⏸️ API 調用等待重新登入完成... ${debugInfo ?? ""}');
@@ -89,7 +191,30 @@ class JwtAutoRelogin {
     try {
       final result = await apiCall();
 
-      // 🔥 關鍵修正：檢查回應是否包含 JWT 錯誤
+      // 記錄成功的 API 原始資料
+      if (debugInfo != null && _shouldLogApiData(debugInfo)) {
+        logApiRawData(debugInfo, result, status: 'SUCCESS');
+      }
+
+      // 關鍵：檢查回應是否包含臨時性錯誤
+      if (isTemporaryErrorResponse(result)) {
+        print('⚠️ 檢測到臨時性錯誤，使用快取資料: $result ${debugInfo ?? ""}');
+
+        // 嘗試使用快取資料
+        if (getCachedData != null) {
+          final cachedData = getCachedData();
+          if (cachedData != null) {
+            print('📋 使用快取資料避免錯誤顯示 ${debugInfo ?? ""}');
+            return cachedData;
+          }
+        }
+
+        // 如果沒有快取，仍返回錯誤結果但記錄日誌
+        print('❌ 無快取資料可用，返回錯誤結果 ${debugInfo ?? ""}');
+        return result;
+      }
+
+      // 檢查回應是否包含 JWT 錯誤
       if (isJwtErrorResponse(result)) {
         print('❌ 檢測到回應中的 JWT 錯誤: $result ${debugInfo ?? ""}');
 
@@ -98,15 +223,58 @@ class JwtAutoRelogin {
 
         // 重試 API 調用
         try {
-          return await apiCall();
+          final retryResult = await apiCall();
+
+          // 記錄重試成功的資料
+          if (debugInfo != null && _shouldLogApiData(debugInfo)) {
+            logApiRawData(debugInfo, retryResult, status: 'RETRY_SUCCESS');
+          }
+
+          return retryResult;
         } catch (retryError) {
           print('❌ 重新登入後仍然失敗: $retryError ${debugInfo ?? ""}');
+
+          // 記錄重試失敗
+          if (debugInfo != null && _shouldLogApiData(debugInfo)) {
+            logApiRawData(debugInfo, retryError, status: 'RETRY_FAILED');
+          }
+
+          // JWT 重新登入失敗時也嘗試使用快取
+          if (getCachedData != null) {
+            final cachedData = getCachedData();
+            if (cachedData != null) {
+              print('📋 JWT 重新登入失敗，使用快取資料 ${debugInfo ?? ""}');
+              return cachedData;
+            }
+          }
+
           throw retryError;
         }
       }
 
       return result;
     } catch (e) {
+      // 記錄異常
+      if (debugInfo != null && _shouldLogApiData(debugInfo)) {
+        logApiRawData(debugInfo, e, status: 'EXCEPTION');
+      }
+
+      print('❌ API 調用異常: $e ${debugInfo ?? ""}');
+
+      // 檢查是否為臨時性錯誤
+      if (isTemporaryError(e)) {
+        print('⚠️ 檢測到臨時性異常，使用快取資料 ${debugInfo ?? ""}');
+
+        // 嘗試使用快取資料
+        if (getCachedData != null) {
+          final cachedData = getCachedData();
+          if (cachedData != null) {
+            print('📋 使用快取資料避免異常錯誤 ${debugInfo ?? ""}');
+            return cachedData;
+          }
+        }
+      }
+
       // 檢查是否為 JWT 相關錯誤
       if (isJwtError(e)) {
         print('❌ 檢測到 JWT 異常錯誤，開始自動重新登入: $e ${debugInfo ?? ""}');
@@ -116,16 +284,60 @@ class JwtAutoRelogin {
 
         // 重試 API 調用
         try {
-          return await apiCall();
+          final retryResult = await apiCall();
+
+          // 記錄重試成功的資料
+          if (debugInfo != null && _shouldLogApiData(debugInfo)) {
+            logApiRawData(debugInfo, retryResult, status: 'JWT_RETRY_SUCCESS');
+          }
+
+          return retryResult;
         } catch (retryError) {
           print('❌ 重新登入後仍然失敗: $retryError ${debugInfo ?? ""}');
+
+          // 記錄重試失敗
+          if (debugInfo != null && _shouldLogApiData(debugInfo)) {
+            logApiRawData(debugInfo, retryError, status: 'JWT_RETRY_FAILED');
+          }
+
+          // JWT 重新登入失敗時也嘗試使用快取
+          if (getCachedData != null) {
+            final cachedData = getCachedData();
+            if (cachedData != null) {
+              print('📋 JWT 重新登入失敗，使用快取資料 ${debugInfo ?? ""}');
+              return cachedData;
+            }
+          }
+
           throw retryError;
         }
       } else {
-        // 非 JWT 錯誤，直接拋出
+        // 其他錯誤，嘗試使用快取
+        if (getCachedData != null) {
+          final cachedData = getCachedData();
+          if (cachedData != null) {
+            print('📋 API 錯誤，使用快取資料: $e ${debugInfo ?? ""}');
+            return cachedData;
+          }
+        }
+
+        // 非 JWT 錯誤且無快取，直接拋出
         throw e;
       }
     }
+  }
+
+  /// 包裝 API 調用，自動處理 JWT 過期（保持向後兼容）
+  Future<T> wrapApiCall<T>(Future<T> Function() apiCall, {String? debugInfo}) async {
+    return wrapApiCallWithFallback<T>(apiCall, null, debugInfo: debugInfo);
+  }
+
+  /// 判斷是否應該記錄 API 資料
+  bool _shouldLogApiData(String debugInfo) {
+    final info = debugInfo.toLowerCase();
+    return info.contains('dashboard') ||
+        info.contains('mesh') ||
+        info.contains('throughput');
   }
 
   /// 執行自動重新登入
@@ -134,7 +346,7 @@ class JwtAutoRelogin {
     if (_isRelogging) {
       print('🔄 已在重新登入中，等待完成...');
       while (_isRelogging) {
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 100));
       }
       return;
     }
@@ -150,7 +362,7 @@ class JwtAutoRelogin {
       print('🔐 開始自動重新登入...');
       print('👤 使用者：$_lastUsername');
 
-      // 🔥 關鍵：使用現有的 LoginProcess
+      // 關鍵：使用現有的 LoginProcess
       final loginProcess = LoginProcess(
           _lastUsername!,
           _lastPassword!,

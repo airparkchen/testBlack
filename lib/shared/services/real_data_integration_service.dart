@@ -8,6 +8,7 @@ import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/utils/api_logger.dart';
 import 'package:whitebox/shared/utils/api_coordinator.dart';
+import '../utils/jwt_auto_relogin.dart';
 
 
 /// 🎯 正確修正：真實數據整合服務 - 拓樸圖只顯示 Extender，List 顯示 Gateway + Extender
@@ -61,16 +62,28 @@ class RealDataIntegrationService {
 
       final apiStartTime = DateTime.now();
 
-      // 1. 獲取原始 Mesh 數據（添加日誌 & API協調器 包裝）
-      final meshResult = await ApiCoordinator.coordinatedCall(
-        'mesh',
+      // 🔥 簡化：使用原有的 JWT 自動重新登入
+      final meshResult = await JwtAutoRelogin.instance.wrapApiCall(
             () => ApiLogger.wrapApiCall(
           method: 'GET',
           endpoint: '/api/v1/system/mesh_topology',
           caller: 'RealDataIntegrationService.getTopologyStructure',
           apiCall: () => WifiApiService.getMeshTopology(),
         ),
+        debugInfo: 'Mesh API',
       );
+
+      // 🔥 關鍵：檢查 API 回應是否有錯誤
+      if (_isMeshApiErrorResponse(meshResult)) {
+        print('⚠️ Mesh API 返回錯誤，保持現有拓樸資料不變');
+        if (_cachedTopologyStructure != null) {
+          print('📋 使用現有拓樸結構');
+          return _cachedTopologyStructure;
+        } else {
+          print('❌ 無現有拓樸資料');
+          return null;
+        }
+      }
 
       // 2. 使用分析器解析詳細設備資訊
       final detailedDevices = _analyzer.analyzeDetailedDeviceInfo(meshResult);
@@ -78,16 +91,14 @@ class RealDataIntegrationService {
       // 3. 建立拓樸結構
       final topologyStructure = _analyzer.analyzeTopologyStructure(detailedDevices);
 
-      // 更新快取和時間戳記
-      _cachedTopologyStructure = topologyStructure;
-      _lastFetchTime = DateTime.now();
-
-      final apiDuration = DateTime.now().difference(apiStartTime);
-      print('✅ Mesh API 呼叫完成，耗時: ${apiDuration.inMilliseconds}ms');
-      print('📅 下次更新時間: ${DateTime.now().add(_cacheExpiry).toString().substring(11, 19)}');
-
+      // 🔥 只有成功解析才更新快取
       if (topologyStructure != null) {
-        print('✅ 成功更新網路拓樸結構');
+        _cachedTopologyStructure = topologyStructure;
+        _lastFetchTime = DateTime.now();
+
+        final apiDuration = DateTime.now().difference(apiStartTime);
+        print('✅ Mesh API 呼叫完成，耗時: ${apiDuration.inMilliseconds}ms');
+        print('💾 拓樸結構更新成功');
         print('   Gateway: ${topologyStructure.gateway.macAddress}');
         print('   Extenders: ${topologyStructure.extenders.length}');
         print('   Hosts: ${topologyStructure.hostDevices.length}');
@@ -97,9 +108,40 @@ class RealDataIntegrationService {
 
     } catch (e) {
       print('❌ 獲取 TopologyStructure 時發生錯誤: $e');
+
+      // 🔥 異常時：保持現有資料
+      if (_cachedTopologyStructure != null) {
+        print('📋 使用現有拓樸結構（異常時）');
+        return _cachedTopologyStructure;
+      }
+
       return null;
     }
   }
+
+  /// 🔥 新增：檢查 Mesh API 是否返回錯誤
+  static bool _isMeshApiErrorResponse(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      // 檢查是否包含錯誤
+      if (response.containsKey('error')) return true;
+
+      // 檢查 response_body 中的錯誤
+      if (response.containsKey('response_body')) {
+        final responseBody = response['response_body'].toString().toLowerCase();
+        if (responseBody.contains('error') ||
+            responseBody.contains('busy') ||
+            responseBody.contains('failed')) {
+          return true;
+        }
+      }
+    } else if (response is List) {
+      // 如果是空 List 也視為錯誤
+      if (response.isEmpty) return true;
+    }
+
+    return false;
+  }
+
 
   /// 🎯 正確：拓樸圖設備列表 - 只包含 Extender（Internet → Gateway → Extender 連線圖）
   static Future<List<NetworkDevice>> getNetworkDevices() async {
