@@ -398,8 +398,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           staticIpConfig.ipAddress = wanSettings['static_ip']?['static_ip_addr'] ?? '';
           staticIpConfig.subnetMask = wanSettings['static_ip']?['static_ip_mask'] ?? '';
           staticIpConfig.gateway = wanSettings['static_ip']?['static_ip_gateway'] ?? '';
-          staticIpConfig.primaryDns = wanSettings['dns']?['dns_1'] ?? '';
-          staticIpConfig.secondaryDns = wanSettings['dns']?['dns_2'] ?? '';
+          staticIpConfig.primaryDns = wanSettings['dns']?['dns1'] ?? '';
+          staticIpConfig.secondaryDns = wanSettings['dns']?['dns2'] ?? '';
         } else if (apiConnectionType == 'pppoe') {
           pppoeUsername = wanSettings['pppoe']?['username'] ?? '';
           pppoePassword = wanSettings['pppoe']?['password'] ?? '';
@@ -484,32 +484,32 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
   // 添加提交網絡設置的方法
-  Future<void> _submitWanSettings() async {
-    try {
-      setState(() {
-        _updateStatus("正在更新網絡設置...");
-      });
+    Future<void> _submitWanSettings() async {
+      try {
+        setState(() {
+          _updateStatus("正在更新網絡設置...");
+        });
 
-      // 確保使用最新準備的設置
-      _prepareWanSettingsForSubmission();
+        // 確保使用最新準備的設置
+        _prepareWanSettingsForSubmission();
 
-      print('即將提交的網絡設置: ${json.encode(_currentWanSettings)}');
+        print('即將提交的網絡設置: ${json.encode(_currentWanSettings)}');
 
-      // 調用API提交網絡設置
-      final result = await WifiApiService.updateWanEth(_currentWanSettings);
+        // 調用API提交網絡設置
+        final result = await WifiApiService.updateWanEth(_currentWanSettings);
 
-      print('網絡設置更新結果: ${json.encode(result)}');
+        print('網絡設置更新結果: ${json.encode(result)}');
 
-      setState(() {
-        _updateStatus("網絡設置已更新");
-      });
-    } catch (e) {
-      print('提交WAN設置時出錯: $e');
-      setState(() {
-        _updateStatus("更新網絡設置失敗: $e");
-      });
+        setState(() {
+          _updateStatus("網絡設置已更新");
+        });
+      } catch (e) {
+        print('提交WAN設置時出錯: $e');
+        setState(() {
+          _updateStatus("更新網絡設置失敗: $e");
+        });
+      }
     }
-  }
 
   Future<void> _submitWirelessSettings() async {
     try {
@@ -826,7 +826,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         'connection_type': 'dhcp',
         'static_ip': {'static_ip_addr': '', 'static_ip_mask': '', 'static_ip_gateway': ''},
         'pppoe': {'username': '', 'password': ''},
-        'dns': {'dns_1': '', 'dns_2': ''}
+        'dns': {'dns1': '', 'dns2': ''}
       };
     }
 
@@ -861,8 +861,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       // DNS 設定（可選）
       if (staticIpConfig.primaryDns.isNotEmpty || staticIpConfig.secondaryDns.isNotEmpty) {
         wanSettings['dns'] = {
-          'dns_1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '',
-          'dns_2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '',
+          'dns1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '',
+          'dns2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '',
         };
       }
 
@@ -885,8 +885,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
       // 更新 DNS 設定
       wanSettings['dns'] = {
-        'dns_1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '8.8.8.8',
-        'dns_2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '8.8.4.4',
+        'dns1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '8.8.8.8',
+        'dns2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '8.8.4.4',
       };
 
     } else if (connectionType == 'PPPoE') {
@@ -909,8 +909,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       // DNS 設定（可選）
       if (staticIpConfig.primaryDns.isNotEmpty || staticIpConfig.secondaryDns.isNotEmpty) {
         wanSettings['dns'] = {
-          'dns_1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '',
-          'dns_2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '',
+          'dns1': staticIpConfig.primaryDns.isNotEmpty ? staticIpConfig.primaryDns : '',
+          'dns2': staticIpConfig.secondaryDns.isNotEmpty ? staticIpConfig.secondaryDns : '',
         };
       }
     }

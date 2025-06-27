@@ -177,6 +177,26 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     _secondaryDnsFocusNode.addListener(() => _handleFieldFocus(_secondaryDnsFocusNode, 320.0));
     _pppoeUsernameFocusNode.addListener(() => _handleFieldFocus(_pppoeUsernameFocusNode, 80.0));
     _pppoePasswordFocusNode.addListener(() => _handleFieldFocus(_pppoePasswordFocusNode, 140.0));
+
+    // 🔥 添加 PPPoE 密碼焦點監聽器來處理數據同步
+    _pppoePasswordFocusNode.addListener(() {
+      print('🎯 PPPoE 密碼焦點狀態變更: ${_pppoePasswordFocusNode.hasFocus}');
+
+      if (!_pppoePasswordFocusNode.hasFocus) {
+        // 當密碼欄位失去焦點時，強制同步數據
+        print('🔄 PPPoE 密碼失去焦點，強制同步數據');
+        print('  - 當前 controller.text: "${_pppoePasswordController.text}"');
+        print('  - 當前 _pppoeConfig.password: "${_pppoeConfig.password}"');
+
+        // 確保數據同步
+        _pppoeConfig.password = _pppoePasswordController.text;
+
+        print('  - 同步後 _pppoeConfig.password: "${_pppoeConfig.password}"');
+
+        // 強制發送通知
+        _notifySelectionChanged();
+      }
+    });
   }
 
   // 移除焦點監聽器
@@ -188,6 +208,14 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     _secondaryDnsFocusNode.removeListener(() => _handleFieldFocus(_secondaryDnsFocusNode, 320.0));
     _pppoeUsernameFocusNode.removeListener(() => _handleFieldFocus(_pppoeUsernameFocusNode, 80.0));
     _pppoePasswordFocusNode.removeListener(() => _handleFieldFocus(_pppoePasswordFocusNode, 140.0));
+
+    // 🔥 移除 PPPoE 密碼焦點監聽器
+    _pppoePasswordFocusNode.removeListener(() {
+      if (!_pppoePasswordFocusNode.hasFocus) {
+        _pppoeConfig.password = _pppoePasswordController.text;
+        _notifySelectionChanged();
+      }
+    });
   }
 
   // 處理輸入框獲得焦點
@@ -340,7 +368,6 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     });
   }
 
-
   // 驗證表單
   void _validateForm() {
     bool isValid = true;
@@ -421,8 +448,6 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     return true;
   }
 
-
-
   // 子網掩碼驗證方法
   bool _validateSubnetMask(String mask) {
     if (!_validateIpFormat(mask)) return false;
@@ -484,7 +509,6 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     );
     return passwordRegex.hasMatch(password);
   }
-
 
   void _notifySelectionChanged() {
     if (widget.onSelectionChanged != null) {
@@ -685,7 +709,6 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       ],
     );
   }
-
   // ========== 以下為輔助方法 ==========
 
   // 構建連接類型下拉選擇框
@@ -852,6 +875,17 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
             controller: controller,
             focusNode: focusNode,
             obscureText: !isVisible,
+            textInputAction: TextInputAction.done,
+            onChanged: (value) {
+              print('🟡 TextFormField onChanged 回調: "$value"');
+            },
+            // 🔥 保留 onEditingComplete，但焦點監聽器會處理大部分情況
+            onEditingComplete: () {
+              print('🏁 PPPoE 密碼編輯完成');
+              // 讓焦點離開，這會觸發焦點監聽器
+              focusNode.unfocus();
+            },
+            // 🔥 移除 onTapOutside，因為焦點監聽器會處理這種情況
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.black.withOpacity(0.4),
