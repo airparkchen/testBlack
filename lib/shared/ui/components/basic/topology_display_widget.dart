@@ -12,6 +12,7 @@ import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart' as RealSpeedService;
 import 'package:whitebox/shared/services/real_data_integration_service.dart';
 import 'package:whitebox/shared/services/dashboard_data_service.dart';
+import 'package:whitebox/shared/services/unified_mesh_data_manager.dart';
 
 /// 智能單位格式化工具
 /// 根據速度數值自動選擇合適的單位顯示
@@ -150,18 +151,54 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     // 🎯 新增：載入 Gateway 設備資料
     _loadGatewayDevice();
     _loadInternetStatus();
-    if (NetworkTopoConfig.useRealData) {
-      _startClientCountUpdates();
-      _startInternetStatusUpdates();
-    }
+    // if (NetworkTopoConfig.useRealData) {
+    //   // _startClientCountUpdates();
+    //   _startInternetStatusUpdates();
+    // }
   }
 
   @override
   void dispose() {
     // 🎯 新增：清理 API 更新計時器
-    _clientCountUpdateTimer?.cancel();
-    _internetStatusUpdateTimer?.cancel();
+    // _clientCountUpdateTimer?.cancel();
+    // _internetStatusUpdateTimer?.cancel();
     super.dispose();
+  }
+
+  void updateClientCounts(List<DeviceConnection> connections, NetworkDevice? gatewayDevice) {
+    if (!mounted) return;
+
+    setState(() {
+      _latestConnections = connections;
+      _latestGatewayDevice = gatewayDevice;
+    });
+
+    print('✅ 拓樸圖客戶端數量已更新：${connections.length} 個連接');
+  }
+
+  /// 🎯 新增：統一更新所有數據的方法
+  void updateAllData({
+    List<DeviceConnection>? connections,
+    NetworkDevice? gatewayDevice,
+    bool updateSpeed = false,
+  }) {
+    if (!mounted) return;
+
+    setState(() {
+      if (connections != null) {
+        _latestConnections = connections;
+      }
+      if (gatewayDevice != null) {
+        _latestGatewayDevice = gatewayDevice;
+      }
+    });
+
+    // 如果需要更新速度數據
+    if (updateSpeed) {
+      updateSpeedData();
+    }
+
+    print('✅ 拓樸圖所有數據已更新');
   }
 
   /// 🔥 新增：啟動 Internet 狀態定期更新
@@ -198,10 +235,12 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     try {
       print('🔄 更新客戶端數量中...');
 
-      // 🔥 修改：確保原子性更新，避免中間狀態
+      // 🎯 使用統一管理器
+      final manager = UnifiedMeshDataManager.instance;
+
       final results = await Future.wait([
-        RealDataIntegrationService.getDeviceConnections(),
-        RealDataIntegrationService.getGatewayDevice(),
+        manager.getDeviceConnections(),
+        manager.getGatewayDevice(),
       ]);
 
       final newConnections = results[0] as List<DeviceConnection>;
@@ -217,7 +256,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
           }
         });
 
-        print('✅ 客戶端數量已更新: ${newConnections.length} 個連接');
+        print('✅ 客戶端數量已更新: ${newConnections.length} 個連接（統一管理器）');
       }
     } catch (e) {
       print('❌ 更新客戶端數量失敗: $e');
@@ -248,32 +287,16 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     });
 
     try {
-      final listDevices = await RealDataIntegrationService.getListViewDevices();
+      // 🎯 使用統一管理器
+      final manager = UnifiedMeshDataManager.instance;
+      final gateway = await manager.getGatewayDevice();
 
-      final gateway = listDevices.firstWhere(
-            (device) => device.additionalInfo['type'] == 'gateway',
-        orElse: () => NetworkDevice(
-          name: 'Controller',
-          id: 'device-gateway',
-          mac: '8c:0f:6f:61:0a:77',
-          ip: '192.168.1.1',
-          connectionType: ConnectionType.wired,
-          additionalInfo: {
-            'type': 'gateway',
-            'status': 'online',
-            'clients': '0',
-          },
-        ),
-      );
-
-      if (mounted) {
+      if (mounted && gateway != null) {
         setState(() {
           _gatewayDevice = gateway;
           _isLoadingGateway = false;
         });
-
-        print('✅ 載入真實 Gateway 設備: ${gateway.name} (${gateway.mac})');
-        print('   Gateway 客戶端數量: ${gateway.additionalInfo['clients']}');
+        print('✅ 載入統一管理器 Gateway 設備: ${gateway.name} (${gateway.mac})');
       }
     } catch (e) {
       print('❌ 載入 Gateway 設備失敗: $e');

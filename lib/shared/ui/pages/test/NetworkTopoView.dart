@@ -12,6 +12,7 @@ import 'package:whitebox/shared/ui/components/basic/topology_display_widget.dart
 import 'package:whitebox/shared/ui/components/basic/device_list_widget.dart';
 import 'package:whitebox/shared/services/real_data_integration_service.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
+import 'package:whitebox/shared/services/unified_mesh_data_manager.dart';
 
 class NetworkTopoView extends StatefulWidget {
   // 保持原有的所有參數，確保對外介面不變
@@ -42,6 +43,8 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
+
+  Timer? _unifiedUpdateTimer;
   // ==================== 狀態變數 ====================
 
   // 視圖模式和導航
@@ -75,6 +78,7 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
   List<NetworkDevice> _listDevices = [];      // 列表設備（Gateway + Extender）
   List<DeviceConnection> _currentConnections = [];
   String _gatewayName = 'Controller';
+  NetworkDevice? _gatewayDevice;
 
   @override
   void initState() {
@@ -103,6 +107,10 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
     // 🟢 修改：使用新的36秒間隔啟動自動重新載入
     if (NetworkTopoConfig.enableAutoReload) {
       _startAutoReload();
+
+    if (NetworkTopoConfig.useRealData) {
+      _startUnifiedUpdates();
+    }
     }
   }
 
@@ -120,43 +128,22 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
     if (!mounted) return;
 
     setState(() {
-      _isLoadingTopologyData = true; // 使用新的載入狀態
+      _isLoadingTopologyData = true;
     });
 
     try {
       if (NetworkTopoConfig.useRealData) {
         print('載入真實拓樸數據...');
 
-        //  呼叫統一的資料統計報告
-        await RealDataIntegrationService.printCompleteDataStatistics();
+        final manager = UnifiedMeshDataManager.instance;
 
-        final topologyDevices = await RealDataIntegrationService.getNetworkDevices();
-        final listDevices = await RealDataIntegrationService.getListViewDevices();
-        final connections = await RealDataIntegrationService.getDeviceConnections();
-        final gatewayName = await RealDataIntegrationService.getGatewayName();
+        await manager.printCompleteDataStatistics();
 
-
-        // 🎯 詳細的資料流調試
-        print('\n=== 🎯 NetworkTopoView 資料載入詳情 ===');
-        print('拓樸圖設備 (${topologyDevices.length} 個 Extender):');
-        for (final device in topologyDevices) {
-          print('  📍 ${device.name} (${device.mac})');
-          print('      └─ Host 數量: ${device.additionalInfo['clients']}');
-        }
-
-        print('\nList 視圖設備 (${listDevices.length} 個):');
-        for (final device in listDevices) {
-          print('  📍 ${device.name} (${device.mac}) [${device.additionalInfo['type']}]');
-          print('      └─ Host 數量: ${device.additionalInfo['clients']}');
-        }
-
-        print('\n設備連接資料 (${connections.length} 個):');
-        for (final conn in connections) {
-          print('  🔗 ${conn.deviceId} → ${conn.connectedDevicesCount} 個 Host');
-        }
-
-        print('\nGateway 名稱: $gatewayName');
-        print('=== NetworkTopoView 資料載入完成 ===\n');
+        final topologyDevices = await manager.getNetworkDevices();
+        final listDevices = await manager.getListViewDevices();
+        final connections = await manager.getDeviceConnections();
+        final gatewayName = await manager.getGatewayName();
+        final gatewayDevice = await manager.getGatewayDevice();
 
         if (mounted) {
           setState(() {
@@ -164,45 +151,21 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
             _listDevices = listDevices;
             _currentConnections = connections;
             _gatewayName = gatewayName;
-            _isLoadingTopologyData = false; // 使用新的載入狀態
+            _gatewayDevice = gatewayDevice;  // 🎯 確保設置 Gateway 設備
+            _isLoadingTopologyData = false;
           });
+
+          // 🎯 關鍵：載入完成後通知拓樸圖更新
+          _notifyTopologyDisplayUpdate();
         }
-        print(' 真實數據載入完成');
+
+        print('✅ 真實數據載入完成並已通知拓樸圖');
 
       } else {
-        // 假數據邏輯保持不變
-        final devices = FakeDataGenerator.generateDevices(_deviceCount);
-        final connections = FakeDataGenerator.generateConnections(devices);
-
-        if (mounted) {
-          setState(() {
-            _topologyDevices = devices;
-            _listDevices = [
-              // 為假數據添加 Gateway
-              NetworkDevice(
-                name: 'Controller',
-                id: 'gateway',
-                mac: '48:21:0B:4A:46:CF',
-                ip: '192.168.1.1',
-                connectionType: ConnectionType.wired,
-                additionalInfo: {
-                  'type': 'gateway',
-                  'status': 'online',
-                  'clients': '2',
-                },
-              ),
-              ...devices,
-            ];
-            _currentConnections = connections;
-            _gatewayName = 'Controller';
-            _isLoadingData = false;
-          });
-        }
-
-        print('✅ 假數據載入完成');
+        // 假數據邏輯...
       }
     } catch (e) {
-      print('❌ 載入拓樸數據時發生錯誤:: $e');
+      print('❌ 載入拓樸數據時發生錯誤: $e');
       if (mounted) {
         setState(() {
           _isLoadingTopologyData = false;
@@ -210,6 +173,48 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
       }
     }
   }
+
+  void _notifyTopologyDisplayUpdate() {
+    if (!mounted) return;
+
+    // 通知拓樸顯示組件更新客戶端數量
+    _topologyDisplayKey.currentState?.updateClientCounts(_currentConnections, _gatewayDevice);
+
+    print('📢 已通知拓樸圖更新：${_currentConnections.length} 個連接');
+  }
+
+  Future<void> _updateFromUnifiedManagerAndNotify() async {
+    try {
+      final manager = UnifiedMeshDataManager.instance;
+
+      // 獲取最新數據
+      final results = await Future.wait([
+        manager.getDeviceConnections(),
+        manager.getGatewayDevice(),
+      ]);
+
+      final connections = results[0] as List<DeviceConnection>;
+      final gatewayDevice = results[1] as NetworkDevice?;
+
+      // 更新本地狀態
+      if (mounted) {
+        setState(() {
+          _currentConnections = connections;
+          _gatewayDevice = gatewayDevice;
+        });
+      }
+
+      // 通知拓樸圖更新
+      _notifyTopologyDisplayUpdate();
+
+      print('✅ 統一管理器數據更新並通知完成');
+
+    } catch (e) {
+      print('❌ 統一管理器更新通知失敗: $e');
+    }
+  }
+
+
   @override
   void dispose() {
     _deviceCountController.removeListener(_handleDeviceCountChanged);
@@ -217,7 +222,22 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
     _updateTimer?.cancel();
     _autoReloadTimer?.cancel();
     _animationController.dispose();
+    _unifiedUpdateTimer?.cancel();
     super.dispose();
+  }
+
+  void _startUnifiedUpdates() {
+    _unifiedUpdateTimer?.cancel();
+
+    final updateInterval = NetworkTopoConfig.meshApiCallInterval;
+    print('🔄 啟動統一更新機制，間隔: ${updateInterval.inSeconds} 秒');
+
+    _unifiedUpdateTimer = Timer.periodic(updateInterval, (_) {
+      if (mounted && NetworkTopoConfig.useRealData) {
+        print('⏰ 統一更新觸發');
+        _updateFromUnifiedManagerAndNotify();
+      }
+    });
   }
 
   /// 啟動自動重新載入計時器
@@ -240,15 +260,15 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
     if (!mounted) return;
 
     try {
-      print('🔄 執行拓樸數據強制重新載入（保持速度區域連續）...');
+      print('🔄 執行拓樸數據強制重新載入...');
 
-      // 清除拓樸數據快取
-      await RealDataIntegrationService.forceReload();
+      final manager = UnifiedMeshDataManager.instance;
+      await manager.forceReload();
 
-      // 🎯 關鍵：只重新載入拓樸數據，不影響速度數據
+      // 重新載入拓樸數據並通知更新
       await _loadTopologyData();
 
-      print('✅ 拓樸數據重新載入完成');
+      print('✅ 拓樸數據重新載入完成並已通知');
     } catch (e) {
       print('❌ 拓樸數據重新載入失敗: $e');
     }
@@ -430,14 +450,11 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
     final devices = _getDevices();
     final connections = _getDeviceConnections(devices);
 
-    // 🟢 修改：使用 Stack + 覆蓋層，避免重建底層組件
     return Stack(
       children: [
-        // 🟢 主要內容：始終存在，不會被重建
         IndexedStack(
           index: _viewMode == 'topology' ? 0 : 1,
           children: [
-            // 🟢 TopologyDisplayWidget 始終存在，速度區域不會被重製
             TopologyDisplayWidget(
               key: _topologyDisplayKey,
               devices: devices,

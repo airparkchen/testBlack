@@ -6,6 +6,7 @@ import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/ui/pages/home/DeviceDetailPage.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 
+
 /// 設備列表組件 - 修正版本
 /// 🎯 關鍵修正：直接使用傳入的設備列表，不再自行添加 Gateway
 class DeviceListWidget extends StatelessWidget {

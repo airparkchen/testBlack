@@ -5,6 +5,7 @@ import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dar
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/services/real_data_integration_service.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
+import 'package:whitebox/shared/services/unified_mesh_data_manager.dart';
 
 /// 設備詳情頁面 - 修正 RSSI 顯示
 class DeviceDetailPage extends StatefulWidget {
@@ -59,12 +60,13 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       List<ClientDevice> clientDevices;
 
       if (NetworkTopoConfig.useRealData) {
-        // 使用真實數據
+        // 🎯 使用統一管理器，不重新調用 API
+        final manager = UnifiedMeshDataManager.instance;
         final deviceId = _generateDeviceId(widget.selectedDevice.mac);
-        clientDevices = await RealDataIntegrationService.getClientDevicesForParent(deviceId);
-        print('✅ 載入真實客戶端數據: ${clientDevices.length} 個設備');
+        clientDevices = await manager.getClientDevicesForParent(deviceId);
+        print('✅ 載入統一管理器客戶端數據: ${clientDevices.length} 個設備（無API調用）');
       } else {
-        // 使用假數據
+        // 假數據邏輯保持不變
         clientDevices = widget.connectedClients ?? _generateFakeClientData();
         print('🎭 使用假客戶端數據: ${clientDevices.length} 個設備');
       }

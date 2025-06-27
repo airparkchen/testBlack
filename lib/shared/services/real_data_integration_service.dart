@@ -12,6 +12,8 @@ import '../utils/jwt_auto_relogin.dart';
 
 
 /// 🎯 正確修正：真實數據整合服務 - 拓樸圖只顯示 Extender，List 顯示 Gateway + Extender
+
+@Deprecated('使用 UnifiedMeshDataManager 替代。此服務將在下個版本移除。')
 class RealDataIntegrationService {
   static final MeshDataAnalyzer _analyzer = MeshDataAnalyzer();
 
