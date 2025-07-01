@@ -10,7 +10,7 @@ import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
 import 'package:whitebox/shared/ui/components/basic/topology_display_widget.dart';
 import 'package:whitebox/shared/ui/components/basic/device_list_widget.dart';
-import 'package:whitebox/shared/services/real_data_integration_service.dart';
+// import 'package:whitebox/shared/services/real_data_integration_service.dart';   舊的API調用機制
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/services/unified_mesh_data_manager.dart';
 
@@ -191,16 +191,21 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
       final results = await Future.wait([
         manager.getDeviceConnections(),
         manager.getGatewayDevice(),
+        manager.getListViewDevices(),
+        manager.getNetworkDevices(),
       ]);
 
       final connections = results[0] as List<DeviceConnection>;
       final gatewayDevice = results[1] as NetworkDevice?;
+
 
       // 更新本地狀態
       if (mounted) {
         setState(() {
           _currentConnections = connections;
           _gatewayDevice = gatewayDevice;
+          _listDevices = results[2] as List<NetworkDevice>;
+          _topologyDevices = results[3] as List<NetworkDevice>;
         });
       }
 
@@ -286,11 +291,11 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
       return widget.externalDevices!;
     }
 
-    // 🎯 根據視圖模式返回不同的設備列表
+    // 根據視圖模式返回不同的設備列表
     if (_viewMode == 'topology') {
-      return _topologyDevices;  // 拓撲圖：只有 Extender
+      return _topologyDevices ?? [];  // 拓撲圖：只有 Extender
     } else {
-      return _listDevices;      // 列表：Gateway + Extender
+      return _listDevices ?? [];      // 列表：Gateway + Extender
     }
   }
 
@@ -444,8 +449,8 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
     );
   }
 
-  /// 建構主要內容
-  /// 修正：建構主要內容（加入載入狀態和正確的數據源）
+  /// 建構主要內容  (切換 topo / List 的地方)
+  /// 建構主要內容（加入載入狀態和正確的數據源）
   Widget _buildMainContent() {
     final devices = _getDevices();
     final connections = _getDeviceConnections(devices);
@@ -578,8 +583,8 @@ class _NetworkTopoViewState extends State<NetworkTopoView>
             InkWell(
               onTap: widget.enableInteractions ? () async {
                 print('🔄 手動觸發重新載入');
-                RealDataIntegrationService.clearCache();
-                await _refreshData();
+                final manager = UnifiedMeshDataManager.instance;
+                await manager.forceReload();
               } : null,
               child: Container(
                 width: 36,

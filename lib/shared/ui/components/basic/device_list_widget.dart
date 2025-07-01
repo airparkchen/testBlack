@@ -8,7 +8,6 @@ import 'package:whitebox/shared/theme/app_theme.dart';
 
 
 /// 設備列表組件 - 修正版本
-/// 🎯 關鍵修正：直接使用傳入的設備列表，不再自行添加 Gateway
 class DeviceListWidget extends StatelessWidget {
   final List<NetworkDevice> devices;
   final bool enableInteractions;
@@ -25,7 +24,6 @@ class DeviceListWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppTheme appTheme = AppTheme();
 
-    // 🎯 修正：直接使用傳入的設備列表，不再重複處理
     print('=== DeviceListWidget Debug ===');
     print('傳入設備數量: ${devices.length}');
     for (var device in devices) {
@@ -70,12 +68,12 @@ class DeviceListWidget extends StatelessWidget {
                       } : null,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusS),
                       child: Padding(
-                        // 🔥 關鍵修正：Extender 減少頂部 padding，讓文字可以更靠近頂部
+                        // Extender 減少頂部 padding，讓文字可以更靠近頂部
                         padding: isGateway
                             ? const EdgeInsets.all(16)  // Gateway 保持原有 padding
-                            : const EdgeInsets.fromLTRB(16, 8, 16, 16), // 🔥 Extender 頂部只留 8px
+                            : const EdgeInsets.fromLTRB(16, 8, 16, 16), // Extender 頂部只留 8px
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start, // 🔥 關鍵修正：從頂部開始對齊
+                          crossAxisAlignment: CrossAxisAlignment.start, // 從頂部開始對齊
                           children: [
                             // 左側圖標區域
                             _buildDeviceIcon(device, isGateway),
@@ -100,21 +98,21 @@ class DeviceListWidget extends StatelessWidget {
     );
   }
 
-  /// 🎯 修正：建構設備圖標
+  /// 設備圖標
   Widget _buildDeviceIcon(NetworkDevice device, bool isGateway) {
     if (isGateway) {
       // Gateway 圖標 - 保持置中
       return SizedBox(
         width: 60,
-        height: 80, // 🎯 配合卡片高度調整
+        height: 80, // 配合卡片高度調整
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // 🎯 垂直置中
-          crossAxisAlignment: CrossAxisAlignment.center, // 🎯 水平置中
+          mainAxisAlignment: MainAxisAlignment.center, // 垂直置中
+          crossAxisAlignment: CrossAxisAlignment.center, // 水平置中
           children: [
             Container(
-              width: 60, // 🎯 固定圖標容器大小
+              width: 60, // 固定圖標容器大小
               height: 60,
-              alignment: Alignment.center, // 🎯 容器內容置中
+              alignment: Alignment.center, // 容器內容置中
               child: Image.asset(
                 'assets/images/icon/router.png',
                 width: 60,
@@ -124,7 +122,7 @@ class DeviceListWidget extends StatelessWidget {
                   return Icon(
                     Icons.router,
                     color: Colors.white,
-                    size: 40, // 🎯 調整後備圖標大小
+                    size: 40, // 調整後備圖標大小
                   );
                 },
               ),
@@ -133,13 +131,13 @@ class DeviceListWidget extends StatelessWidget {
         ),
       );
     } else {
-      // 🔥 修正：Extender 圖標 - 重新計算置中位置
+      // Extender 圖標 - 重新計算置中位置
       return SizedBox(
         width: 60,
         height: 80, // 🎯 配合卡片高度調整
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // 🔥 修正：重新置中
-          crossAxisAlignment: CrossAxisAlignment.center, // 🎯 水平置中
+          mainAxisAlignment: MainAxisAlignment.center, // 重新置中
+          crossAxisAlignment: CrossAxisAlignment.center, //  水平置中
           children: [
             // 🔥 新增：向上微調，補償 padding 減少的效果
             const SizedBox(height: 4), // 🔥 微調位置

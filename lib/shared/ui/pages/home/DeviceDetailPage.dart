@@ -1,9 +1,10 @@
 // lib/shared/ui/pages/home/DeviceDetailPage.dart - RSSI 修正版本
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
-import 'package:whitebox/shared/services/real_data_integration_service.dart';
+// import 'package:whitebox/shared/services/real_data_integration_service.dart'; 舊的API調用機制
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/services/unified_mesh_data_manager.dart';
 
@@ -42,10 +43,31 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   // 載入狀態
   bool _isLoadingClients = true;
 
+  // 🆕 新增：定期更新的計時器
+  Timer? _updateTimer;
+
   @override
   void initState() {
     super.initState();
     _loadClientDevices();
+
+    // ✅ 新增：啟動定期更新
+    _startPeriodicUpdate();
+  }
+
+  void _startPeriodicUpdate() {
+    _updateTimer = Timer.periodic(NetworkTopoConfig.meshApiCallInterval, (_) {
+      if (mounted) {  // 確保頁面還在顯示
+        print('🔄 DeviceDetailPage 定期更新客戶端數據');
+        _loadClientDevices();  // 重新載入客戶端數據
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();  // ✅ 重要：頁面關閉時取消計時器
+    super.dispose();
   }
 
   /// 異步載入客戶端設備資料
