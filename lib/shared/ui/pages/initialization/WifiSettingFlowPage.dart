@@ -19,7 +19,7 @@ import 'package:whitebox/shared/ui/components/basic/SummaryComponent.dart';
 import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart';
 import 'package:whitebox/shared/ui/pages/initialization/LoginPage.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
-
+import 'package:whitebox/shared/ui/components/basic/WifiScannerComponent.dart';
 
 class WifiSettingFlowPage extends StatefulWidget {
   // 新增：總開關，用於繞過所有限制
@@ -256,6 +256,21 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           _updateStatus("Initial password calculated successfully");
         });
       } catch (e) {
+        print('密碼計算錯誤: $e');
+
+        // 🚨 檢查 API 繁忙相關錯誤 - 這些都應該觸發 "Login Too Frequent"
+        if (e.toString().contains('SSID_UNKNOWN_ERROR') ||
+            e.toString().contains('WiFi information unavailable due to API connection limits') ||
+            e.toString().contains('Another API request is busy') ||
+            e.toString().contains('請求失敗，狀態碼: 400') ||
+            e.toString().contains('請求失敗，狀態碼: 500') ||
+            e.toString().contains('無法從系統資訊獲取序列號') ||
+            e.toString().contains('無法獲取計算密碼所需的系統資訊')) {
+          print('🚨 檢測到 API 繁忙相關錯誤，顯示 Login Too Frequent 對話框');
+          _handleFrequentApiCallError();
+          return;
+        }
+
         // 提供更友好的錯誤信息
         String errorMessage = "Password calculation failed";
         if (e.toString().contains('Unable to connect')) {
@@ -281,31 +296,116 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         _updateStatus("Performing login...");
       });
 
-      final loginResult = await WifiApiService.performFullLogin(
-          userName: userName,
-          calculatedPassword: calculatedPassword
-      );
+      // 🔥 修改：不直接調用 performFullLogin，改為分步驟處理
+      try {
+        // 先嘗試 SRP 登入
+        print("嘗試 SRP 登入方式...");
+        final srpResult = await WifiApiService.loginWithSRP(userName, calculatedPassword);
 
-      setState(() {
-        if (loginResult['success'] == true) {
-          jwtToken = loginResult['jwtToken'];
-          isAuthenticated = loginResult['isAuthenticated'] ?? false;
-          _updateStatus("Login successful");
-          hasInitialized = true;
+        if (srpResult.success) {
+          print("SRP 登入成功");
+          setState(() {
+            jwtToken = srpResult.jwtToken;
+            isAuthenticated = true;
+            _updateStatus("Login successful");
+            hasInitialized = true;
+          });
+
+          if (jwtToken != null && jwtToken!.isNotEmpty) {
+            WifiApiService.setJwtToken(jwtToken!);
+          }
         } else {
-          _updateStatus("Login failed: ${loginResult['message']}");
-          _handleAuthenticationFailure("Login failed: ${loginResult['message']}");
-        }
-      });
+          print("SRP 登入失敗，嘗試傳統登入");
 
-      if (jwtToken != null && jwtToken!.isNotEmpty) {
-        WifiApiService.setJwtToken(jwtToken!);
+          // 🚨 傳統登入時直接使用已計算的密碼，避免再次調用 calculatePasswordWithLogs
+          try {
+            final loginData = {
+              'user': userName,
+              'password': calculatedPassword,
+            };
+
+            final response = await WifiApiService.call('postUserLogin', loginData);
+
+            // 檢查登入結果
+            bool loginSuccess = false;
+            String message = '登入失敗';
+
+            if (response.containsKey('token')) {
+              loginSuccess = true;
+              message = '登入成功，獲取到 JWT 令牌';
+              WifiApiService.setJwtToken(response['token']);
+              jwtToken = response['token'];
+            } else if (response.containsKey('jwt')) {
+              loginSuccess = true;
+              message = '登入成功，獲取到 JWT 令牌';
+              WifiApiService.setJwtToken(response['jwt']);
+              jwtToken = response['jwt'];
+            } else if (response.containsKey('status') && response['status'] == 'success') {
+              loginSuccess = true;
+              message = '登入成功';
+            }
+
+            setState(() {
+              if (loginSuccess) {
+                isAuthenticated = true;
+                _updateStatus("Login successful");
+                hasInitialized = true;
+              } else {
+                _updateStatus("Login failed: $message");
+                _handleAuthenticationFailure("Login failed: $message");
+              }
+            });
+
+          } catch (traditionalLoginError) {
+            print('傳統登入錯誤: $traditionalLoginError');
+
+            // 🚨 檢查傳統登入中的 SSID UNKNOWN 錯誤
+            if (traditionalLoginError.toString().contains('SSID_UNKNOWN_ERROR') ||
+                traditionalLoginError.toString().contains('WiFi information unavailable due to API connection limits')) {
+              print('🚨 傳統登入階段檢測到 SSID UNKNOWN 錯誤');
+              _handleFrequentApiCallError();
+              return;
+            }
+
+            setState(() {
+              _updateStatus("Traditional login error: $traditionalLoginError");
+            });
+            _handleAuthenticationFailure("Traditional login error: $traditionalLoginError");
+            return;
+          }
+        }
+
+      } catch (loginError) {
+        print('登入過程錯誤: $loginError');
+
+        // 🚨 檢查登入過程中的 SSID UNKNOWN 錯誤
+        if (loginError.toString().contains('SSID_UNKNOWN_ERROR') ||
+            loginError.toString().contains('WiFi information unavailable due to API connection limits')) {
+          print('🚨 登入過程檢測到 SSID UNKNOWN 錯誤');
+          _handleFrequentApiCallError();
+          return;
+        }
+
+        setState(() {
+          _updateStatus("Login error: $loginError");
+        });
+        _handleAuthenticationFailure("Login error: $loginError");
+        return;
       }
 
       await Future.delayed(const Duration(milliseconds: 200));
 
     } catch (e) {
       print('Error during authentication initialization: $e');
+
+      // 🚨 最外層也檢查 SSID UNKNOWN 錯誤
+      if (e.toString().contains('SSID_UNKNOWN_ERROR') ||
+          e.toString().contains('WiFi information unavailable due to API connection limits')) {
+        print('🚨 最外層檢測到 SSID UNKNOWN 錯誤');
+        _handleFrequentApiCallError();
+        return;
+      }
+
       setState(() {
         _updateStatus("Initialization error: $e");
       });
@@ -317,10 +417,98 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
+// API頻繁 錯誤提示
+  void _handleFrequentApiCallError() {
+    if (!mounted) return;
+
+    print('🚨 準備顯示頻繁 API 調用錯誤對話框');
+
+    // 🔥 重要：停止認證動畫和載入狀態
+    setState(() {
+      isAuthenticating = false;
+      isLoading = false;
+    });
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A2A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: const Color(0xFF9747FF).withOpacity(0.5),
+              width: 1,
+            ),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_outlined,
+                color: const Color(0xFFFF00E5),
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Login Too Frequent',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Login attempts are too frequent. Please wait a moment and try again.',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                print('🚨 用戶點擊 OK，準備跳轉回 InitializationPage');
+                Navigator.of(context).pop(); // 關閉對話框
+                // 跳轉回 InitializationPage
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const InitializationPage(),
+                  ),
+                      (route) => false, // 清除所有路由堆疊
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF9747FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'OK',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 修改認證失敗處理
   void _handleAuthenticationFailure(String errorMessage) {
     if (_shouldBypassRestrictions) {
-      // 繞過限制時，不顯示錯誤，直接設定為已認證
       setState(() {
         isAuthenticated = true;
         hasInitialized = true;
@@ -329,17 +517,64 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       return;
     }
 
-    // 原有的錯誤處理邏輯
     if (mounted) {
+      // 🚨 檢查是否是登入頻繁錯誤，修改錯誤訊息
+      String displayMessage = errorMessage;
+
+      // 檢查各種登入頻繁相關的錯誤
+      if (errorMessage.contains('登入失敗') ||
+          errorMessage.contains('HTTPS POST 請求失敗: 500') ||
+          errorMessage.contains('Another API request is busy') ||
+          errorMessage.contains('請求失敗，狀態碼: 500') ||
+          errorMessage.contains('請求失敗，狀態碼: 400') ||
+          errorMessage.contains('無法從系統資訊獲取序列號') ||
+          errorMessage.contains('無法獲取計算密碼所需的系統資訊') ||
+          errorMessage.contains('Password calculation failed')) {
+        displayMessage = 'Login requests are too frequent. Please wait a moment and try again.';
+      }
+
       showDialog(
         context: context,
+        barrierDismissible: false, // 禁止點擊外部關閉
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text('Authentication Failed'),
-            content: Text('Unable to complete initial authentication: $errorMessage\nPlease try again.'),
+            backgroundColor: const Color(0xFF2A2A2A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: const Color(0xFF9747FF).withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_outlined, // 改為警告圖示
+                  color: const Color(0xFFFF00E5),
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Authentication Failed',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'Unable to complete initial authentication: $displayMessage',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
+            ),
             actions: <Widget>[
-              TextButton(
-                child: const Text('OK'),
+              ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   Navigator.of(context).pushAndRemoveUntil(
@@ -347,6 +582,17 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                         (route) => false,
                   );
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF9747FF),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(fontSize: 16),
+                ),
               ),
             ],
           );
@@ -354,7 +600,6 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       );
     }
   }
-
   Future<void> _loadCurrentWanSettings() async {
     // 如果用戶已經修改過設置，不要覆蓋用戶的選擇
     if (_userHasModifiedWanSettings) {
@@ -484,32 +729,32 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
   // 添加提交網絡設置的方法
-    Future<void> _submitWanSettings() async {
-      try {
-        setState(() {
-          _updateStatus("正在更新網絡設置...");
-        });
+  Future<void> _submitWanSettings() async {
+    try {
+      setState(() {
+        _updateStatus("正在更新網絡設置...");
+      });
 
-        // 確保使用最新準備的設置
-        _prepareWanSettingsForSubmission();
+      // 確保使用最新準備的設置
+      _prepareWanSettingsForSubmission();
 
-        print('即將提交的網絡設置: ${json.encode(_currentWanSettings)}');
+      print('即將提交的網絡設置: ${json.encode(_currentWanSettings)}');
 
-        // 調用API提交網絡設置
-        final result = await WifiApiService.updateWanEth(_currentWanSettings);
+      // 調用API提交網絡設置
+      final result = await WifiApiService.updateWanEth(_currentWanSettings);
 
-        print('網絡設置更新結果: ${json.encode(result)}');
+      print('網絡設置更新結果: ${json.encode(result)}');
 
-        setState(() {
-          _updateStatus("網絡設置已更新");
-        });
-      } catch (e) {
-        print('提交WAN設置時出錯: $e');
-        setState(() {
-          _updateStatus("更新網絡設置失敗: $e");
-        });
-      }
+      setState(() {
+        _updateStatus("網絡設置已更新");
+      });
+    } catch (e) {
+      print('提交WAN設置時出錯: $e');
+      setState(() {
+        _updateStatus("更新網絡設置失敗: $e");
+      });
     }
+  }
 
   Future<void> _submitWirelessSettings() async {
     try {
@@ -571,6 +816,12 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
       final result = await WifiApiService.updateWirelessBasic(wirelessConfig);
       print('無線設置更新結果: ${json.encode(result)}');
+
+      // 在無線設置提交成功後，記錄配置的 SSID
+      if (result != null && !result.containsKey('error')) {
+        WifiScannerComponent.setConfiguredSSID(ssid);
+        print('已記錄配置完成的 SSID: $ssid');
+      }
 
       setState(() {
         _updateStatus("無線設置已更新");
@@ -1923,7 +2174,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     );
   }
 
-  // 新增：構建可滑動的內容區域
+  // 構建可滑動的內容區域
   Widget _buildScrollableContent({
     required double screenHeight,
     required double stepperAreaHeight,

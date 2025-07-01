@@ -82,6 +82,12 @@ class PasswordService {
         ssid = currentSSID ?? 'UNKNOWN';
       }
 
+      // 檢查最終的 SSID 是否為 UNKNOWN
+      if (ssid.toUpperCase() == 'UNKNOWN' || ssid.toLowerCase() == 'unknown') {
+        debugPrint('WiFi information unavailable due to Connection limits. Please wait and try again.');
+        throw Exception('SSID_UNKNOWN_ERROR: WiFi information unavailable due to API connection limits. Please wait and try again.');
+      }
+
       // 確保必要參數存在
       if (serialNumber == null || serialNumber.isEmpty) {
         throw ArgumentError('序列號不能為空');

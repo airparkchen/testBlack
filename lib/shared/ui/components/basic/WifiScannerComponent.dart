@@ -44,17 +44,32 @@ class WifiScannerComponent extends StatefulWidget {
   final int maxDevicesToShow;
   final OnWifiScanComplete? onScanComplete;
   final OnDeviceSelected? onDeviceSelected;
-  final OnWifiConnectRequested? onConnectRequested; // 新增這行
+  final OnWifiConnectRequested? onConnectRequested;
   final bool autoScan;
   final WifiScannerController? controller;
   final double height;
 
+  // 新增：記錄從設定流程中完成的SSID
+  static String? configuredSSID;
+
+  // 新增：設定配置完成的SSID的靜態方法
+  static void setConfiguredSSID(String ssid) {
+    configuredSSID = ssid;
+    print('📡 記錄配置完成的SSID: $ssid');
+  }
+
+  // 新增：清除配置的SSID
+  static void clearConfiguredSSID() {
+    configuredSSID = null;
+    print('📡 清除配置的SSID記錄');
+  }
+
   const WifiScannerComponent({
     Key? key,
-    this.maxDevicesToShow = 10,
+    this.maxDevicesToShow = 10,   //wifi scanner
     this.onScanComplete,
     this.onDeviceSelected,
-    this.onConnectRequested, // 新增這行
+    this.onConnectRequested,
     this.autoScan = true,
     this.controller,
     this.height = 400,
@@ -605,7 +620,28 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         }
       }
 
-      uniqueResults.sort((a, b) => b.level.compareTo(a.level));
+      // uniqueResults.sort((a, b) => b.level.compareTo(a.level));  //一般過濾
+      uniqueResults.sort((a, b) {
+        // 第一優先：配置完成的 SSID
+        bool aIsConfigured = WifiScannerComponent.configuredSSID != null &&
+            a.ssid == WifiScannerComponent.configuredSSID;
+        bool bIsConfigured = WifiScannerComponent.configuredSSID != null &&
+            b.ssid == WifiScannerComponent.configuredSSID;
+
+        if (aIsConfigured && !bIsConfigured) return -1;
+        if (!aIsConfigured && bIsConfigured) return 1;
+
+        // 第二優先：EG180 開頭的 SSID
+        bool aIsEG180 = a.ssid.startsWith('EG180');
+        bool bIsEG180 = b.ssid.startsWith('EG180');
+
+        if (aIsEG180 && !bIsEG180) return -1;
+        if (!aIsEG180 && bIsEG180) return 1;
+
+        // 第三優先：信號強度
+        return b.level.compareTo(a.level);
+      });
+
       final limitedResults = uniqueResults.take(widget.maxDevicesToShow).toList();
 
       setState(() {
