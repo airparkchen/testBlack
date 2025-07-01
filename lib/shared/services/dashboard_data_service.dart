@@ -6,6 +6,7 @@ import 'package:whitebox/shared/models/dashboard_data_models.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
 import 'package:whitebox/shared/utils/api_logger.dart';
 import 'package:whitebox/shared/utils/api_coordinator.dart';
+import 'package:whitebox/shared/services/dashboard_event_notifier.dart';
 import '../utils/jwt_auto_relogin.dart';
 
 /// Internet 連線狀態數據類
@@ -168,11 +169,12 @@ class DashboardDataService {
         _cachedData = dashboardData;
         _lastFetchTime = DateTime.now();
 
-        print('✅ Dashboard 資料載入完成');
+        DashboardEventNotifier.notifySuccess(dashboardData);
+        print('✅ Dashboard 數據載入成功並已通知監聽器');
         return dashboardData;
 
       } catch (e) {
-        // 🔥 新增：如果是協調器跳過，且有快取，則使用快取
+        // 如果是協調器跳過，且有快取，則使用快取
         if (e.toString().contains('frequency limit') && _cachedData != null) {
           print('🕐 Dashboard API 被跳過，使用現有快取資料');
           return _cachedData!;
@@ -201,7 +203,7 @@ class DashboardDataService {
     try {
       print('🌐 調用 Dashboard API (嘗試 ${retryCount + 1}/${maxRetries + 1})');
 
-      // 🔥 簡化：使用原有的 JWT 自動重新登入，但不強制使用快取
+      // 使用原有的 JWT 自動重新登入，但不強制使用快取
       final result = await JwtAutoRelogin.instance.wrapApiCall(
             () async {
           return await ApiLogger.wrapApiCall(
@@ -214,7 +216,7 @@ class DashboardDataService {
         debugInfo: 'Dashboard API',
       );
 
-      // 🔥 關鍵：只有成功且非錯誤回應才更新快取
+      // 只有成功且非錯誤回應才更新快取
       if (result != null &&
           !result.containsKey('error') &&
           !_isApiErrorResponse(result)) {

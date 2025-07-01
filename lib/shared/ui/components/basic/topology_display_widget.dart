@@ -13,6 +13,8 @@ import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart' as 
 import 'package:whitebox/shared/services/real_data_integration_service.dart';
 import 'package:whitebox/shared/services/dashboard_data_service.dart';
 import 'package:whitebox/shared/services/unified_mesh_data_manager.dart';
+import 'package:whitebox/shared/services/dashboard_event_notifier.dart';
+import 'package:whitebox/shared/models/dashboard_data_models.dart';
 
 /// 智能單位格式化工具
 /// 根據速度數值自動選擇合適的單位顯示
@@ -98,26 +100,25 @@ class TopologyDisplayWidget extends StatefulWidget {
 class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
   final AppTheme _appTheme = AppTheme();
 
-  // 🎯 速度數據生成器 - 保持原有邏輯
+  // 速度數據生成器
   late SpeedDataGenerator? _fakeSpeedDataGenerator;
   late RealSpeedService.RealSpeedDataGenerator? _realSpeedDataGenerator;
 
-  // 🎯 新增：Gateway 設備資料
+  // Gateway 設備資料
   NetworkDevice? _gatewayDevice;
   bool _isLoadingGateway = false;
 
-  // 🎯 新增：API 更新計時器（10秒一次）
+  // 速度數據的 API 更新計時器
   Timer? _apiUpdateTimer;
-
-  // 🔥 新增：Internet 狀態更新計時器
-  Timer? _internetStatusUpdateTimer;
 
   Timer? _clientCountUpdateTimer;
   List<DeviceConnection> _latestConnections = [];
   NetworkDevice? _latestGatewayDevice;
 
+  // Internet 狀態（使用監聽機制）
   InternetConnectionStatus? _internetStatus;
 
+  @override
   @override
   void initState() {
     super.initState();
@@ -133,8 +134,8 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
       _fakeSpeedDataGenerator = null;
       print('🌐 初始化真實速度數據生成器');
 
-      // 🎯 新增：啟動 API 更新計時器
-      _startAPIUpdates();
+      // 🎯 修改：只啟動速度數據 API 更新計時器
+      _startSpeedAPIUpdates();
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -148,13 +149,15 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
       print('🎭 初始化假數據速度生成器（固定長度滑動窗口模式）');
     }
 
+    // ✅ 新增：註冊 Dashboard 監聽器
+    DashboardEventNotifier.addSuccessListener(_onDashboardSuccess);
+    DashboardEventNotifier.addErrorListener(_onDashboardError);
+
+    // ✅ 新增：載入初始 Internet 狀態
+    _loadInitialInternetStatus();
+
     // 🎯 新增：載入 Gateway 設備資料
     _loadGatewayDevice();
-    _loadInternetStatus();
-    // if (NetworkTopoConfig.useRealData) {
-    //   // _startClientCountUpdates();
-    //   _startInternetStatusUpdates();
-    // }
   }
 
   @override
@@ -163,6 +166,48 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     // _clientCountUpdateTimer?.cancel();
     // _internetStatusUpdateTimer?.cancel();
     super.dispose();
+  }
+
+  /// ✅ 新增：Dashboard API 成功時的回調
+  void _onDashboardSuccess(DashboardData dashboardData) {
+    if (!mounted) return;
+
+    // 🎯 使用現有的 InternetConnectionStatus 類
+    final newInternetStatus = InternetConnectionStatus(
+      isConnected: dashboardData.internetStatus.pingStatus.toLowerCase() == 'connected',
+      status: dashboardData.internetStatus.pingStatus,
+      timestamp: DateTime.now(),
+    );
+
+    setState(() {
+      _internetStatus = newInternetStatus;
+    });
+
+    print('✅ 監聽到 Dashboard API 成功，Internet 狀態更新:');
+    print('   ping_status: ${dashboardData.internetStatus.pingStatus}');
+    print('   isConnected: ${newInternetStatus.isConnected}');
+    print('   shouldShowError: ${newInternetStatus.shouldShowError}');
+  }
+
+  /// ✅ 新增：Dashboard API 失敗時的回調
+  void _onDashboardError(dynamic error) {
+    print('⚠️ 監聽到 Dashboard API 失敗，保持現有 Internet 狀態: $error');
+    // 不更新狀態，保持現有顯示
+  }
+
+  /// ✅ 新增：載入初始 Internet 狀態
+  Future<void> _loadInitialInternetStatus() async {
+    try {
+      // 嘗試從快取中獲取 Dashboard 數據
+      final dashboardData = await DashboardDataService.getDashboardData();
+      _onDashboardSuccess(dashboardData);
+    } catch (e) {
+      print('⚠️ 載入初始 Internet 狀態失敗: $e');
+      // 設置為未知狀態
+      setState(() {
+        _internetStatus = InternetConnectionStatus.unknown();
+      });
+    }
   }
 
   void updateClientCounts(List<DeviceConnection> connections, NetworkDevice? gatewayDevice) {
@@ -199,21 +244,6 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     }
 
     print('✅ 拓樸圖所有數據已更新');
-  }
-
-  /// 🔥 新增：啟動 Internet 狀態定期更新
-  void _startInternetStatusUpdates() {
-    _internetStatusUpdateTimer?.cancel();
-
-    // 🔥 每 15 秒更新 Internet 狀態（錯開其他 API 調用）
-    print('🌐 啟動 Internet 狀態定期更新，間隔: 15 秒');
-
-    _internetStatusUpdateTimer = Timer.periodic(Duration(seconds: 15), (_) {
-      if (mounted) {
-        print('🌐 定期更新 Internet 狀態...');
-        _loadInternetStatus();
-      }
-    });
   }
 
   /// 🟢 新增：啟動客戶端數量更新
@@ -264,15 +294,14 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     }
   }
 
-  /// 🎯 新增：啟動 API 更新計時器（10秒一次）
-  void _startAPIUpdates() {
+  void _startSpeedAPIUpdates() {
     _apiUpdateTimer?.cancel();
 
-    print('🔄 啟動 API 更新計時器，間隔: 10 秒');
+    print('🔄 啟動速度數據 API 更新計時器，間隔: ${NetworkTopoConfig.throughputApiCallInterval.inSeconds} 秒');
 
     _apiUpdateTimer = Timer.periodic(NetworkTopoConfig.throughputApiCallInterval, (_) {
       if (mounted && NetworkTopoConfig.useRealData && _realSpeedDataGenerator != null) {
-        print('⏰ API 更新計時器觸發');
+        print('⏰ 速度數據 API 更新計時器觸發（不再調用 Dashboard API）');
         _realSpeedDataGenerator!.updateFromAPI();
       }
     });
@@ -308,36 +337,6 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     }
   }
 
-  /// 🎯 新增：載入 Internet 連線狀態
-  Future<void> _loadInternetStatus() async {
-    if (!mounted) return;
-
-    try {
-      // 🔥 關鍵：使用相同的快取，而不是獨立調用
-      final dashboardData = await DashboardDataService.getDashboardData();
-
-      final internetStatus = InternetConnectionStatus(
-        isConnected: dashboardData.internetStatus.pingStatus.toLowerCase() == 'connected',
-        status: dashboardData.internetStatus.pingStatus,
-        timestamp: DateTime.now(),
-      );
-
-      if (mounted) {
-        setState(() {
-          _internetStatus = internetStatus;
-        });
-
-        print('✅ 拓樸圖 Internet 狀態: ${internetStatus.status} -> ${internetStatus.isConnected ? "已連接" : "未連接"}');
-      }
-    } catch (e) {
-      print('❌ 載入 Internet 狀態失敗: $e');
-      if (mounted) {
-        setState(() {
-          _internetStatus = InternetConnectionStatus.unknown();
-        });
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -613,13 +612,12 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     );
   }
 
-  /// 🎯 修改：更新速度數據（現在是插值動畫，500ms一次）
+  /// 🎯 修改：更新速度數據（
   void updateSpeedData() {
     if (!mounted) return;
 
     if (NetworkTopoConfig.useRealData) {
-      // 🎯 修改：現在調用插值更新，不是 API 更新
-      // _loadInternetStatus();
+      // 🎯 修改：現在只調用插值更新，不更新 Internet 狀態
       _realSpeedDataGenerator?.update().then((_) {
         if (mounted) {
           setState(() {
