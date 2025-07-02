@@ -98,6 +98,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   late PageController _pageController;
   final StepperController _stepperController = StepperController();
 
+  // ==================== 進度控制 ====================
+  Function(double, {String? status})? _progressUpdateFunction;
+
   // ==================== 當前設定快取 ====================
   Map<String, dynamic> _currentWanSettings = {};
   Map<String, dynamic> _currentWirelessSettings = {};
@@ -956,77 +959,62 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
-// 修改精靈完成處理 - 縮短等待時間
-  void _handleWizardCompleted() async {
+
+  // 新增：執行配置並更新進度（保留所有原有 setState 邏輯）
+  Future<void> _executeConfigurationWithProgress() async {
+    if (_progressUpdateFunction == null) return;
+
     try {
       if (!_shouldBypassRestrictions) {
-        // 正常模式下執行所有步驟
+        // Step 1: 提交網路設定 (0% -> 10%)
+        _progressUpdateFunction!(0.0, status: 'Submitting network settings...');
+        await _submitWanSettings(); // 使用原有方法，保留所有 setState 邏輯
+        _progressUpdateFunction!(10.0);
+        await Future.delayed(const Duration(seconds: 1));
 
-        // print('Step 0: Start setting...');
-        // await WifiApiService.configStart();
-        // await Future.delayed(const Duration(seconds: 2));
+        // Step 2: 提交無線設定 (10% -> 20%)
+        _progressUpdateFunction!(10.0, status: 'Submitting wireless settings...');
+        await _submitWirelessSettings(); // 使用原有方法，保留所有 setState 邏輯
+        _progressUpdateFunction!(20.0);
+        await Future.delayed(const Duration(seconds: 1));
 
-        print('Step 1: Submitting network settings...');
-        await _submitWanSettings();
-        await Future.delayed(const Duration(seconds: 2));
-
-        print('Step 2: Submitting wireless settings...');
-        await _submitWirelessSettings();
-        await Future.delayed(const Duration(seconds: 2));
-
+        // Step 3: 變更密碼 (20% -> 30%)
         if (password.isNotEmpty && confirmPassword.isNotEmpty && password == confirmPassword) {
-          print('Step 3: Changing user password...');
-          await _changePassword();
+          _progressUpdateFunction!(20.0, status: 'Changing user password...');
+          await _changePassword(); // 使用原有方法，保留所有 setState 邏輯
+          _progressUpdateFunction!(30.0);
+          await Future.delayed(const Duration(seconds: 1));
+        } else {
+          _progressUpdateFunction!(30.0);
         }
 
-        print('Step 4: Completing configuration...');
+        // Step 4: 完成配置 (30% -> 40%)
+        _progressUpdateFunction!(30.0, status: 'Completing configuration...');
         await WifiApiService.configFinish();
-        print('Configuration completed');
+        _progressUpdateFunction!(40.0, status: 'Applying settings, please wait...');
+        await Future.delayed(const Duration(seconds: 1));
 
-        print('Step 5: Applying settings and waiting for 220 seconds...');
-        setState(() {
-          _updateStatus("Applying settings, please wait...");
-        });
+        // Step 5: 等待設定生效 (40% -> 100% 在 218 秒內完成)
+        await _waitWithProgress();
 
-        await Future.delayed(const Duration(seconds: 220)); // 保持220秒等待時間
-        print('Settings applied and wait completed');
-
-        // print('Step 6: Reconnecting to Wi-Fi with new SSID and password...');
-        // setState(() {
-        //   _updateStatus("Connecting to Wi-Fi...");
-        //   isConnecting = true;
-        // });
-        // await _reconnectToWifi();
       } else {
         // 繞過模式下，快速完成
-        print('繞過限制模式：跳過設定提交和等待');
-        await Future.delayed(const Duration(seconds: 2)); // 只等待2秒
+        _progressUpdateFunction!(100.0, status: 'Configuration completed');
       }
 
-      // 導航到 InitializationPage
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const InitializationPage()),
-              (route) => false,
-        );
-      }
     } catch (e) {
-      print('Error during setup process: $e');
-      setState(() {
-        isConnecting = false;
-      });
+      print('配置過程中發生錯誤: $e');
+      _progressUpdateFunction!(100.0, status: 'Configuration failed');
 
+      // 保留原有的錯誤處理邏輯
       if (_shouldBypassRestrictions) {
-        // 繞過模式下，即使出錯也導航到 LoginPage
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const LoginPage()),
                 (route) => false,
           );
         }
-        return;
       } else {
-        // 正常模式下顯示錯誤
         if (mounted) {
           showDialog(
             context: context,
@@ -1054,6 +1042,52 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
+// 新增：帶進度的等待方法
+  Future<void> _waitWithProgress() async {
+    const int totalWaitSeconds = 218; // 218 秒
+    const int updateIntervalMs = 500; // 每 500 毫秒更新一次進度
+    const int totalUpdates = totalWaitSeconds * 1000 ~/ updateIntervalMs;
+
+    // 從 40% 到 100%，需要增加 60%
+    const double progressIncrement = 60.0 / totalUpdates;
+
+    double currentProgress = 40.0;
+
+    for (int i = 0; i < totalUpdates && mounted; i++) {
+      await Future.delayed(const Duration(milliseconds: updateIntervalMs));
+
+      currentProgress += progressIncrement;
+      if (currentProgress > 100.0) currentProgress = 100.0;
+
+      // 計算剩餘時間
+      int remainingSeconds = totalWaitSeconds - (i * updateIntervalMs ~/ 1000);
+      String status = 'Applying settings... (${remainingSeconds}s remaining)';
+
+      _progressUpdateFunction!(currentProgress, status: status);
+
+      // 如果達到 100% 就提前結束
+      if (currentProgress >= 100.0) break;
+    }
+
+    // 確保最終達到 100%
+    _progressUpdateFunction!(100.0, status: 'Configuration completed');
+  }
+
+// 修改精靈完成處理 - 縮短等待時間
+  void _handleWizardCompleted() async {
+    // 這個方法現在只負責最終的導航
+    try {
+      // 導航到 InitializationPage
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const InitializationPage()),
+              (route) => false,
+        );
+      }
+    } catch (e) {
+      print('導航過程中發生錯誤: $e');
+    }
+  }
   // 省略號動畫
   void _startEllipsisAnimation() {
     _ellipsisTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
@@ -2455,9 +2489,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     required double verticalPadding,
   }) {
     final screenSize = MediaQuery.of(context).size;
-
-    // 計算適合的組件高度 - 使用 contentHeight
-    final componentHeight = contentHeight * 0.85; // 使用內容區域的85%，預留一些空間
+    final componentHeight = contentHeight * 0.85;
 
     return Column(
       children: [
@@ -2477,7 +2509,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           ),
         ),
 
-        // 內容 - 使用固定高度替代 Expanded
+        // 內容
         Container(
           height: contentHeight,
           width: double.infinity,
@@ -2488,10 +2520,18 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                 vertical: verticalPadding,
               ),
               child: FinishingWizardComponent(
-                processNames: _processNames,
-                totalDurationSeconds: 10,
+                onProgressControllerReady: (updateFunction) {
+                  _progressUpdateFunction = updateFunction;
+                  // 延遲到下一個 frame 執行配置流程，避免在 build 期間調用 setState
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    // 等待前 3 個 process 完成（9 秒）後再開始 API
+                    Timer(const Duration(seconds: 9), () {
+                      _executeConfigurationWithProgress();
+                    });
+                  });
+                },
                 onCompleted: _handleWizardCompleted,
-                height: componentHeight, // 傳入計算好的高度
+                height: componentHeight,
               ),
             ),
           ),
