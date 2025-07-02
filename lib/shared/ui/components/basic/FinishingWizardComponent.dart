@@ -162,7 +162,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     });
   }
 
-  // 新模式：更新 API 進度的方法（僅影響 Process 04）
+  // 🔥 修復：新模式的 API 進度更新方法
   void _updateApiProgress(double progress, {String? status}) {
     if (mounted && _isApiPhase) {
       setState(() {
@@ -171,13 +171,21 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
         // 更新 Process 04 的進度
         _processes[3] = ProcessInfo('Process 04', _apiProgress);
 
-        // 當 API 進度達到100%時觸發完成回調
+        // 🔥 修復：當 API 進度達到100%時，先執行完成回調（API邏輯），再顯示對話框
         if (_apiProgress >= 100.0 && !_isCompleted) {
           _isCompleted = true;
-          // 不直接觸發 onCompleted，而是先顯示重連對話框
+          // 延遲一小段時間確保UI更新完成
           Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) {
-              _showReconnectDialog();
+            if (widget.onCompleted != null && mounted) {
+              // 先執行原來的完成回調（這會執行 API 邏輯）
+              widget.onCompleted!();
+
+              // API 執行完成後，顯示重連對話框
+              Future.delayed(const Duration(seconds: 1), () {
+                if (mounted) {
+                  _showReconnectDialogWithNavigation();
+                }
+              });
             }
           });
         }
@@ -185,8 +193,8 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     }
   }
 
-  // 新增：顯示重新連接 WiFi 對話框
-  void _showReconnectDialog() {
+  // 🔥 修復：顯示重連對話框並處理導航
+  void _showReconnectDialogWithNavigation() {
     // 直接使用 WifiScannerComponent.configuredSSID 靜態變量
     String configuredSSID = WifiScannerComponent.configuredSSID ?? 'your configured network';
 
@@ -268,10 +276,8 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop(); // 關閉對話框
-                // 觸發原來的完成回調
-                if (widget.onCompleted != null) {
-                  widget.onCompleted!();
-                }
+                // 🔥 修復：點擊OK後不再觸發onCompleted，因為已經執行過了
+                // 這裡可以添加其他邏輯，比如直接導航到特定頁面
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF9747FF),
@@ -353,7 +359,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     return totalPercentage / (_processes.length * 100.0);
   }
 
-  // 構建單個進程項目（舊模式使用）
+  // 構建單個進程項目
   Widget _buildProcessItem(ProcessInfo process) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
