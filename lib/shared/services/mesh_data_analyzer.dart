@@ -1,10 +1,9 @@
-// lib/shared/services/mesh_data_analyzer.dart - 修正版本
-// 🎯 修正：正確辨識 gateway-extender1-extender2 串聯結構
+// lib/shared/services/mesh_data_analyzer.dart - 修正有線連接過濾問題
 
 import 'dart:convert';
 import 'package:whitebox/shared/models/mesh_data_models.dart';
 
-/// Mesh 數據分析器 - 修正版本
+/// Mesh 數據分析器 - 修正有線連接過濾問題
 class MeshDataAnalyzer {
   // 過濾統計
   int filteredExtenders = 0;
@@ -146,6 +145,232 @@ class MeshDataAnalyzer {
     return topology;
   }
 
+  /// 分析單個設備節點
+  DetailedDeviceInfo? _analyzeDeviceNode(Map<String, dynamic> node, bool isMainNode) {
+    final String deviceType = node['type']?.toString() ?? 'unknown';
+    final String macAddr = node['macAddr']?.toString() ?? '';
+    final String ipAddress = node['ipAddress']?.toString() ?? '';
+
+    // 🔥 修正：改善過濾規則，正確處理有線連接
+    if (_shouldFilterDevice(node)) {
+      if (deviceType == 'extender') {
+        filteredExtenders++;
+      } else if (deviceType == 'host') {
+        filteredHosts++;
+      }
+      print("🚫 [DEVICE_ANALYSIS] 過濾設備: $macAddr (類型: $deviceType)");
+      return null;
+    }
+
+    // 分析連接資訊
+    final connectionInfo = _analyzeConnectionInfo(node);
+
+    // 計算客戶端數量
+    int clientCount = 0;
+    if (isMainNode && node.containsKey('connectedDevices') && node['connectedDevices'] is List) {
+      final connectedDevices = node['connectedDevices'] as List;
+      // 只計算有效的 host 設備
+      clientCount = connectedDevices.where((device) {
+        if (device is Map<String, dynamic>) {
+          return device['type'] == 'host' && !_shouldFilterDevice(device);
+        } else if (device is Map) {
+          final convertedDevice = Map<String, dynamic>.from(device);
+          return convertedDevice['type'] == 'host' && !_shouldFilterDevice(convertedDevice);
+        }
+        return false;
+      }).length;
+    }
+
+    final deviceInfo = DetailedDeviceInfo(
+      macAddress: macAddr,
+      ipAddress: ipAddress,
+      deviceType: deviceType,
+      deviceName: node['devName']?.toString() ?? '',
+      clientCount: clientCount,
+      connectionInfo: connectionInfo,
+      parentAccessPoint: node['parentAccessPoint']?.toString() ?? '',
+      hops: node['hops'] ?? 0,
+      rssiValues: _parseRSSI(node['rssi']),
+      isMainNode: isMainNode,
+      rawData: node,
+    );
+
+    print("✅ [DEVICE_ANALYSIS] 解析設備: ${deviceInfo.getDisplayName()}");
+    print("    ├─ 類型: $deviceType");
+    print("    ├─ IP: $ipAddress");
+    print("    ├─ 連接方式: ${connectionInfo.description}");
+    print("    ├─ 客戶端數: $clientCount");
+    print("    └─ 父節點: ${deviceInfo.parentAccessPoint}");
+
+    return deviceInfo;
+  }
+
+  /// 🧪 實驗版本：僅根據 connectionType 決定 Extender 過濾邏輯
+  bool _shouldFilterDevice(Map<String, dynamic> device) {
+    final String deviceType = device['type']?.toString() ?? '';
+    final String connectionType = device['connectionType']?.toString() ?? '';
+    final String deviceMac = device['macAddr']?.toString() ?? '';
+    final String ipAddress = device['ipAddress']?.toString() ?? '';
+
+    if (deviceType == 'extender') {
+      // 🧪 實驗：完全基於 connectionType 決定 RSSI 檢查邏輯
+      final rssiValues = _parseRSSI(device['rssi']);
+
+      if (connectionType.toLowerCase() == 'ethernet') {
+        // 🔥 有線連接：永遠不基於 RSSI 過濾（因為有線 RSSI 就是 0）
+        print("🔍 [FILTER] Extender 有線連接，不檢查 RSSI: $deviceMac");
+        return false;
+      } else if (connectionType.toLowerCase() == 'wireless' || connectionType.contains('GHz')) {
+        // 🔥 無線連接：嚴格檢查 RSSI
+        if (rssiValues.isNotEmpty && rssiValues.every((rssi) => rssi == 0)) {
+          print("🔍 [FILTER] Extender 無線連接但 RSSI 全為 0，過濾: $deviceMac");
+          print("    ├─ ConnectionType: $connectionType");
+          print("    ├─ RSSI: $rssiValues");
+          print("    └─ 邏輯：既然是無線就必須有 RSSI 值");
+          return true; // 🔥 無線連接必須有有效 RSSI
+        } else {
+          print("🔍 [FILTER] Extender 無線連接且 RSSI 有效，不過濾: $deviceMac (RSSI: $rssiValues)");
+          return false;
+        }
+      } else {
+        // 🔥 未知或其他 connectionType：保守策略，不過濾
+        print("🔍 [FILTER] Extender 未知連接類型，不過濾: $deviceMac ($connectionType)");
+        return false;
+      }
+    } else if (deviceType == 'host') {
+      // 🔥 Host 設備過濾邏輯保持不變
+      // 過濾 ssid 包含 "bh-" 的 host (backhaul)
+      final String ssid = device['ssid']?.toString() ?? '';
+      if (ssid.contains('bh-')) {
+        print("🔍 [FILTER] Host 設備包含 backhaul SSID，過濾: $deviceMac");
+        return true;
+      }
+
+      // 過濾沒有 IP 的 host
+      if (ipAddress.isEmpty) {
+        print("🔍 [FILTER] Host 設備無 IP 地址，過濾: $deviceMac");
+        return true;
+      }
+    }
+
+    return false; // 🔥 預設不過濾
+  }
+
+  /// 解析 RSSI 值（支援多頻段）
+  List<int> _parseRSSI(dynamic rssiData) {
+    if (rssiData == null) return [];
+
+    String rssiStr = rssiData.toString();
+    if (rssiStr.isEmpty) return [];
+
+    // 處理多頻段 RSSI，如 "0,-21,-25"
+    return rssiStr.split(',').map((s) => int.tryParse(s.trim()) ?? 0).toList();
+  }
+
+  /// 分析連接資訊
+  ConnectionInfo _analyzeConnectionInfo(Map<String, dynamic> device) {
+    final String connectionType = device['connectionType']?.toString() ?? '';
+    final String ssid = device['ssid']?.toString() ?? '';
+    final String radio = device['radio']?.toString() ?? '';
+    final String wirelessStandard = device['wirelessStandard']?.toString() ?? '';
+
+    String method = '';
+    String description = '';
+
+    if (connectionType.toLowerCase() == 'ethernet') {
+      method = 'Ethernet';
+      description = 'Ethernet 有線連接';
+    } else if (connectionType.toLowerCase() == 'wireless') {
+      method = 'Wireless';
+      description = 'WiFi 無線連接';
+      if (radio.isNotEmpty) {
+        description += ' ($radio)';
+      }
+    } else if (connectionType.contains('GHz')) {
+      method = 'Wireless';
+      description = 'WiFi $connectionType 連接';
+      if (ssid.isNotEmpty) {
+        description += ' (SSID: $ssid)';
+      }
+    } else {
+      method = connectionType.isNotEmpty ? connectionType : 'Unknown';
+      description = connectionType.isNotEmpty ? connectionType : '未知連接方式';
+    }
+
+    // 添加 WiFi 標準資訊
+    if (wirelessStandard.isNotEmpty) {
+      description += ' [802.11$wirelessStandard]';
+    }
+
+    return ConnectionInfo(
+      method: method,
+      description: description,
+      ssid: ssid,
+      radio: radio,
+      connectionType: connectionType,
+      wirelessStandard: wirelessStandard,
+    );
+  }
+
+  /// 輸出詳細設備分析到控制台
+  void printDetailedDeviceAnalysis(List<DetailedDeviceInfo> devices) {
+    final timestamp = DateTime.now().toString();
+
+    print("");
+    print("╔════════════════════════════════════════════════════════════════════════════════════════════════════════════");
+    print("║ [DETAILED_DEVICE_ANALYSIS] 詳細設備分析結果");
+    print("║ 時間: $timestamp");
+    print("║ 總設備數: ${devices.length}");
+    print("║ 過濾的 Extender: $filteredExtenders");
+    print("║ 過濾的 Host: $filteredHosts");
+    print("╠════════════════════════════════════════════════════════════════════════════════════════════════════════════");
+
+    // 按設備類型分組
+    final gatewayDevices = devices.where((d) => d.deviceType == 'gateway').toList();
+    final extenderDevices = devices.where((d) => d.deviceType == 'extender').toList();
+    final hostDevices = devices.where((d) => d.deviceType == 'host').toList();
+
+    // Gateway 分析
+    print("║");
+    print("║ 🏠 Gateway (Controller) 設備:");
+    for (var device in gatewayDevices) {
+      print("║   📍 ${device.getDisplayName()}");
+      print("║     ├─ MAC: ${device.macAddress}");
+      print("║     ├─ IP: ${device.ipAddress}");
+      print("║     ├─ 客戶端數: ${device.clientCount}");
+      print("║     └─ 連接方式: ${device.connectionInfo.description}");
+    }
+
+    // Extender 分析
+    print("║");
+    print("║ 📡 Extender (Agent) 設備:");
+    for (var device in extenderDevices) {
+      print("║   📍 ${device.getDisplayName()}");
+      print("║     ├─ MAC: ${device.macAddress}");
+      print("║     ├─ IP: ${device.ipAddress}");
+      print("║     ├─ 客戶端數: ${device.clientCount}");
+      print("║     ├─ 連接方式: ${device.connectionInfo.description}");
+      print("║     ├─ 父節點: ${device.parentAccessPoint}");
+      print("║     ├─ 跳數: ${device.hops}");
+      print("║     └─ RSSI: ${device.rssiValues}");
+    }
+
+    // Host 分析
+    print("║");
+    print("║ 📱 Host (Client) 設備:");
+    for (var device in hostDevices) {
+      print("║   📍 ${device.getDisplayName()}");
+      print("║     ├─ MAC: ${device.macAddress}");
+      print("║     ├─ IP: ${device.ipAddress}");
+      print("║     ├─ 連接方式: ${device.connectionInfo.description}");
+      print("║     ├─ 父節點: ${device.parentAccessPoint}");
+      print("║     └─ RSSI: ${device.rssiValues}");
+    }
+
+    print("╚════════════════════════════════════════════════════════════════════════════════════════════════════════════");
+    print("");
+  }
+
   /// 🎯 修正：輸出拓樸結構到控制台 - 正確顯示串聯結構
   void printTopologyStructure(NetworkTopologyStructure topology) {
     final timestamp = DateTime.now().toString();
@@ -233,6 +458,7 @@ class MeshDataAnalyzer {
       print("║ $prefix 📡 ${extender.getDisplayName()} (Hop ${extender.hops})");
       print("║ ${_getTreeIndent(level, isLast)}  ├─ MAC: ${extender.macAddress}");
       print("║ ${_getTreeIndent(level, isLast)}  ├─ IP: ${extender.ipAddress}");
+      print("║ ${_getTreeIndent(level, isLast)}  ├─ 連接方式: ${extender.connectionInfo.description}");
       print("║ ${_getTreeIndent(level, isLast)}  ├─ RSSI: ${extender.rssiValues} (${_parseRSSIDescription(extender.rssiValues)})");
       print("║ ${_getTreeIndent(level, isLast)}  ├─ 父節點: ${_getParentDescription(topology, extender.parentAccessPoint)}");
 
@@ -308,207 +534,5 @@ class MeshDataAnalyzer {
     }
 
     return "Unknown ($parentMAC)";
-  }
-
-  /// 分析單個設備節點（邏輯保持不變）
-  DetailedDeviceInfo? _analyzeDeviceNode(Map<String, dynamic> node, bool isMainNode) {
-    final String deviceType = node['type']?.toString() ?? 'unknown';
-    final String macAddr = node['macAddr']?.toString() ?? '';
-    final String ipAddress = node['ipAddress']?.toString() ?? '';
-
-    // 應用過濾規則
-    if (_shouldFilterDevice(node)) {
-      if (deviceType == 'extender') {
-        filteredExtenders++;
-      } else if (deviceType == 'host') {
-        filteredHosts++;
-      }
-      print("🚫 [DEVICE_ANALYSIS] 過濾設備: $macAddr (類型: $deviceType)");
-      return null;
-    }
-
-    // 分析連接資訊
-    final connectionInfo = _analyzeConnectionInfo(node);
-
-    // 計算客戶端數量
-    int clientCount = 0;
-    if (isMainNode && node.containsKey('connectedDevices') && node['connectedDevices'] is List) {
-      final connectedDevices = node['connectedDevices'] as List;
-      // 只計算有效的 host 設備
-      clientCount = connectedDevices.where((device) {
-        if (device is Map<String, dynamic>) {
-          return device['type'] == 'host' && !_shouldFilterDevice(device);
-        } else if (device is Map) {
-          final convertedDevice = Map<String, dynamic>.from(device);
-          return convertedDevice['type'] == 'host' && !_shouldFilterDevice(convertedDevice);
-        }
-        return false;
-      }).length;
-    }
-
-    final deviceInfo = DetailedDeviceInfo(
-      macAddress: macAddr,
-      ipAddress: ipAddress,
-      deviceType: deviceType,
-      deviceName: node['devName']?.toString() ?? '',
-      clientCount: clientCount,
-      connectionInfo: connectionInfo,
-      parentAccessPoint: node['parentAccessPoint']?.toString() ?? '',
-      hops: node['hops'] ?? 0,
-      rssiValues: _parseRSSI(node['rssi']),
-      isMainNode: isMainNode,
-      rawData: node,
-    );
-
-    print("✅ [DEVICE_ANALYSIS] 解析設備: ${deviceInfo.getDisplayName()}");
-    print("    ├─ 類型: $deviceType");
-    print("    ├─ IP: $ipAddress");
-    print("    ├─ 連接方式: ${connectionInfo.description}");
-    print("    ├─ 客戶端數: $clientCount");
-    print("    └─ 父節點: ${deviceInfo.parentAccessPoint}");
-
-    return deviceInfo;
-  }
-
-  /// 設備過濾邏輯（保持不變）
-  bool _shouldFilterDevice(Map<String, dynamic> device) {
-    final String deviceType = device['type']?.toString() ?? '';
-
-    if (deviceType == 'extender') {
-      // 過濾 RSSI 全部為 0 的 extender
-      final rssiValues = _parseRSSI(device['rssi']);
-      if (rssiValues.isNotEmpty && rssiValues.every((rssi) => rssi == 0)) {
-        return true;
-      }
-    } else if (deviceType == 'host') {
-      // 過濾 ssid 包含 "bh-" 的 host
-      final String ssid = device['ssid']?.toString() ?? '';
-      if (ssid.contains('bh-')) {
-        return true;
-      }
-
-      // 過濾沒有 IP 的 host
-      final String ip = device['ipAddress']?.toString() ?? '';
-      if (ip.isEmpty) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /// 解析 RSSI 值（支援多頻段）
-  List<int> _parseRSSI(dynamic rssiData) {
-    if (rssiData == null) return [];
-
-    String rssiStr = rssiData.toString();
-    if (rssiStr.isEmpty) return [];
-
-    // 處理多頻段 RSSI，如 "0,-21,-25"
-    return rssiStr.split(',').map((s) => int.tryParse(s.trim()) ?? 0).toList();
-  }
-
-  /// 分析連接資訊（邏輯保持不變）
-  ConnectionInfo _analyzeConnectionInfo(Map<String, dynamic> device) {
-    final String connectionType = device['connectionType']?.toString() ?? '';
-    final String ssid = device['ssid']?.toString() ?? '';
-    final String radio = device['radio']?.toString() ?? '';
-    final String wirelessStandard = device['wirelessStandard']?.toString() ?? '';
-
-    String method = '';
-    String description = '';
-
-    if (connectionType.toLowerCase() == 'ethernet') {
-      method = 'Ethernet';
-      description = 'Ethernet 有線連接';
-    } else if (connectionType.toLowerCase() == 'wireless') {
-      method = 'Wireless';
-      description = 'WiFi 無線連接';
-      if (radio.isNotEmpty) {
-        description += ' ($radio)';
-      }
-    } else if (connectionType.contains('GHz')) {
-      method = 'Wireless';
-      description = 'WiFi $connectionType 連接';
-      if (ssid.isNotEmpty) {
-        description += ' (SSID: $ssid)';
-      }
-    } else {
-      method = connectionType.isNotEmpty ? connectionType : 'Unknown';
-      description = connectionType.isNotEmpty ? connectionType : '未知連接方式';
-    }
-
-    // 添加 WiFi 標準資訊
-    if (wirelessStandard.isNotEmpty) {
-      description += ' [802.11$wirelessStandard]';
-    }
-
-    return ConnectionInfo(
-      method: method,
-      description: description,
-      ssid: ssid,
-      radio: radio,
-      connectionType: connectionType,
-      wirelessStandard: wirelessStandard,
-    );
-  }
-
-  /// 輸出詳細設備分析到控制台（保持不變）
-  void printDetailedDeviceAnalysis(List<DetailedDeviceInfo> devices) {
-    final timestamp = DateTime.now().toString();
-
-    print("");
-    print("╔════════════════════════════════════════════════════════════════════════════════════════════════════════════");
-    print("║ [DETAILED_DEVICE_ANALYSIS] 詳細設備分析結果");
-    print("║ 時間: $timestamp");
-    print("║ 總設備數: ${devices.length}");
-    print("║ 過濾的 Extender: $filteredExtenders");
-    print("║ 過濾的 Host: $filteredHosts");
-    print("╠════════════════════════════════════════════════════════════════════════════════════════════════════════════");
-
-    // 按設備類型分組
-    final gatewayDevices = devices.where((d) => d.deviceType == 'gateway').toList();
-    final extenderDevices = devices.where((d) => d.deviceType == 'extender').toList();
-    final hostDevices = devices.where((d) => d.deviceType == 'host').toList();
-
-    // Gateway 分析
-    print("║");
-    print("║ 🏠 Gateway (Controller) 設備:");
-    for (var device in gatewayDevices) {
-      print("║   📍 ${device.getDisplayName()}");
-      print("║     ├─ MAC: ${device.macAddress}");
-      print("║     ├─ IP: ${device.ipAddress}");
-      print("║     ├─ 客戶端數: ${device.clientCount}");
-      print("║     └─ 連接方式: ${device.connectionInfo.description}");
-    }
-
-    // Extender 分析
-    print("║");
-    print("║ 📡 Extender (Agent) 設備:");
-    for (var device in extenderDevices) {
-      print("║   📍 ${device.getDisplayName()}");
-      print("║     ├─ MAC: ${device.macAddress}");
-      print("║     ├─ IP: ${device.ipAddress}");
-      print("║     ├─ 客戶端數: ${device.clientCount}");
-      print("║     ├─ 連接方式: ${device.connectionInfo.description}");
-      print("║     ├─ 父節點: ${device.parentAccessPoint}");
-      print("║     ├─ 跳數: ${device.hops}");
-      print("║     └─ RSSI: ${device.rssiValues}");
-    }
-
-    // Host 分析
-    print("║");
-    print("║ 📱 Host (Client) 設備:");
-    for (var device in hostDevices) {
-      print("║   📍 ${device.getDisplayName()}");
-      print("║     ├─ MAC: ${device.macAddress}");
-      print("║     ├─ IP: ${device.ipAddress}");
-      print("║     ├─ 連接方式: ${device.connectionInfo.description}");
-      print("║     ├─ 父節點: ${device.parentAccessPoint}");
-      print("║     └─ RSSI: ${device.rssiValues}");
-    }
-
-    print("╚════════════════════════════════════════════════════════════════════════════════════════════════════════════");
-    print("");
   }
 }
