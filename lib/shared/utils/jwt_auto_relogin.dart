@@ -281,7 +281,12 @@ class JwtAutoRelogin {
         errorStr.contains('403') ||
         errorStr.contains('bearer') ||
         errorStr.contains('authentication') ||
-        errorStr.contains('認證錯誤');
+        errorStr.contains('認證錯誤') ||
+        errorStr.contains('invalid jwt') ||      // 🔥 新增：Invalid JWT
+        errorStr.contains('jwt invalid') ||      // 🔥 新增：JWT invalid
+        errorStr.contains('token invalid') ||    // 🔥 新增：Token invalid
+        errorStr.contains('jwt expired') ||      // 🔥 新增：JWT expired
+        errorStr.contains('token expired');      // 🔥 新增：Token expired
   }
 
   /// 檢查是否為臨時性錯誤（應該使用快取而非重新登入）
@@ -349,12 +354,19 @@ class JwtAutoRelogin {
         }
       }
 
-      // 檢查 response_body 欄位中的 JWT 錯誤
+      // 🔥 修正：檢查 response_body 欄位中的 JWT 錯誤（擴展檢測範圍）
       if (response.containsKey('response_body')) {
         final responseBodyStr = response['response_body'].toString().toLowerCase();
         if (responseBodyStr.contains('jwt token has expired') ||
+            responseBodyStr.contains('invalid jwt') ||  // 🔥 新增：Invalid JWT
+            responseBodyStr.contains('jwt expired') ||
+            responseBodyStr.contains('jwt invalid') ||  // 🔥 新增：JWT invalid
+            responseBodyStr.contains('token expired') ||
+            responseBodyStr.contains('token invalid') ||  // 🔥 新增：Token invalid
             (responseBodyStr.contains('jwt') && responseBodyStr.contains('expired')) ||
-            (responseBodyStr.contains('token') && responseBodyStr.contains('expired'))) {
+            (responseBodyStr.contains('jwt') && responseBodyStr.contains('invalid')) ||  // 🔥 新增
+            (responseBodyStr.contains('token') && responseBodyStr.contains('expired')) ||
+            (responseBodyStr.contains('token') && responseBodyStr.contains('invalid'))) {  // 🔥 新增
           return true;
         }
       }
