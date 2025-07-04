@@ -13,8 +13,6 @@ typedef OnWifiScanComplete = void Function(List<WiFiAccessPoint> devices, String
 typedef OnDeviceSelected = void Function(WiFiAccessPoint device);
 typedef OnWifiConnectRequested = void Function(WiFiAccessPoint device);
 
-
-
 // WiFi掃描控制器
 class WifiScannerController {
   _WifiScannerComponentState? _state;
@@ -66,7 +64,7 @@ class WifiScannerComponent extends StatefulWidget {
 
   const WifiScannerComponent({
     Key? key,
-    this.maxDevicesToShow = 10,   //wifi scanner
+    this.maxDevicesToShow = 10,
     this.onScanComplete,
     this.onDeviceSelected,
     this.onConnectRequested,
@@ -79,21 +77,32 @@ class WifiScannerComponent extends StatefulWidget {
   State<WifiScannerComponent> createState() => _WifiScannerComponentState();
 }
 
-class _WifiScannerComponentState extends State<WifiScannerComponent> {
+class _WifiScannerComponentState extends State<WifiScannerComponent>
+    with WidgetsBindingObserver {
+
+  // 狀態變數
   List<WiFiAccessPoint> discoveredDevices = [];
   bool isScanning = false;
   String? errorMessage;
+  bool _isRequestingPermissions = false;
+  bool _permissionDeniedPermanently = false;
   bool _permissionRequested = false;
 
+  // AppTheme 實例
   final AppTheme _appTheme = AppTheme();
 
   @override
   void initState() {
     super.initState();
+    // 註冊生命週期觀察者
+    WidgetsBinding.instance.addObserver(this);
+
+    // 註冊控制器
     if (widget.controller != null) {
       widget.controller!._registerState(this);
     }
 
+    // 自動掃描
     if (widget.autoScan) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         startScan();
@@ -103,15 +112,86 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
 
   @override
   void dispose() {
+    // 移除生命週期觀察者
+    WidgetsBinding.instance.removeObserver(this);
+
+    // 取消註冊控制器
     if (widget.controller != null) {
       widget.controller!._unregisterState();
     }
+
     super.dispose();
+  }
+
+  // 監聽 App 生命週期變化
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // 當 App 從背景回到前台時
+    if (state == AppLifecycleState.resumed) {
+      print('App 回到前台，重新檢查權限狀態');
+      _checkPermissionStatusOnResume();
+    }
+  }
+
+  // 當 App 回到前台時檢查權限狀態
+  Future<void> _checkPermissionStatusOnResume() async {
+    // 如果之前權限被拒絕，現在重新檢查
+    if (_permissionDeniedPermanently || errorMessage != null) {
+      try {
+        if (Platform.isAndroid) {
+          final deviceInfo = DeviceInfoPlugin();
+          final androidInfo = await deviceInfo.androidInfo;
+
+          // 重新檢查位置權限
+          var locationStatus = await Permission.locationWhenInUse.status;
+          print('App 回到前台時位置權限狀態: $locationStatus');
+
+          bool hasLocationPermission = locationStatus == PermissionStatus.granted;
+          bool hasNearbyDevicesPermission = true;
+
+          // 檢查 Android 13+ 的附近設備權限
+          if (androidInfo.version.sdkInt >= 33) {
+            var nearbyDevicesStatus = await Permission.nearbyWifiDevices.status;
+            print('App 回到前台時附近設備權限狀態: $nearbyDevicesStatus');
+            hasNearbyDevicesPermission = nearbyDevicesStatus == PermissionStatus.granted;
+          }
+
+          // 如果權限已經被授予，重置狀態並清除錯誤
+          if (hasLocationPermission && hasNearbyDevicesPermission) {
+            print('權限已授予，重置狀態');
+            setState(() {
+              _permissionDeniedPermanently = false;
+              _permissionRequested = false;
+              errorMessage = null;
+            });
+
+            // 如果沒有掃描結果，自動開始掃描
+            if (discoveredDevices.isEmpty && !isScanning) {
+              print('權限已授予，自動開始掃描');
+              startScan();
+            }
+          }
+        }
+      } catch (e) {
+        print('檢查權限狀態時發生錯誤: $e');
+      }
+    }
   }
 
   // 檢查並請求必要權限
   Future<bool> _checkAndRequestPermissions() async {
     try {
+      // 避免重複請求權限
+      if (_isRequestingPermissions) {
+        return false;
+      }
+
+      setState(() {
+        _isRequestingPermissions = true;
+      });
+
       if (Platform.isAndroid) {
         final deviceInfo = DeviceInfoPlugin();
         final androidInfo = await deviceInfo.androidInfo;
@@ -122,9 +202,29 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         var locationStatus = await Permission.locationWhenInUse.status;
         print('位置權限狀態: $locationStatus');
 
+        // 如果權限被永久拒絕，不要再次請求
+        if (locationStatus == PermissionStatus.permanentlyDenied) {
+          setState(() {
+            _permissionDeniedPermanently = true;
+            _isRequestingPermissions = false;
+          });
+          return false;
+        }
+
         if (locationStatus != PermissionStatus.granted) {
+          // 只在尚未被永久拒絕時才請求權限
           locationStatus = await Permission.locationWhenInUse.request();
           print('請求位置權限後狀態: $locationStatus');
+
+          // 如果用戶拒絕權限，標記為永久拒絕以避免重複請求
+          if (locationStatus == PermissionStatus.denied ||
+              locationStatus == PermissionStatus.permanentlyDenied) {
+            setState(() {
+              _permissionDeniedPermanently = true;
+              _isRequestingPermissions = false;
+            });
+            return false;
+          }
         }
 
         // Android 13+ 需要額外權限
@@ -132,25 +232,57 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
           var nearbyDevicesStatus = await Permission.nearbyWifiDevices.status;
           print('附近 WiFi 設備權限狀態: $nearbyDevicesStatus');
 
+          if (nearbyDevicesStatus == PermissionStatus.permanentlyDenied) {
+            setState(() {
+              _permissionDeniedPermanently = true;
+              _isRequestingPermissions = false;
+            });
+            return false;
+          }
+
           if (nearbyDevicesStatus != PermissionStatus.granted) {
             nearbyDevicesStatus = await Permission.nearbyWifiDevices.request();
             print('請求附近 WiFi 設備權限後狀態: $nearbyDevicesStatus');
+
+            if (nearbyDevicesStatus == PermissionStatus.denied ||
+                nearbyDevicesStatus == PermissionStatus.permanentlyDenied) {
+              setState(() {
+                _permissionDeniedPermanently = true;
+                _isRequestingPermissions = false;
+              });
+              return false;
+            }
           }
+
+          setState(() {
+            _isRequestingPermissions = false;
+          });
 
           return locationStatus == PermissionStatus.granted &&
               nearbyDevicesStatus == PermissionStatus.granted;
         }
 
+        setState(() {
+          _isRequestingPermissions = false;
+        });
+
         return locationStatus == PermissionStatus.granted;
       }
+
+      setState(() {
+        _isRequestingPermissions = false;
+      });
       return true;
     } catch (e) {
       print('權限檢查錯誤: $e');
+      setState(() {
+        _isRequestingPermissions = false;
+      });
       return false;
     }
   }
 
-// 修改：檢查當前連線的 WiFi SSID - 使用 network_info_plus
+  // 修改：檢查當前連線的 WiFi SSID - 使用 network_info_plus
   Future<String?> _getCurrentWifiSSID() async {
     try {
       final connectivityResult = await Connectivity().checkConnectivity();
@@ -159,18 +291,14 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         final info = NetworkInfo();
         final currentSSID = await info.getWifiName();
 
-        // print('原始獲取的 SSID: "$currentSSID"');
-
         // 詳細的清理和格式化 SSID
         if (currentSSID != null && currentSSID.isNotEmpty) {
           String cleanedSSID = currentSSID
-              .replaceAll('"', '')           // 移除引號
-              .replaceAll("'", '')           // 移除單引號
-              .replaceAll('<', '')           // 移除 < 符號
-              .replaceAll('>', '')           // 移除 > 符號
-              .trim();                       // 移除前後空白
-
-          // print('清理後的 SSID: "$cleanedSSID"');
+              .replaceAll('"', '') // 移除引號
+              .replaceAll("'", '') // 移除單引號
+              .replaceAll('<', '') // 移除 < 符號
+              .replaceAll('>', '') // 移除 > 符號
+              .trim(); // 移除前後空白
 
           return cleanedSSID.isEmpty ? null : cleanedSSID;
         }
@@ -182,7 +310,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
     }
   }
 
-// 修改：SSID 比較函數
+  // 修改：SSID 比較函數
   bool _compareSSID(String? currentSSID, String selectedSSID) {
     if (currentSSID == null || selectedSSID.isEmpty) {
       return false;
@@ -205,13 +333,9 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         .trim()
         .toLowerCase();
 
-    // print('比較 SSID:');
-    // print('  當前清理後: "$cleanedCurrent"');
-    // print('  選擇清理後: "$cleanedSelected"');
-    // print('  是否相同: ${cleanedCurrent == cleanedSelected}');
-
     return cleanedCurrent == cleanedSelected;
   }
+
   // 簡潔版本的對話框
   void _showWifiConnectionDialog(BuildContext context, String selectedSSID) {
     showDialog(
@@ -276,7 +400,8 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
             ElevatedButton(
               onPressed: () async {
                 Navigator.of(context).pop();
-                await AppSettings.openAppSettingsPanel(AppSettingsPanelType.wifi);
+                await AppSettings.openAppSettingsPanel(
+                    AppSettingsPanelType.wifi);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF9747FF),
@@ -346,8 +471,9 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
     );
   }
 
+  // 修改 UI 建構方法，添加手動刷新按鈕
   Widget _buildContent() {
-    if (isScanning) {
+    if (isScanning || _isRequestingPermissions) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -383,15 +509,41 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // 添加手動檢查權限按鈕
                 ElevatedButton(
-                  onPressed: startScan,
+                  onPressed: () {
+                    _checkPermissionStatusOnResume();
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Retry'),
+                  child: const Text('Check Permission'),
                 ),
+
                 const SizedBox(width: 12),
+
+                // 只有在非永久拒絕的情況下才顯示重試按鈕
+                if (!_permissionDeniedPermanently)
+                  ElevatedButton(
+                    onPressed: () {
+                      // 重置權限請求狀態以允許重試
+                      setState(() {
+                        _permissionRequested = false;
+                        _isRequestingPermissions = false;
+                      });
+                      startScan();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Retry'),
+                  ),
+
+                if (!_permissionDeniedPermanently)
+                  const SizedBox(width: 12),
+
                 ElevatedButton(
                   onPressed: () async {
                     await openAppSettings();
@@ -436,7 +588,8 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
   }
 
   Widget _buildDeviceListItem(WiFiAccessPoint device) {
-    bool hasPassword = device.capabilities != null && device.capabilities.isNotEmpty;
+    bool hasPassword = device.capabilities != null &&
+        device.capabilities.isNotEmpty;
     int signalStrength = device.level;
     IconData wifiIcon;
 
@@ -494,14 +647,15 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
               child: FutureBuilder<String?>(
                 future: _getCurrentWifiSSID(),
                 builder: (context, snapshot) {
-                  bool isCurrentWifi = snapshot.hasData && _compareSSID(snapshot.data, device.ssid);
+                  bool isCurrentWifi = snapshot.hasData &&
+                      _compareSSID(snapshot.data, device.ssid);
 
                   return Text(
                     device.ssid.isNotEmpty ? device.ssid : 'Unknown Network',
                     style: TextStyle(
                       fontSize: 16,
                       color: const Color.fromRGBO(255, 255, 255, 0.8),
-                      fontWeight: isCurrentWifi ? FontWeight.bold : FontWeight.normal, // 當前連線的顯示為粗體
+                      fontWeight: isCurrentWifi ? FontWeight.bold : FontWeight.normal,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -537,9 +691,8 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
     );
   }
 
-
   Future<void> startScan() async {
-    if (isScanning) return;
+    if (isScanning || _isRequestingPermissions) return;
 
     setState(() {
       isScanning = true;
@@ -547,14 +700,19 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
     });
 
     try {
-      // 先檢查並請求權限
-      if (!_permissionRequested) {
+      // 先檢查並請求權限（只執行一次）
+      if (!_permissionRequested && !_permissionDeniedPermanently) {
         bool permissionsGranted = await _checkAndRequestPermissions();
         _permissionRequested = true;
 
         if (!permissionsGranted) {
           setState(() {
-            errorMessage = 'WiFi scanning requires location permission\nPlease allow "Location" and "Nearby devices" in settings';
+            // 使用更友善的錯誤訊息，避免閃爍
+            if (_permissionDeniedPermanently) {
+              errorMessage = 'Location permission is required for WiFi scanning\nPlease enable it in Settings';
+            } else {
+              errorMessage = 'WiFi scanning requires location permission\nPlease allow "Location" and "Nearby devices" permissions';
+            }
             isScanning = false;
           });
 
@@ -563,9 +721,20 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
           }
           return;
         }
+      } else if (_permissionDeniedPermanently) {
+        // 如果權限已被永久拒絕，直接顯示錯誤而不再請求
+        setState(() {
+          errorMessage = 'Location permission is required for WiFi scanning\nPlease enable it in Settings';
+          isScanning = false;
+        });
+
+        if (widget.onScanComplete != null) {
+          widget.onScanComplete!([], errorMessage);
+        }
+        return;
       }
 
-      // 檢查是否可以開始掃描
+      // 繼續原有的掃描邏輯...
       final canStart = await WiFiScan.instance.canStartScan();
       print('canStartScan 狀態: $canStart');
 
@@ -620,7 +789,6 @@ class _WifiScannerComponentState extends State<WifiScannerComponent> {
         }
       }
 
-      // uniqueResults.sort((a, b) => b.level.compareTo(a.level));  //一般過濾
       uniqueResults.sort((a, b) {
         // 第一優先：配置完成的 SSID
         bool aIsConfigured = WifiScannerComponent.configuredSSID != null &&
