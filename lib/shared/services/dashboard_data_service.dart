@@ -369,7 +369,7 @@ class DashboardDataService {
     );
   }
 
-  /// 解析 WiFi 頻率狀態（第一頁用）- 重寫版本
+  /// 解析 WiFi 頻率狀態（第一頁用）
   static List<WiFiFrequencyStatus> _parseWiFiFrequencies(Map<String, dynamic> dashboardInfo) {
     final List<WiFiFrequencyStatus> frequencies = [];
 

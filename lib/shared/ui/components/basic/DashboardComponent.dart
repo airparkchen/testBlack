@@ -278,7 +278,7 @@ class _DashboardComponentState extends State<DashboardComponent>
       secondPageConnections.add(EthernetConnection(
           speed: 'WiFi',
           status: '',
-          connectionType: 'wifi_title' // 🔥 新增：標記這是WiFi標題
+          connectionType: 'wifi_title' // 新增：標記這是WiFi標題
       ));
 
       // 🎯 各頻率的 SSID（使用特殊的 SSID 排版）
@@ -286,7 +286,7 @@ class _DashboardComponentState extends State<DashboardComponent>
         secondPageConnections.add(EthernetConnection(
             speed: ssidInfo.ssidLabel, // 例如：SSID(2.4GHz)
             status: ssidInfo.ssid,      // 例如：OWA813V_2.4G
-            connectionType: 'wifi_ssid' // 🔥 新增：標記這是WiFi SSID項目
+            connectionType: 'wifi_ssid' //新增：標記這是WiFi SSID項目
         ));
       }
     }
@@ -460,7 +460,7 @@ class _DashboardComponentState extends State<DashboardComponent>
 
                       // 中間：LAN 埠名稱（如 "2.5Gbps"）
                       Expanded(
-                        flex: 3,
+                        flex: 2,
                         child: Center(
                           child: Text(
                             connection.speed,
@@ -475,7 +475,7 @@ class _DashboardComponentState extends State<DashboardComponent>
 
                       // 右側：連接狀態（如 "Connected"）
                       Expanded(
-                        flex: 2,
+                        flex: 3,
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: Text(
@@ -604,7 +604,7 @@ class _DashboardComponentState extends State<DashboardComponent>
                 connection.speed,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withOpacity(0.7),
                   fontWeight: FontWeight.normal,
                 ),
               ),

@@ -59,16 +59,6 @@ class UnifiedMeshDataManager {
   /// 🎯 統一獲取 Mesh 數據（所有其他方法的唯一入口）
   Future<bool> _ensureMeshDataLoaded({bool forceRefresh = false}) async {
     try {
-      // 🎯 檢查快取
-      if (!forceRefresh && _isCacheValid()) {
-        final secondsSinceUpdate = DateTime.now().difference(_lastFetchTime!).inSeconds;
-        print('📋 使用快取的 Mesh 數據 (${secondsSinceUpdate}s 前更新)');
-        return true;
-      }
-
-      print('🌐 載入 Mesh API 數據 (forceRefresh: $forceRefresh)');
-
-      // 🎯 唯一的 API 調用點
       final meshResult = await JwtAutoRelogin.instance.wrapApiCallWithFallback(
             () => ApiLogger.wrapApiCall(
           method: 'GET',

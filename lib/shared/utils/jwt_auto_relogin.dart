@@ -1,17 +1,27 @@
 // lib/shared/utils/jwt_auto_relogin.dart
-// JWT 自動重新登入管理器 + API 錯誤容錯處理
+// 原本的 JWT 自動重新登入管理器 + 最小化網路功能添加
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:whitebox/shared/api/wifi_api/login_process.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 
-/// 增強型 JWT 自動重新登入管理器 + API 容錯處理
+/// 🎯 網路連線狀態
+enum NetworkStatus {
+  connected,
+  disconnected,
+  unknown
+}
+
+/// 增強型 JWT 自動重新登入管理器 + 最小化網路功能
 class JwtAutoRelogin {
   static JwtAutoRelogin? _instance;
   static JwtAutoRelogin get instance => _instance ??= JwtAutoRelogin._();
 
   JwtAutoRelogin._();
+
+  // ==================== 原本的 JWT 功能（不變） ====================
 
   // 登入憑證（用於自動重新登入）
   String? _lastUsername;
@@ -20,6 +30,239 @@ class JwtAutoRelogin {
   // 重新登入狀態控制
   bool _isRelogging = false;
   final List<Completer> _waitingCalls = [];
+
+  // ==================== 🎯 新增：最小化網路功能 ====================
+
+  // 網路狀態管理
+  NetworkStatus _currentNetworkStatus = NetworkStatus.unknown;
+
+  // 網路斷線彈窗管理
+  bool _isNetworkDialogShowing = false;
+  GlobalKey<NavigatorState>? _navigatorKey;
+  String? _initialRouteName;
+
+  /// 🎯 新增：初始化導航器
+  void initializeNavigator(GlobalKey<NavigatorState> navigatorKey, {String? initialRouteName}) {
+    _navigatorKey = navigatorKey;
+    _initialRouteName = initialRouteName ?? '/';
+    print('🎯 JwtAutoRelogin: 導航器已初始化，初始路由: $_initialRouteName');
+  }
+
+  /// 🎯 新增：獲取當前網路狀態
+  NetworkStatus get networkStatus => _currentNetworkStatus;
+
+  /// 🎯 新增：更新網路狀態並處理彈窗
+  void _updateNetworkStatus(NetworkStatus status) {
+    if (_currentNetworkStatus != status) {
+      final oldStatus = _currentNetworkStatus;
+      _currentNetworkStatus = status;
+      print('🌐 網路狀態變更: $oldStatus -> $status');
+      _handleNetworkStatusChange(status);
+    }
+  }
+
+  /// 🎯 新增：處理網路狀態變更
+  void _handleNetworkStatusChange(NetworkStatus status) {
+    switch (status) {
+      case NetworkStatus.disconnected:
+        if (!_isNetworkDialogShowing) {
+          _showNetworkDisconnectedDialog();
+        }
+        break;
+      case NetworkStatus.connected:
+        if (_isNetworkDialogShowing) {
+          _hideNetworkDisconnectedDialog();
+        }
+        break;
+      case NetworkStatus.unknown:
+        break;
+    }
+  }
+
+  /// 🎯 新增：顯示網路斷線彈窗
+  void _showNetworkDisconnectedDialog() {
+    if (_isNetworkDialogShowing) return;
+
+    final BuildContext? context = _navigatorKey?.currentContext;
+    if (context == null) return;
+
+    _isNetworkDialogShowing = true;
+    print('📱 顯示網路斷線彈窗');
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            backgroundColor: Colors.black87,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.wifi_off_rounded, color: Colors.red, size: 20),
+                SizedBox(width: 8),
+                Text('Network Connection Lost', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Please check your network connection and try again.', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14, height: 1.4)),
+                SizedBox(height: 16),
+                Text('• Check your WiFi connection\n• Verify router connectivity\n• Restart network settings if needed', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, height: 1.3)),
+              ],
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => _goToInitialPage(context),
+                      style: TextButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1))),
+                      child: Text('Restart', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => _retryNetworkConnection(context),
+                      style: TextButton.styleFrom(backgroundColor: Color(0xFF9747FF).withOpacity(0.2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Color(0xFF9747FF), width: 1))),
+                      child: Text('Retry', style: TextStyle(color: Color(0xFF9747FF), fontWeight: FontWeight.w600, fontSize: 14)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 🎯 新增：隱藏網路斷線彈窗
+  void _hideNetworkDisconnectedDialog() {
+    final BuildContext? context = _navigatorKey?.currentContext;
+    if (context != null && _isNetworkDialogShowing) {
+      Navigator.of(context).pop();
+      _isNetworkDialogShowing = false;
+      print('✅ 網路恢復，關閉斷線彈窗');
+      _showNetworkRestoredSnackBar(context);
+    }
+  }
+
+  /// 🎯 新增：顯示網路恢復提示
+  void _showNetworkRestoredSnackBar(BuildContext context) {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.wifi, color: Colors.green, size: 16),
+              SizedBox(width: 8),
+              Text('Network connection restored', style: TextStyle(color: Colors.white, fontSize: 14)),
+            ],
+          ),
+          backgroundColor: Colors.green.withOpacity(0.8),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    } catch (e) {
+      print('⚠️ 無法顯示網路恢復提示: $e');
+    }
+  }
+
+  /// 🎯 新增：返回初始頁面
+  void _goToInitialPage(BuildContext context) {
+    try {
+      Navigator.of(context).pop();
+      _isNetworkDialogShowing = false;
+      _navigatorKey?.currentState?.pushNamedAndRemoveUntil(_initialRouteName ?? '/', (route) => false);
+    } catch (e) {
+      print('❌ 返回初始頁面失敗: $e');
+    }
+  }
+
+  /// 🎯 新增：重試網路連線
+  void _retryNetworkConnection(BuildContext context) {
+    print('🔄 嘗試重新檢測網路連線...');
+    _performNetworkTest().then((isConnected) {
+      if (isConnected) {
+        _updateNetworkStatus(NetworkStatus.connected);
+      } else {
+        _showRetryFailedMessage(context);
+      }
+    }).catchError((e) {
+      _showRetryFailedMessage(context);
+    });
+  }
+
+  /// 🎯 新增：執行網路測試
+  Future<bool> _performNetworkTest() async {
+    try {
+      final result = await WifiApiService.getSystemDashboard().timeout(Duration(seconds: 5));
+      if (result != null && !result.containsKey('error')) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 🎯 新增：顯示重試失敗訊息
+  void _showRetryFailedMessage(BuildContext context) {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red, size: 16),
+              SizedBox(width: 8),
+              Text('Still unable to connect.', style: TextStyle(color: Colors.white, fontSize: 12)),
+            ],
+          ),
+          backgroundColor: Colors.purple.withOpacity(0.8),
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    } catch (e) {
+      print('⚠️ 無法顯示重試失敗訊息: $e');
+    }
+  }
+
+  /// 🎯 新增：檢查是否為網路斷線錯誤
+  bool _isNetworkError(dynamic error) {
+    final errorStr = error.toString().toLowerCase();
+    return errorStr.contains('socketexception') && errorStr.contains('network is unreachable') ||
+        errorStr.contains('errno = 101') ||
+        errorStr.contains('connection failed') && errorStr.contains('network is unreachable') ||
+        errorStr.contains('no route to host') ||
+        errorStr.contains('network unreachable') ||
+        errorStr.contains('host unreachable');
+  }
+
+  /// 🎯 新增：檢查回應是否為網路斷線錯誤
+  bool _isNetworkErrorResponse(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      final errorStr = response['error']?.toString().toLowerCase() ?? '';
+      final responseBody = response['response_body']?.toString().toLowerCase() ?? '';
+
+      return _isNetworkError(errorStr) || _isNetworkError(responseBody);
+    }
+    return false;
+  }
+
+  // ==================== 原本的 JWT 功能（保持不變） ====================
 
   /// 初始化：儲存登入憑證
   void saveCredentials(String username, String password) {
@@ -196,6 +439,23 @@ class JwtAutoRelogin {
         logApiRawData(debugInfo, result, status: 'SUCCESS');
       }
 
+      // 🎯 新增：檢查是否為網路錯誤
+      if (_isNetworkErrorResponse(result)) {
+        print('🌐❌ 檢測到網路錯誤，更新網路狀態: $result ${debugInfo ?? ""}');
+        _updateNetworkStatus(NetworkStatus.disconnected);
+
+        // 嘗試使用快取資料
+        if (getCachedData != null) {
+          final cachedData = getCachedData();
+          if (cachedData != null) {
+            print('📋 網路錯誤，使用快取資料 ${debugInfo ?? ""}');
+            return cachedData;
+          }
+        }
+
+        return result;
+      }
+
       // 關鍵：檢查回應是否包含臨時性錯誤
       if (isTemporaryErrorResponse(result)) {
         print('⚠️ 檢測到臨時性錯誤，使用快取資料: $result ${debugInfo ?? ""}');
@@ -252,6 +512,9 @@ class JwtAutoRelogin {
         }
       }
 
+      // 🎯 新增：成功時更新網路狀態
+      _updateNetworkStatus(NetworkStatus.connected);
+
       return result;
     } catch (e) {
       // 記錄異常
@@ -260,6 +523,23 @@ class JwtAutoRelogin {
       }
 
       print('❌ API 調用異常: $e ${debugInfo ?? ""}');
+
+      // 🎯 新增：檢查是否為網路斷線異常
+      if (_isNetworkError(e)) {
+        print('🌐❌ 檢測到網路斷線異常，更新網路狀態: $e ${debugInfo ?? ""}');
+        _updateNetworkStatus(NetworkStatus.disconnected);
+
+        // 嘗試使用快取資料
+        if (getCachedData != null) {
+          final cachedData = getCachedData();
+          if (cachedData != null) {
+            print('📋 網路斷線，使用快取資料 ${debugInfo ?? ""}');
+            return cachedData;
+          }
+        }
+
+        throw e;
+      }
 
       // 檢查是否為臨時性錯誤
       if (isTemporaryError(e)) {
@@ -412,6 +692,12 @@ class JwtAutoRelogin {
     _lastUsername = null;
     _lastPassword = null;
     _isRelogging = false;
+    _currentNetworkStatus = NetworkStatus.unknown;
+
+    // 🎯 新增：清除時也關閉可能顯示的網路彈窗
+    if (_isNetworkDialogShowing) {
+      _hideNetworkDisconnectedDialog();
+    }
 
     // 完成所有等待的請求
     for (final completer in _waitingCalls) {
@@ -421,7 +707,7 @@ class JwtAutoRelogin {
     }
     _waitingCalls.clear();
 
-    print('🗑️ JWT 自動重新登入：已清除登入憑證');
+    print('🗑️ JWT 自動重新登入：已清除登入憑證和網路狀態');
   }
 
   /// 檢查是否有儲存的憑證
@@ -429,4 +715,23 @@ class JwtAutoRelogin {
 
   /// 檢查是否正在重新登入
   bool get isRelogging => _isRelogging;
+
+  /// 🎯 新增：檢查是否正在顯示網路彈窗
+  bool get isNetworkDialogShowing => _isNetworkDialogShowing;
+
+  /// 🎯 新增：手動觸發網路狀態檢查
+  Future<void> checkNetworkStatus() async {
+    try {
+      final isConnected = await _performNetworkTest();
+      _updateNetworkStatus(isConnected ? NetworkStatus.connected : NetworkStatus.disconnected);
+    } catch (e) {
+      print('❌ 手動網路檢查失敗: $e');
+      _updateNetworkStatus(NetworkStatus.disconnected);
+    }
+  }
+
+  /// 🎯 新增：手動設置網路狀態（供測試使用）
+  void setNetworkStatus(NetworkStatus status) {
+    _updateNetworkStatus(status);
+  }
 }
