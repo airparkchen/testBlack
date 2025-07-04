@@ -113,8 +113,10 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       _primaryDnsController.text = _staticIpConfig.primaryDns;
       _secondaryDnsController.text = _staticIpConfig.secondaryDns;
 
-      // 驗證所有字段，更新表單狀態
-      _validateForm();
+      // 🔧 修改：將驗證延遲到 build 完成後
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _validateForm();
+      });
     }
 
     // 初始化PPPoE配置
@@ -126,8 +128,10 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       _pppoeUsernameController.text = _pppoeConfig.username;
       _pppoePasswordController.text = _pppoeConfig.password;
 
-      // 驗證所有字段，更新表單狀態
-      _validateForm();
+      // 🔧 修改：將驗證延遲到 build 完成後
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _validateForm();
+      });
     }
 
     // 設置監聽器，在輸入變化時更新表單狀態

@@ -1,5 +1,5 @@
 // lib/shared/utils/jwt_auto_relogin.dart
-// 原本的 JWT 自動重新登入管理器 + 最小化網路功能添加
+// 原本的 JWT 自動重新登入管理器 + 最小化網路功能添加 +網路問題處理
 
 import 'dart:async';
 import 'dart:convert';

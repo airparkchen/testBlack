@@ -1,3 +1,4 @@
+// lib/shared/ui/pages/initialization/InitializationPage.dart
 import 'package:flutter/material.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 import 'package:whitebox/shared/ui/pages/initialization/QrCodeScannerPage.dart';
@@ -171,7 +172,7 @@ class _InitializationPageState extends State<InitializationPage>
           context,
           MaterialPageRoute(
             builder: (context) => LoginPage(
-              onBackPressed: () => Navigator.of(context).pop(), // 新增這行
+              onBackPressed: () => Navigator.of(context).pop(),
             ),
           ),
         );
@@ -179,7 +180,13 @@ class _InitializationPageState extends State<InitializationPage>
         // blank_state 為 1 或其他值，開啟原來的 WifiSettingFlowPage
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const WifiSettingFlowPage()),
+          MaterialPageRoute(
+            builder: (context) => const WifiSettingFlowPage(
+              // 🔧 新增：啟用資料保留功能
+              preserveDataOnBack: true,  // 返回時保留資料
+              preserveDataOnNext: true,  // 前進時保留下一步資料
+            ),
+          ),
         );
       }
 
@@ -244,11 +251,17 @@ class _InitializationPageState extends State<InitializationPage>
             ),
           ),
         );
-      }else {
+      } else {
         // blank_state 為 1 或其他值，開啟原來的 WifiSettingFlowPage
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const WifiSettingFlowPage()),
+          MaterialPageRoute(
+            builder: (context) => const WifiSettingFlowPage(
+              // 🔧 新增：啟用資料保留功能
+              preserveDataOnBack: true,  // 返回時保留資料
+              preserveDataOnNext: true,  // 前進時保留下一步資料
+            ),
+          ),
         );
       }
 

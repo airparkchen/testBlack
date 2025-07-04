@@ -1,3 +1,4 @@
+// lib/shared/ui/components/basic/AccountPasswordComponent.dart
 import 'package:flutter/material.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 
@@ -8,7 +9,11 @@ class AccountPasswordComponent extends StatefulWidget {
   final List<String> displayOptions;
   final String fixedUsername;
   final bool disableUsername;
-  final double? height; // 新增高度參數
+  final double? height;
+
+  // 🔧 新增：初始值參數
+  final String? initialPassword;
+  final String? initialConfirmPassword;
 
   const AccountPasswordComponent({
     Key? key,
@@ -18,7 +23,10 @@ class AccountPasswordComponent extends StatefulWidget {
     this.displayOptions = const ['User', 'Password', 'Confirm Password'],
     this.fixedUsername = 'admin',
     this.disableUsername = true,
-    this.height, // 高度參數可選
+    this.height,
+    // 🔧 新增初始值參數
+    this.initialPassword,
+    this.initialConfirmPassword,
   }) : super(key: key);
 
   @override
@@ -49,6 +57,18 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
       _userController.text = widget.fixedUsername;
     }
 
+    // 🔧 新增：設置初始密碼值
+    if (widget.initialPassword != null && widget.initialPassword!.isNotEmpty) {
+      _passwordController.text = widget.initialPassword!;
+      print('🔧 AccountPasswordComponent: 設置初始密碼，長度: ${widget.initialPassword!.length}');
+    }
+
+    // 🔧 新增：設置初始確認密碼值
+    if (widget.initialConfirmPassword != null && widget.initialConfirmPassword!.isNotEmpty) {
+      _confirmPasswordController.text = widget.initialConfirmPassword!;
+      print('🔧 AccountPasswordComponent: 設置初始確認密碼，長度: ${widget.initialConfirmPassword!.length}');
+    }
+
     _userController.addListener(_notifyFormChanged);
     _passwordController.addListener(() {
       _validatePassword();
@@ -62,6 +82,15 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
     // 添加焦點監聽
     _passwordFocusNode.addListener(_handlePasswordFocus);
     _confirmPasswordFocusNode.addListener(_handleConfirmPasswordFocus);
+
+    // 🔧 新增：如果有初始值，需要在組件載入後立即驗證和通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialPassword != null || widget.initialConfirmPassword != null) {
+        _validatePassword();
+        _validateConfirmPassword();
+        _notifyFormChanged();
+      }
+    });
   }
 
   @override
