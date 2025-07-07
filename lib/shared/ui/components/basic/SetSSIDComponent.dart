@@ -35,6 +35,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
   final TextEditingController _passwordController = TextEditingController();
   final AppTheme _appTheme = AppTheme();
   final ScrollController _scrollController = ScrollController();
+  bool _isSsidError = false;  // SSID 錯誤狀態
 
   // 焦點節點
   final FocusNode _ssidFocusNode = FocusNode();
@@ -45,7 +46,6 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
   bool _showPasswordField = true;
 
   // Error state flags
-  bool _isSsidError = false;
   bool _isPasswordError = false;
 
   // Error message texts
@@ -184,18 +184,20 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     final ssid = _ssidController.text;
 
     setState(() {
-      if (ssid.isEmpty) {
-        _isSsidError = true;
-        _ssidErrorText = 'Please enter an SSID';
-      } else if (ssid.length > 64) {
-        _isSsidError = true;
-        _ssidErrorText = 'SSID must be 64 characters or less';
-      } else if (!_isValidCharacters(ssid)) {
-        _isSsidError = true;
-        _ssidErrorText = 'SSID contains invalid characters';
+      if (ssid.isNotEmpty) {
+        // 檢查長度 - 32 字元限制
+        if (ssid.length > 32) {
+          _isSsidError = true;
+        }
+        // 檢查字符有效性
+        else if (!_isValidCharacters(ssid)) {
+          _isSsidError = true;
+        }
+        else {
+          _isSsidError = false;
+        }
       } else {
         _isSsidError = false;
-        _ssidErrorText = '';
       }
     });
   }
@@ -250,6 +252,52 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     }
 
     return true;
+  }
+
+  // 動態 SSID 提示方法（類似密碼提示）
+  String _getSsidHintText(String ssid, bool isError) {
+    if (ssid.isEmpty) {
+      return 'SSID must be 32 characters or less';
+    }
+
+    if (ssid.length > 32) {
+      return 'SSID too long (current: ${ssid.length}, max: 32 characters)';
+    }
+
+    if (ssid.length >= 30) {
+      return 'SSID meets requirements (${ssid.length}/32 characters)';
+    }
+
+    if (!_isValidCharacters(ssid)) {
+      return 'SSID contains invalid characters';
+    }
+
+    return 'SSID meets requirements (${ssid.length}/32 characters)';
+  }
+
+// 動態密碼提示方法
+  String _getPasswordHintText(String password, bool isError) {
+    if (!_showPasswordField) {
+      return '';
+    }
+
+    if (password.isEmpty) {
+      return 'Password must be at least 8 characters';
+    }
+
+    if (password.length < 8) {
+      return 'Password too short (minimum 8 characters)';
+    }
+
+    if (password.length > 64) {
+      return 'Password too long (maximum 64 characters)';
+    }
+
+    if (!_isValidCharacters(password)) {
+      return 'Password contains invalid characters';
+    }
+
+    return 'Password meets requirements';
   }
 
   @override
@@ -315,6 +363,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
               isError: _isSsidError,
               focusNode: _ssidFocusNode,
             ),
+            hintText: _getSsidHintText(_ssidController.text, _isSsidError),
             errorText: _isSsidError ? _ssidErrorText : null,
             bottomInset: bottomInset,
           ),
@@ -343,7 +392,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
                 isError: _isPasswordError,
                 focusNode: _passwordFocusNode,
               ),
-              errorText: _isPasswordError ? _passwordErrorText : null,
+              hintText: _getPasswordHintText(_passwordController.text, _isPasswordError),
               bottomInset: bottomInset,
             ),
           ],
@@ -364,6 +413,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
     required bool isError,
     required Widget child,
     String? errorText,
+    String? hintText,
     required double bottomInset,
   }) {
     return Column(
@@ -372,24 +422,22 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
         Text(
           label,
           style: TextStyle(
-            fontSize: bottomInset > 0 ? 16 : 18, // 鍵盤彈出時縮小字體
+            fontSize: bottomInset > 0 ? 16 : 18,
             fontWeight: FontWeight.normal,
             color: isError ? const Color(0xFFFF00E5) : Colors.white,
           ),
         ),
         const SizedBox(height: 8),
         child,
-        if (errorText != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: Text(
-              errorText,
-              style: TextStyle(
-                color: const Color(0xFFFF00E5),
-                fontSize: bottomInset > 0 ? 10 : 12, // 鍵盤彈出時縮小字體
-              ),
-            ),
+        const SizedBox(height: 4),
+        // 🔧 修改：顯示動態提示文字
+        Text(
+          hintText ?? (errorText ?? ''),
+          style: TextStyle(
+            color: isError ? const Color(0xFFFF00E5) : Colors.white,
+            fontSize: bottomInset > 0 ? 10 : 12,
           ),
+        ),
       ],
     );
   }

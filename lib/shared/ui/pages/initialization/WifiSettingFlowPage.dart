@@ -1819,8 +1819,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     // 驗證 SSID
     if (ssid.isEmpty) {
       return 'Please enter an SSID';
-    } else if (ssid.length > 64) {
-      return 'SSID must be 64 characters or less';
+    } else if (ssid.length > 32) {
+      return 'SSID must be 32 characters or less';
     } else {
       // 驗證 SSID 字符
       final RegExp validChars = RegExp(
@@ -2238,10 +2238,16 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       return false;
     }
 
-    if (ssid.length > 64) {
-      print('❌ SSID 驗證失敗: SSID 長度超過 64 字元');
+    if (ssid.length > 32) {
+      print('❌ SSID 驗證失敗: SSID 長度超過 32 字元');
       return false;
     }
+
+    // // 🔧 新增：檢查 SSID 長度（32 字節限制）
+    // if (ssid.length > 32) {
+    //   print('❌ SSID 驗證失敗: SSID 長度超過 32 字元 (當前: ${ssid.length})');
+    //   return false;
+    // }
 
     // 驗證 SSID 字符
     final RegExp validChars = RegExp(
