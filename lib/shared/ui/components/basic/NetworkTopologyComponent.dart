@@ -298,10 +298,10 @@ class _NetworkTopologyComponentState extends State<NetworkTopologyComponent> {
               ),
             ),
             Positioned(
-              left: (kInternetRadius * 2 - 60) / 2,
+              left: (kInternetRadius * 2 - 80) / 2,   //拓寬 避免有些手機無法顯示t
               top: -5,
               child: Container(
-                width: 60,
+                width: 80,
                 child: Text(
                   'Internet',
                   textAlign: TextAlign.center,
