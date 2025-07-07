@@ -206,14 +206,68 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _handleLogin() async {
-
     if (_passwordController.text.isEmpty) {
-      // 顯示錯誤提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your password'),
-          backgroundColor: Color(0xFFFF00E5), // 使用您的錯誤顏色
-        ),
+      // 添加沒有輸入密碼的提示 (參考其他地方的提視窗)
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF2A2A2A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: const Color(0xFF9747FF).withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_outlined,
+                  color: const Color(0xFFFF00E5),
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Password Required',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: const Text(
+              'Please enter your password to continue.',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // 關閉對話框
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF9747FF),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          );
+        },
       );
       return; // 停止登入流程
     }
