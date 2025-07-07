@@ -41,7 +41,7 @@ class _LoginPageState extends State<LoginPage> {
 
   // 所有比例參數保持不變...
   final double _topSpaceRatio = 0.06;
-  final double _titleHeightRatio = 0.05;
+  final double _titleHeightRatio = 0.06;
   final double _titleSpaceRatio = 0.03;
   final double _cardHeightRatio = 0.40;
   final double _cardToButtonSpaceRatio = 0.15;
@@ -464,7 +464,7 @@ class _LoginPageState extends State<LoginPage> {
                       height: screenSize.height * _titleHeightRatio,
                       alignment: Alignment.center,
                       child: Text(
-                        "Account",
+                        "Login",
                         style: AppTextStyles.heading1, // 使用 heading1 樣式
                       ),
                     ),
