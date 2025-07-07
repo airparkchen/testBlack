@@ -363,6 +363,7 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
                 backgroundColor: Colors.black,
                 backgroundOpacity: 0.4,
                 hintText: hintText,
+                contentPadding: const EdgeInsets.fromLTRB(0, 0, 34, 0), // 右側留 34px 空間給圖示
               ),
               Positioned(
                 right: 8,

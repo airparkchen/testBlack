@@ -458,7 +458,7 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.black.withOpacity(0.4),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              contentPadding: const EdgeInsets.fromLTRB(16, 16, 50, 16), // 右側留 34px 空間給圖示
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(2),
                 borderSide: BorderSide(

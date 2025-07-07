@@ -174,6 +174,7 @@ class CustomTextField extends StatelessWidget {
   final InputDecoration? decoration;
   final TextStyle? textStyle;
   final TextStyle? hintStyle;
+  final EdgeInsets? contentPadding;
 
   // 添加 enabled 參數
   final bool enabled;
@@ -209,6 +210,7 @@ class CustomTextField extends StatelessWidget {
     this.borderOpacity = 0.7,
     this.backgroundColor = Colors.black,
     this.backgroundOpacity = 0.4,
+    this.contentPadding,
   }) : super(key: key);
 
   @override
@@ -283,7 +285,8 @@ class CustomTextField extends StatelessWidget {
                     fontSize: 16,
                   ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
+                  // 🔧 修改：使用傳入的 contentPadding，如果沒有則使用 EdgeInsets.zero
+                  contentPadding: contentPadding ?? EdgeInsets.zero,
                 ),
               ),
             ),

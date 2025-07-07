@@ -893,7 +893,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.black.withOpacity(0.4),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              contentPadding: const EdgeInsets.fromLTRB(16, 16, 50, 16),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(2),
                 borderSide: BorderSide(

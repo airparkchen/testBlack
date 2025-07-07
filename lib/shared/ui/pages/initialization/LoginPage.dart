@@ -206,6 +206,18 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _handleLogin() async {
+
+    if (_passwordController.text.isEmpty) {
+      // 顯示錯誤提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your password'),
+          backgroundColor: Color(0xFFFF00E5), // 使用您的錯誤顏色
+        ),
+      );
+      return; // 停止登入流程
+    }
+
     if (!_isFormValid) {
       _validatePassword();
       return;
