@@ -2934,7 +2934,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                 borderRadius: BorderRadius.circular(buttonBorderRadius),
                 child: Center(
                   child: Text(
-                    'Next',
+                    _isLastStep() ? 'Apply' : 'Next',
                     style: TextStyle(
                       fontSize: buttonTextFontSize,
                       color: (isAuthenticating || !isAuthenticated)
@@ -2949,5 +2949,10 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         ],
       ),
     );
+  }
+  // 🔧 新增：判斷是否為最後一個步驟的方法
+  bool _isLastStep() {
+    final steps = _getCurrentModelSteps();
+    return steps.isNotEmpty && currentStepIndex == steps.length - 1;
   }
 }
