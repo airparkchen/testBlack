@@ -320,7 +320,6 @@ class _DashboardComponentState extends State<DashboardComponent>
     // ==================== 🔥 修正：第三頁：Ethernet（保持原布局，恢復標題顯示） ====================
     final thirdPageConnections = <EthernetConnection>[];
 
-    // 🔥 關鍵修正：不在這裡添加 "Ethernet" 標題，讓 _buildEthernetPage 特殊處理
     // 只轉換 LAN 埠資料，標題由 _buildEthernetPage 中的 _buildSectionTitle 處理
 
     // 🔥 將 LAN 埠資料轉換為連接項目（如果有的話）
@@ -436,114 +435,62 @@ class _DashboardComponentState extends State<DashboardComponent>
       ) {
     return Padding(
       padding: contentPadding,
-      child: Column(  // 🎯 修改：從 ListView 改為 Column
-        crossAxisAlignment: CrossAxisAlignment.start,  // 🎯 靠左對齊
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🔥 修正：恢復原本的 Ethernet 頁面特殊處理
+          // 第三頁 Ethernet 的處理（保持原有）
           if (pageData.pageTitle.contains("Ethernet")) ...[
-            // 🔥 第三頁：顯示 Ethernet 標題
             _buildSectionTitle("Ethernet", bottomInset),
-
-            // 🔥 加上橫線分隔（跟 WiFi 一樣）
             _buildDivider(bottomInset),
-
-            // 🔥 根據是否有 LAN 資料決定顯示內容
-            if (pageData.connections.isNotEmpty) ...[
-              // 有 LAN 資料：顯示 LAN 埠列表（跟 WiFi 頻段一樣的排版）
-              ...pageData.connections.map((connection) {
-                return Padding(
-                  padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 4 : 6),
-                  child: Row(
-                    children: [
-                      // 左側空間（讓 LAN 埠名稱看起來居中）
-                      Expanded(flex: 1, child: SizedBox()),
-
-                      // 中間：LAN 埠名稱（如 "2.5Gbps"）
-                      Expanded(
-                        flex: 2,
-                        child: Center(
-                          child: Text(
-                            connection.speed,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.7),
-                              fontWeight: FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // 右側：連接狀態（如 "Connected"）
-                      Expanded(
-                        flex: 3,
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            connection.status,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: _getStatusColor(connection.status),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ] else ...[
-              // 沒有 LAN 資料：顯示提示訊息
-              SizedBox(height: 40),
-              Center(
-                child: Text(
-                  'No LAN data available',
-                  style: TextStyle(
-                    fontSize: bottomInset > 0 ? 14 : 16,
-                    color: Colors.white.withOpacity(0.5),
-                  ),
-                ),
-              ),
-            ],
+            // ... Ethernet 內容處理
           ] else ...[
-            // 🎯 修正：第一頁和第二頁 - 移除 Spacer，讓內容從頂部開始
+            // 🔥 第一頁和第二頁的處理
             ...pageData.connections.asMap().entries.map((entry) {
               int index = entry.key;
               EthernetConnection connection = entry.value;
               bool isLastItem = index == pageData.connections.length - 1;
 
-              // 🔥 修正：根據connectionType來決定排版方式
               String connectionType = connection.connectionType ?? '';
               bool isWiFiOrGuestTitle = connectionType == 'wifi_title' || connectionType == 'guest_wifi_title';
               bool isSSIDItem = connectionType == 'wifi_ssid' || connectionType == 'guest_wifi_ssid';
-              bool needsDividerAfter = isWiFiOrGuestTitle; // 只有WiFi/Guest WiFi標題後需要橫線
+              bool needsDividerAfter = isWiFiOrGuestTitle;
+
+              // 🎯 判斷是否為最後一個SSID項目
+              bool isLastSSIDItem = false;
+              if (isSSIDItem) {
+                isLastSSIDItem = true;
+                // 檢查後面是否還有其他SSID項目
+                for (int i = index + 1; i < pageData.connections.length; i++) {
+                  String futureType = pageData.connections[i].connectionType ?? '';
+                  if (futureType == 'wifi_ssid' || futureType == 'guest_wifi_ssid') {
+                    isLastSSIDItem = false;
+                    break;
+                  }
+                }
+              }
 
               return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,  // 🎯 靠左對齊
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildConnectionItem(connection, bottomInset, index == 0),
+                  // 🔥 使用修改後的構建方法
+                  _buildConnectionItem(connection, bottomInset, index == 0, isLastSSIDItem),
 
-                  // 🎯 關鍵：只在WiFi或Guest WiFi標題後加橫線
+                  // 原有的分隔線處理
                   if (needsDividerAfter)
                     _buildDivider(bottomInset),
 
-                  // 其他項目的間距處理
-                  if (!isLastItem && !needsDividerAfter) ...[
+                  if (!isLastItem && !needsDividerAfter && !isSSIDItem) ...[
                     if (pageData.pageTitle.contains("SSID"))
-                      SizedBox(height: 2) // SSID頁面的小間距
+                      SizedBox(height: 2)
                     else if (!_isWiFiOrEthernetRelatedItem(connection.speed))
-                      _buildDivider(bottomInset) // 第一頁非WiFi項目的橫線
+                      _buildDivider(bottomInset)
                     else
-                      SizedBox(height: 2), // WiFi/Ethernet項目的小間距
+                      SizedBox(height: 2),
                   ],
                 ],
               );
             }).toList(),
           ],
-
-          // 🎯 移除額外的空間，讓內容緊湊排列
-          // if (bottomInset > 0)
-          //   SizedBox(height: bottomInset * 0.5),  // 🔥 註解掉這行
         ],
       ),
     );
@@ -562,15 +509,112 @@ class _DashboardComponentState extends State<DashboardComponent>
 
   // ==================== 🔥 重寫：連接項目構建（保持原排版邏輯） ====================
 
+  /// 🔥 修正：專門為第二頁SSID設計的雙行佈局項目
+  Widget _buildSSIDItem(EthernetConnection connection, double bottomInset) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        vertical: bottomInset > 0 ? 8 : 10,  // 🎯 增加垂直間距因為是雙行
+      ),
+      width: double.infinity,  // 🎯 佔滿整個寬度（WiFi標題下方全部空間）
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,  // 🎯 整體左對齊
+        children: [
+          // 🎯 第一行：SSID(頻率) - 置左對齊
+          Align(
+            alignment: Alignment.centerLeft,  // 🎯 在整個空間內置左
+            child: Text(
+              connection.speed,  // 例如："SSID(2.4GHz)", "SSID(5GHz)", "SSID(6GHz)"
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.9),
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ),
+
+          SizedBox(height: 4),  // 🎯 兩行之間的間距
+
+          // 🎯 第二行：實際SSID名稱 - 置右對齊
+          Align(
+            alignment: Alignment.centerRight,  // 🎯 在整個空間內置右
+            child: Text(
+              _formatSSIDNameOnly(connection.status),  // 🔥 只省略SSID名稱，不動頻率
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.7),
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.visible,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 🎯 新增：只處理SSID名稱的省略，保護頻率不被動到
+  String _formatSSIDNameOnly(String ssidName) {
+    if (ssidName.isEmpty) return ssidName;
+
+    // 🎯 計算最大顯示長度
+    // 根據您的需求：SSID名稱不能超過頻率標籤的起始位置
+    // 假設 "SSID(2.4GHz)" 大約佔據 12 個字元寬度
+    // 右側SSID應該不超過大約 15-16 個字元避免重疊
+    const int maxSSIDLength = 16;
+
+    if (ssidName.length <= maxSSIDLength) {
+      return ssidName;  // 🎯 長度適中，完整顯示
+    }
+
+    // 🎯 智能省略：保留前面和後面，特別保護頻率後綴
+    // 檢查是否有頻率後綴（如 _2.4G, _5G, _6G）
+    final frequencyPattern = RegExp(r'_\d+\.?\d*G$');
+    final match = frequencyPattern.firstMatch(ssidName);
+
+    if (match != null) {
+      // 🔥 有頻率後綴，要保護它
+      final frequencySuffix = match.group(0)!;  // 例如 "_5G"
+      final nameWithoutSuffix = ssidName.substring(0, match.start);
+
+      // 計算可用空間（扣除後綴和省略號的長度）
+      final availableLength = maxSSIDLength - frequencySuffix.length - 3; // 3 for "..."
+
+      if (nameWithoutSuffix.length <= availableLength) {
+        return ssidName;  // 🎯 即使有後綴也能完整顯示
+      } else {
+        // 🎯 省略中間部分，保留前面 + "..." + 頻率後綴
+        final frontLength = (availableLength * 0.6).floor();  // 前面佔60%
+        final frontPart = nameWithoutSuffix.substring(0, frontLength);
+        return '$frontPart...$frequencySuffix';
+        // 例如："Apple_Home_Network_5G" -> "Apple...5G"
+      }
+    } else {
+      // 🔥 沒有頻率後綴，使用前後保留的省略方式
+      const int frontChars = 8;   // 前面字元數
+      const int backChars = 5;    // 後面字元數
+
+      if (ssidName.length > frontChars + backChars + 3) {
+        String frontPart = ssidName.substring(0, frontChars);
+        String backPart = ssidName.substring(ssidName.length - backChars);
+        return '$frontPart...$backPart';
+        // 例如："VeryLongSSIDNameWithoutFreq" -> "VeryLong...tFreq"
+      } else {
+        // 長度不足以前後省略，直接截斷
+        return '${ssidName.substring(0, maxSSIDLength - 3)}...';
+      }
+    }
+  }
+
   /// 🔥 修正：連接項目構建，保持原有的排版格式
-  Widget _buildConnectionItem(EthernetConnection connection, double bottomInset, bool isFirstItem) {
+  Widget _buildConnectionItem(EthernetConnection connection, double bottomInset, bool isFirstItem, bool isLastSSID) {
     String connectionType = connection.connectionType ?? '';
 
-    // 🔥 情況1：標題行（如 "WiFi", "Guest WiFi", "Ethernet"）
+    // 標題行處理
     if (connection.status.isEmpty || connectionType.contains('title')) {
       return Padding(
         padding: EdgeInsets.only(
-          top: isFirstItem ? 0 : (bottomInset > 0 ? 8 : 10), //標題行距
+          top: isFirstItem ? 0 : (bottomInset > 0 ? 8 : 10),
           bottom: bottomInset > 0 ? 4 : 6,
         ),
         child: Align(
@@ -587,47 +631,66 @@ class _DashboardComponentState extends State<DashboardComponent>
       );
     }
 
-    // 🔥 情況2：SSID項目（左上角標題，右下角SSID名稱）
+    // 🔥 SSID項目：兩行顯示 + 條件性橫線
     if (connectionType == 'wifi_ssid' || connectionType == 'guest_wifi_ssid') {
-      return Padding(
-        padding: EdgeInsets.only(
-          top: bottomInset > 0 ? 6: 8,   //SSID間距
-          bottom: bottomInset > 0 ? 6 : 8,
+      return Container(
+        margin: EdgeInsets.only(
+          left: 50,  // 不超過 WiFi 標題
+          right: 0,
+          top: bottomInset > 0 ? 6 : 8,
+          bottom: isLastSSID ? (bottomInset > 0 ? 6 : 8) : 0,
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 左上角：SSID 標題（如 "SSID(2.4GHz)"）
+            // 第一行：SSID頻率標題（置左）
             Align(
-              alignment: Alignment.center,
+              alignment: Alignment.centerLeft,
               child: Text(
-                connection.speed,
+                connection.speed,  // "SSID(2.4GHz)"
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withOpacity(0.9),
                   fontWeight: FontWeight.normal,
                 ),
               ),
             ),
+
+            // 行間距
             SizedBox(height: 6),
-            // 右下角：SSID 名稱
+
+            // 第二行：實際SSID名稱（置右）
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                connection.status,
+                _formatSSIDWithSmartEllipsis(connection.status),
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withOpacity(0.9),
                   fontWeight: FontWeight.w500,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.visible,
               ),
             ),
+
+            // 🔥 條件性橫線：只有不是最後一個SSID才顯示
+            if (!isLastSSID) ...[
+              SizedBox(height: 8),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: Colors.white.withOpacity(0.1),
+                indent: 0,
+                endIndent: 0,
+              ),
+            ],
           ],
         ),
       );
     }
 
-    // 🔥 情況3：單行項目（Model Name, Internet）
+    // 其他項目處理（保持原有邏輯）
     if (_isSingleLineItem(connection.speed)) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 4 : 6),
@@ -636,61 +699,39 @@ class _DashboardComponentState extends State<DashboardComponent>
           children: [
             Text(
               connection.speed,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             Text(
               connection.status,
-              style: TextStyle(
-                fontSize: 16,
-                color: _getStatusColor(connection.status),
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(fontSize: 16, color: _getStatusColor(connection.status), fontWeight: FontWeight.w500),
             ),
           ],
         ),
       );
     }
 
-    // 🔥 情況4：WiFi頻段項目和Ethernet埠項目（統一排版：名稱居中，狀態右對齊）
-    // 這包括 WiFi 頻段（2.4GHz, 5GHz等）和 Ethernet 埠（2.5Gbps等）
+    // WiFi頻段項目（第一頁用）
     return Padding(
       padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 2 : 4),
       child: Row(
         children: [
-          // 左側空間（讓名稱看起來居中）
           Expanded(flex: 1, child: SizedBox()),
-
-          // 中間：名稱（WiFi 頻段或 Ethernet 埠）
           Expanded(
             flex: 2,
             child: Center(
               child: Text(
                 connection.speed,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white.withOpacity(0.7),
-                  fontWeight: FontWeight.normal,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.white.withOpacity(0.7), fontWeight: FontWeight.normal),
               ),
             ),
           ),
-
-          // 右側：狀態
           Expanded(
             flex: 1,
             child: Align(
               alignment: Alignment.centerRight,
               child: Text(
                 connection.status,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: _getStatusColor(connection.status),
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(fontSize: 16, color: _getStatusColor(connection.status), fontWeight: FontWeight.w500),
               ),
             ),
           ),
@@ -699,9 +740,83 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
+  /// 🎯 新增：格式化SSID，限制長度並加上省略號
+  String _formatSSIDWithSmartEllipsis(String ssid) {
+    if (ssid.isEmpty) return ssid;
+
+    const int maxDisplayLength = 22;
+
+    if (ssid.length <= maxDisplayLength) {
+      return ssid;
+    }
+
+    // 智能識別頻率後綴
+    String frequencySuffix = _extractFrequencySuffix(ssid);
+
+    if (frequencySuffix.isNotEmpty) {
+      int remainingLength = maxDisplayLength - frequencySuffix.length - 3;
+      if (remainingLength > 3) {
+        String prefix = ssid.substring(0, remainingLength);
+        return '$prefix...$frequencySuffix';
+      }
+    }
+
+    // 常規省略
+    const int frontChars = 12;
+    const int backChars = 6;
+
+    if (ssid.length > frontChars + backChars + 3) {
+      String frontPart = ssid.substring(0, frontChars);
+      String backPart = ssid.substring(ssid.length - backChars);
+      return '$frontPart...$backPart';
+    } else {
+      return '${ssid.substring(0, maxDisplayLength - 3)}...';
+    }
+  }
+
+  /// 🎯 提取頻率後綴（支援各種頻率格式，為未來擴展做準備）
+  String _extractFrequencySuffix(String ssid) {
+    final frequencyPatterns = [
+      '_2.4G', '_5G', '_6G', '_MLO',
+      '_2G', '_5GHz', '_6GHz',
+      '2.4G', '5G', '6G', 'MLO',
+      '2.4GHz', '5GHz', '6GHz',
+    ];
+
+    for (String pattern in frequencyPatterns) {
+      if (ssid.endsWith(pattern)) {
+        return pattern;
+      }
+    }
+
+    final RegExp frequencyRegex = RegExp(r'[_]?([\d\.]+G(?:Hz)?|MLO)$', caseSensitive: false);
+    final match = frequencyRegex.firstMatch(ssid);
+    if (match != null) {
+      return match.group(0) ?? '';
+    }
+
+    return '';
+  }
+
+
   /// 判斷是否為單行項目
   bool _isSingleLineItem(String speed) {
     return speed == 'Model Name' || speed == 'Internet';
+  }
+
+
+  /// 🎯 獲取狀態顏色
+  Color _getStatusColor(String status) {
+    final statusLower = status.toLowerCase();
+    if (statusLower.contains('connect') && !statusLower.contains('disconnect')) {
+      return Colors.white.withOpacity(0.7);
+    } else if (statusLower.contains('on')) {
+      return Colors.white.withOpacity(0.7);
+    } else if (statusLower.contains('disconnect') || statusLower.contains('off')) {
+      return Colors.white.withOpacity(0.7);
+    } else {
+      return Colors.white.withOpacity(0.7);
+    }
   }
 
   // ==================== 保持原有的 UI 元件構建方法 ====================
@@ -743,23 +858,6 @@ class _DashboardComponentState extends State<DashboardComponent>
         color: Colors.white,
       ),
     );
-  }
-
-  /// 獲取狀態顏色 不同狀態不同顏色
-  Color _getStatusColor(String status) {
-    final statusLower = status.toLowerCase();
-    if (statusLower.contains('connect') && !statusLower.contains('disconnect')) {
-      // return Colors.green.shade300;
-      return Colors.white.withOpacity(0.7);
-    } else if (statusLower.contains('on')) {
-      // return Colors.green.shade300;
-      return Colors.white.withOpacity(0.7);
-    } else if (statusLower.contains('disconnect') || statusLower.contains('off')) {
-      // return Colors.red.shade300;
-      return Colors.white.withOpacity(0.7);
-    } else {
-      return Colors.white.withOpacity(0.7);
-    }
   }
 
   Widget _buildDivider(double bottomInset) {
