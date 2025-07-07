@@ -42,6 +42,7 @@ class WifiSettingFlowPage extends StatefulWidget {
 class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   final AppTheme _appTheme = AppTheme();
 
+  bool _forceWPA3Only = true;  // 設為 true 時只有 WPA3 選項
   bool showDebugMessages = true; // 或設為 false 以關閉調試訊息
   //追蹤用戶是否已經修改過設置(DHCP/Static_IP/PPPOE)
   bool _userHasModifiedWanSettings = false;
@@ -2173,7 +2174,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         }
 
         // 明確指定安全選項，不依賴 detailOptions
-        List<String> securityOptions = [
+        List<String> securityOptions = _forceWPA3Only
+            ? ['WPA3 Personal']  // 只有 WPA3
+            : [                  // 完整選項
           'no authentication',
           'Enhanced Open (OWE)',
           'WPA2 Personal',
