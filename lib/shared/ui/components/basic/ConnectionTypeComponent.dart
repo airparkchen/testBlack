@@ -338,9 +338,13 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
           }
           break;
         default:
+        // 🔧 新增：檢查明顯無效的地址
           if (!_validateIpFormat(ip)) {
             isValid = false;
             errorMessage = 'Please enter a valid IP address';
+          } else if (_isObviouslyInvalidIp(ip)) {
+            isValid = false;
+            errorMessage = _getInvalidIpMessage(ip);
           }
           break;
       }
@@ -523,6 +527,20 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
         _selectedConnectionType == 'PPPoE' ? _pppoeConfig : null,
       );
     }
+  }
+  // 🔧 新增：檢查明顯無效的 IP 地址
+  bool _isObviouslyInvalidIp(String ip) {
+    return ip == '0.0.0.0' || ip == '255.255.255.255';
+  }
+
+// 🔧 新增：獲取無效 IP 的錯誤訊息
+  String _getInvalidIpMessage(String ip) {
+    if (ip == '0.0.0.0') {
+      return 'IP address cannot be 0.0.0.0';
+    } else if (ip == '255.255.255.255') {
+      return 'IP address cannot be 255.255.255.255';
+    }
+    return 'Please enter a valid IP address';
   }
 
   @override
