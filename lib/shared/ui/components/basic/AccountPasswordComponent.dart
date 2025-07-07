@@ -386,7 +386,8 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Your password must be at least 8 characters',
+          _getPasswordHintText(controller.text, isError, label),  //動態提示
+          // 'Your password must be at least 8 characters',
           style: TextStyle(
             fontSize: bottomInset > 0 ? 10 : 12, // 鍵盤彈出時縮小字體
             color: isError ? Color(0xFFFF00E5) : Colors.white,
@@ -424,5 +425,51 @@ class _AccountPasswordComponentState extends State<AccountPasswordComponent> {
         SizedBox(height: bottomInset > 0 ? 10 : 24), // 鍵盤彈出時縮小間距
       ],
     );
+  }
+
+  // 新增：動態密碼提示方法
+  String _getPasswordHintText(String password, bool isError, String label) {
+    // 🔧 如果是 Confirm Password，只檢查是否相符
+    if (label == 'Confirm Password') {
+      if (password.isEmpty) {
+        return 'Please confirm your password';
+      }
+      if (isError) {
+        return 'Passwords do not match';
+      }
+      return 'Passwords match';
+    }
+
+    // 🔧 如果是 Password，檢查完整的密碼要求
+    if (password.isEmpty) {
+      return 'Your password must be at least 8 characters';
+    }
+
+    if (password.length < 8) {
+      return 'Password too short (minimum 8 characters)';
+    }
+
+    if (password.length > 32) {
+      return 'Password too long (maximum 32 characters)';
+    }
+
+    // 檢查密碼複雜度
+    if (!_isPasswordCharactersValid(password)) {
+      if (!RegExp(r'[A-Z]').hasMatch(password)) {
+        return 'Password must contain at least one uppercase letter';
+      }
+      if (!RegExp(r'[a-z]').hasMatch(password)) {
+        return 'Password must contain at least one lowercase letter';
+      }
+      if (!RegExp(r'[0-9]').hasMatch(password)) {
+        return 'Password must contain at least one digit';
+      }
+      if (!RegExp(r'[\x21\x23-\x2F\x3A-\x3B\x3D\x3F-\x40\x5B\x5D-\x60\x7B-\x7E]').hasMatch(password)) {
+        return 'Password must contain at least one special character';
+      }
+      return 'Password contains invalid characters';
+    }
+
+    return 'Password meets requirements';
   }
 }
