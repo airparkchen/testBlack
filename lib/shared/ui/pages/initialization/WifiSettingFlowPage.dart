@@ -719,10 +719,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
           if (vap.containsKey('password')) {
             if (vap['password'] is String) {
-              // 只在 ssidPassword 為空時才設置（避免覆蓋用戶輸入）
-              if (ssidPassword.isEmpty) {
+              // 🔧 修改：API 有密碼且不為空時才更新，否則保持預設值
+              if (ssidPassword == '12345678' && vap['password'].isNotEmpty) {
                 ssidPassword = vap['password'];
-                print('設置WiFi密碼: 已設置，長度: ${ssidPassword.length} (從API)');
+                print('更新為API密碼: 已設置，長度: ${ssidPassword.length} (從API)');
+              } else if (ssidPassword.isEmpty) {
+                ssidPassword = vap['password'].isNotEmpty ? vap['password'] : '12345678';
+                print('設置密碼: 已設置，長度: ${ssidPassword.length}');
               } else {
                 print('保留用戶輸入的WiFi密碼，長度: ${ssidPassword.length}');
               }
@@ -2166,6 +2169,11 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         );
 
       case 'SetSSIDComponent':
+      // 🔧 新增：確保第一次進入時有預設密碼
+        if (ssidPassword.isEmpty) {
+          ssidPassword = '12345678';
+          print('🔧 設置初始預設密碼: $ssidPassword');
+        }
       // 在創建組件前，確保已調用獲取無線設置的方法
         if (_currentWirelessSettings.isEmpty && !_isLoadingWirelessSettings) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
