@@ -185,7 +185,11 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   /// 🎯 修正：建構頂部區域 - Gateway 不顯示 RSSI bar
   Widget _buildTopArea() {
     // 🎯 修正1：檢查是否為 Gateway，Gateway 不顯示 RSSI
+    final String? rssiString = widget.selectedDevice.additionalInfo['rssi'];
+    final int rssiValue = int.tryParse(rssiString ?? '') ?? 0;
     final bool isGatewayDevice = widget.selectedDevice.additionalInfo['type'] == 'gateway';
+    final bool shouldShowRssiBar = !isGatewayDevice && rssiValue != 0;
+
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -219,7 +223,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           ),
 
           // 🎯 修正：只有非 Gateway 設備才顯示 RSSI bar
-          if (!isGatewayDevice) ...[
+          if (shouldShowRssiBar) ...[
             // 解析 RSSI 數據
             Builder(
               builder: (context) {
