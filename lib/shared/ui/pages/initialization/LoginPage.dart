@@ -618,6 +618,7 @@ class _LoginPageState extends State<LoginPage> {
                   fontSize: _inputTextFontSize,
                   color: _isLoggingIn ? Colors.white.withOpacity(0.5) : Colors.white,
                 ),
+                contentPadding: const EdgeInsets.fromLTRB(0, 11, 30, 16), // 右側留 34px 空間給圖示
               ),
               Positioned(
                 right: 8,
