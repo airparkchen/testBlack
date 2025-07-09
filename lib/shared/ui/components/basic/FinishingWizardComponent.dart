@@ -66,9 +66,9 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     }
   }
 
-  // 🔥 新增：單一Process模式初始化
+  // 單一Process模式初始化
   void _initializeSingleProcessMode() {
-    // 🔥 只使用 1 個 process，名稱改為 'Process 04'（保持原本的樣子）
+    // 只使用 1 個 process，名稱改為 'Process 01'
     final processNames = ['Process 01'];
 
     // 初始化進程列表
@@ -195,16 +195,15 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
       setState(() {
         _apiProgress = progress.clamp(0.0, 100.0);
 
-        // 🔥 更新 Process 04 的進度（保持原本的樣子）
-        _processes[0] = ProcessInfo('Process 04', _apiProgress);
+        _processes[0] = ProcessInfo('Process 01', _apiProgress);
 
-        // 🔥 修正：當 API 進度達到100%時，先顯示對話框，再執行完成邏輯
+        // 當 API 進度達到100%時，先顯示對話框，再執行完成邏輯
         if (_apiProgress >= 100.0 && !_isCompleted) {
           _isCompleted = true;
 
           print('🎯 API 進度達到 100%，準備顯示重連對話框');
 
-          // 🔥 重要修正：延遲一小段時間確保UI更新完成，然後直接顯示對話框
+          // 延遲一小段時間確保UI更新完成，然後直接顯示對話框
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) {
               print('🎯 顯示重連對話框');

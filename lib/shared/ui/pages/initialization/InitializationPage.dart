@@ -111,8 +111,7 @@ class _InitializationPageState extends State<InitializationPage>
 
   // 自動掃描方法
   void _startAutoScan() {
-    if (widget.shouldAutoSearch) {
-      print('🔍 跳過初始自動掃描，等待自動搜尋');
+    if (widget.shouldAutoSearch && !_autoSearchCompleted) {  // 只有在自動搜尋模式且未完成時才跳過
       return;
     }
 
@@ -163,7 +162,16 @@ class _InitializationPageState extends State<InitializationPage>
           });
           return; // 不重置 _isAutoSearching，繼續重試流程
         } else {
-          // 找到了 SSID 或達到最大重試次數
+          // 🔥 修正：立即設置狀態，不要等待其他操作
+          print('🔥 立即設置自動搜尋完成狀態');
+          setState(() {
+            _isAutoSearching = false;
+            _autoSearchAttempts = 0;
+            _autoSearchCompleted = true; // 🔥 標記自動搜尋已完成
+          });
+          print('🔥 自動搜尋狀態已重置：_autoSearchCompleted = $_autoSearchCompleted');
+
+          // 🔥 然後才顯示提示訊息
           if (foundConfiguredSSID) {
             print('✅ 成功找到配置的 SSID "$configuredSSID"');
 
@@ -201,22 +209,17 @@ class _InitializationPageState extends State<InitializationPage>
               ),
             );
           }
-
-          // 🔥 重置自動搜尋狀態，並標記自動搜尋已完成
-          setState(() {
-            _isAutoSearching = false;
-            _autoSearchAttempts = 0;
-            _autoSearchCompleted = true; // 🔥 新增：標記自動搜尋已完成
-          });
         }
       } else {
         // 沒有配置的 SSID 記錄
         print('⚠️ 沒有配置的 SSID 記錄');
+        print('🔥 設置自動搜尋完成狀態（無配置SSID）');
         setState(() {
           _isAutoSearching = false;
           _autoSearchAttempts = 0;
-          _autoSearchCompleted = true; // 🔥 新增：標記自動搜尋已完成
+          _autoSearchCompleted = true; // 🔥 標記自動搜尋已完成
         });
+        print('🔥 自動搜尋狀態已重置：_autoSearchCompleted = $_autoSearchCompleted');
       }
     }
   }
