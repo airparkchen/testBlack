@@ -782,6 +782,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
       // 過濾和處理結果
       final seenSsids = <String>{};
       final uniqueResults = <WiFiAccessPoint>[];
+      final currentSSID = await _getCurrentWifiSSID();
 
       for (var result in results) {
         if (result.ssid.isNotEmpty && seenSsids.add(result.ssid)) {
@@ -790,7 +791,14 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
       }
 
       uniqueResults.sort((a, b) {
-        // 第一優先：配置完成的 SSID
+        // 第一優先：已連線的 SSID
+        bool aIsConnected = _compareSSID(currentSSID, a.ssid);
+        bool bIsConnected = _compareSSID(currentSSID, b.ssid);
+
+        if (aIsConnected && !bIsConnected) return -1;
+        if (!aIsConnected && bIsConnected) return 1;
+
+        // 第二優先：配置完成的 SSID
         bool aIsConfigured = WifiScannerComponent.configuredSSID != null &&
             a.ssid == WifiScannerComponent.configuredSSID;
         bool bIsConfigured = WifiScannerComponent.configuredSSID != null &&
@@ -799,14 +807,14 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
         if (aIsConfigured && !bIsConfigured) return -1;
         if (!aIsConfigured && bIsConfigured) return 1;
 
-        // 第二優先：EG180 開頭的 SSID
+        // 第三優先：EG180 開頭的 SSID
         bool aIsEG180 = a.ssid.startsWith('EG180');
         bool bIsEG180 = b.ssid.startsWith('EG180');
 
         if (aIsEG180 && !bIsEG180) return -1;
         if (!aIsEG180 && bIsEG180) return 1;
 
-        // 第三優先：信號強度
+        // 第四優先：信號強度
         return b.level.compareTo(a.level);
       });
 

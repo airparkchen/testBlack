@@ -33,10 +33,13 @@ class _InitializationPageState extends State<InitializationPage>
   // 創建 AppTheme 實例
   final AppTheme _appTheme = AppTheme();
 
-  // 🔥 新增：追蹤自動搜尋狀態
+  // 追蹤自動搜尋狀態
   bool _isAutoSearching = false;
   int _autoSearchAttempts = 0;
   static const int _maxAutoSearchAttempts = 3; // 最多嘗試 3 次
+
+  // 追蹤自動搜尋是否已完成
+  bool _autoSearchCompleted = false;
 
   @override
   void initState() {
@@ -77,6 +80,7 @@ class _InitializationPageState extends State<InitializationPage>
     _scannerController.startScan();
   }
 
+  //App 生命週期的觸發條件
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -85,9 +89,16 @@ class _InitializationPageState extends State<InitializationPage>
       case AppLifecycleState.resumed:
         print('App resumed - 檢查是否需要重新掃描');
 
-        // 如果不是自動搜尋模式且當前沒有在自動搜尋中
-        if (!widget.shouldAutoSearch && !_isAutoSearching) {
+        // 修改觸發條件：
+        // 1. 非自動搜尋模式 OR 自動搜尋已完成
+        // 2. 當前沒有在自動搜尋中
+        bool shouldTriggerScan = (!widget.shouldAutoSearch || _autoSearchCompleted) && !_isAutoSearching;
+
+        if (shouldTriggerScan) {
+          print('🔍 觸發 App 回到前台的掃描');
           _startAutoScan();
+        } else {
+          print('🔍 跳過 App 回到前台的掃描 - shouldAutoSearch: ${widget.shouldAutoSearch}, autoSearchCompleted: $_autoSearchCompleted, isAutoSearching: $_isAutoSearching');
         }
         break;
       case AppLifecycleState.paused:
@@ -132,12 +143,11 @@ class _InitializationPageState extends State<InitializationPage>
 
     print('WiFi 掃描完成 - 發現 ${devices.length} 個裝置');
 
-    // 🔥 新增：如果是自動搜尋，檢查是否找到配置的 SSID
+    // 🔥 自動搜尋模式的特殊處理
     if (_isAutoSearching && widget.shouldAutoSearch) {
       final configuredSSID = WifiScannerComponent.configuredSSID;
 
       if (configuredSSID != null && configuredSSID.isNotEmpty) {
-        // 檢查掃描結果中是否包含配置的 SSID
         bool foundConfiguredSSID = devices.any((device) => device.ssid == configuredSSID);
 
         print('🔍 自動搜尋結果：配置的 SSID "$configuredSSID" ${foundConfiguredSSID ? "已找到" : "未找到"}');
@@ -157,7 +167,7 @@ class _InitializationPageState extends State<InitializationPage>
           if (foundConfiguredSSID) {
             print('✅ 成功找到配置的 SSID "$configuredSSID"');
 
-            // 🔥 新增：顯示成功提示
+            // 顯示成功提示
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Row(
@@ -174,7 +184,7 @@ class _InitializationPageState extends State<InitializationPage>
           } else {
             print('❌ 達到最大重試次數，仍未找到配置的 SSID "$configuredSSID"');
 
-            // 新增：顯示未找到提示
+            // 顯示未找到提示
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Row(
@@ -192,15 +202,21 @@ class _InitializationPageState extends State<InitializationPage>
             );
           }
 
-          // 重置自動搜尋狀態
-          _isAutoSearching = false;
-          _autoSearchAttempts = 0;
+          // 🔥 重置自動搜尋狀態，並標記自動搜尋已完成
+          setState(() {
+            _isAutoSearching = false;
+            _autoSearchAttempts = 0;
+            _autoSearchCompleted = true; // 🔥 新增：標記自動搜尋已完成
+          });
         }
       } else {
         // 沒有配置的 SSID 記錄
         print('⚠️ 沒有配置的 SSID 記錄');
-        _isAutoSearching = false;
-        _autoSearchAttempts = 0;
+        setState(() {
+          _isAutoSearching = false;
+          _autoSearchAttempts = 0;
+          _autoSearchCompleted = true; // 🔥 新增：標記自動搜尋已完成
+        });
       }
     }
   }
@@ -475,11 +491,11 @@ class _InitializationPageState extends State<InitializationPage>
   Widget _buildSearchButton({required double height}) {
     return GestureDetector(
       onTap: isScanning ? null : () {
-        // 🔥 手動搜尋時，重置自動搜尋狀態
-        _isAutoSearching = false;
-        _autoSearchAttempts = 0;
-
+        // 手動搜尋時，重置所有自動搜尋相關狀態
         setState(() {
+          _isAutoSearching = false;
+          _autoSearchAttempts = 0;
+          _autoSearchCompleted = false; // 重置自動搜尋完成狀態
           isScanning = true;
         });
         _scannerController.startScan();
@@ -494,7 +510,6 @@ class _InitializationPageState extends State<InitializationPage>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 🔥 新增：顯示自動搜尋狀態
               if (_isAutoSearching) ...[
                 SizedBox(
                   width: height * 0.3,
