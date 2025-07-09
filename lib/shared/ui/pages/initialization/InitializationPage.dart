@@ -10,7 +10,11 @@ import 'package:whitebox/shared/theme/app_theme.dart';
 import 'LoginPage.dart';
 
 class InitializationPage extends StatefulWidget {
-  const InitializationPage({super.key});
+  final bool shouldAutoSearch;
+  const InitializationPage({
+    super.key,
+    this.shouldAutoSearch = false, // 預設為 false
+  });
 
   @override
   State<InitializationPage> createState() => _InitializationPageState();
@@ -29,6 +33,11 @@ class _InitializationPageState extends State<InitializationPage>
   // 創建 AppTheme 實例
   final AppTheme _appTheme = AppTheme();
 
+  // 🔥 新增：追蹤自動搜尋狀態
+  bool _isAutoSearching = false;
+  int _autoSearchAttempts = 0;
+  static const int _maxAutoSearchAttempts = 3; // 最多嘗試 3 次
+
   @override
   void initState() {
     super.initState();
@@ -37,16 +46,35 @@ class _InitializationPageState extends State<InitializationPage>
     WidgetsBinding.instance.addObserver(this);
 
     // 頁面初次載入時自動掃描
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startAutoScan();
-    });
+    if (widget.shouldAutoSearch) {
+      print('🔍 檢測到需要自動搜尋，延遲執行（等待設備重啟網路服務）');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // 🔥 修改1：增加延遲時間到 3 秒，讓設備有時間重啟
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            print('🔍 開始第一次自動搜尋');
+            _triggerAutoSearchWithRetry();
+          }
+        });
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startAutoScan();
+      });
+    }
   }
 
-  @override
-  void dispose() {
-    // 移除生命週期觀察者
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
+  void _triggerAutoSearchWithRetry() {
+    if (!mounted || isScanning) return;
+
+    _isAutoSearching = true;
+    _autoSearchAttempts++;
+
+    print('🔍 觸發自動搜尋（第 $_autoSearchAttempts 次嘗試）');
+    setState(() {
+      isScanning = true;
+    });
+    _scannerController.startScan();
   }
 
   @override
@@ -55,28 +83,28 @@ class _InitializationPageState extends State<InitializationPage>
 
     switch (state) {
       case AppLifecycleState.resumed:
-      // App 從背景恢復到前景時自動掃描
-        print('App resumed - 開始自動掃描');
-        _startAutoScan();
+        print('App resumed - 檢查是否需要重新掃描');
+
+        // 如果不是自動搜尋模式且當前沒有在自動搜尋中
+        if (!widget.shouldAutoSearch && !_isAutoSearching) {
+          _startAutoScan();
+        }
         break;
       case AppLifecycleState.paused:
         print('App paused');
         break;
-      case AppLifecycleState.detached:
-        print('App detached');
-        break;
-      case AppLifecycleState.inactive:
-        print('App inactive');
-        break;
-      case AppLifecycleState.hidden:
-        print('App hidden');
+      default:
         break;
     }
   }
 
   // 自動掃描方法
   void _startAutoScan() {
-    // 確保不會在已經掃描時重複掃描
+    if (widget.shouldAutoSearch) {
+      print('🔍 跳過初始自動掃描，等待自動搜尋');
+      return;
+    }
+
     if (!isScanning && mounted) {
       print('開始自動 WiFi 掃描');
       setState(() {
@@ -88,7 +116,7 @@ class _InitializationPageState extends State<InitializationPage>
 
   // 處理掃描完成
   void _handleScanComplete(List<WiFiAccessPoint> devices, String? error) {
-    if (!mounted) return; // 確保 widget 還在樹中
+    if (!mounted) return;
 
     setState(() {
       discoveredDevices = devices;
@@ -103,6 +131,78 @@ class _InitializationPageState extends State<InitializationPage>
     }
 
     print('WiFi 掃描完成 - 發現 ${devices.length} 個裝置');
+
+    // 🔥 新增：如果是自動搜尋，檢查是否找到配置的 SSID
+    if (_isAutoSearching && widget.shouldAutoSearch) {
+      final configuredSSID = WifiScannerComponent.configuredSSID;
+
+      if (configuredSSID != null && configuredSSID.isNotEmpty) {
+        // 檢查掃描結果中是否包含配置的 SSID
+        bool foundConfiguredSSID = devices.any((device) => device.ssid == configuredSSID);
+
+        print('🔍 自動搜尋結果：配置的 SSID "$configuredSSID" ${foundConfiguredSSID ? "已找到" : "未找到"}');
+
+        if (!foundConfiguredSSID && _autoSearchAttempts < _maxAutoSearchAttempts) {
+          // 🔥 如果沒找到配置的 SSID 且還有重試次數，等待後重試
+          print('🔍 未找到配置的 SSID，${2 * _autoSearchAttempts} 秒後進行第 ${_autoSearchAttempts + 1} 次嘗試');
+
+          Future.delayed(Duration(seconds: 2 * _autoSearchAttempts), () {
+            if (mounted && _isAutoSearching) {
+              _triggerAutoSearchWithRetry();
+            }
+          });
+          return; // 不重置 _isAutoSearching，繼續重試流程
+        } else {
+          // 找到了 SSID 或達到最大重試次數
+          if (foundConfiguredSSID) {
+            print('✅ 成功找到配置的 SSID "$configuredSSID"');
+
+            // 🔥 新增：顯示成功提示
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text('Found network: "$configuredSSID"'),
+                  ],
+                ),
+                backgroundColor: Colors.green.withOpacity(0.8),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else {
+            print('❌ 達到最大重試次數，仍未找到配置的 SSID "$configuredSSID"');
+
+            // 新增：顯示未找到提示
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Configured network "$configuredSSID" not found.\nIt may still be starting up.'),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.orange.withOpacity(0.8),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+
+          // 重置自動搜尋狀態
+          _isAutoSearching = false;
+          _autoSearchAttempts = 0;
+        }
+      } else {
+        // 沒有配置的 SSID 記錄
+        print('⚠️ 沒有配置的 SSID 記錄');
+        _isAutoSearching = false;
+        _autoSearchAttempts = 0;
+      }
+    }
   }
 
   // 建立使用圖片的功能按鈕
@@ -375,6 +475,10 @@ class _InitializationPageState extends State<InitializationPage>
   Widget _buildSearchButton({required double height}) {
     return GestureDetector(
       onTap: isScanning ? null : () {
+        // 🔥 手動搜尋時，重置自動搜尋狀態
+        _isAutoSearching = false;
+        _autoSearchAttempts = 0;
+
         setState(() {
           isScanning = true;
         });
@@ -390,13 +494,33 @@ class _InitializationPageState extends State<InitializationPage>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                isScanning ? 'Scanning...' : 'Search',
-                style: TextStyle(
-                  fontSize: height * 0.4,
-                  color: Colors.white,
+              // 🔥 新增：顯示自動搜尋狀態
+              if (_isAutoSearching) ...[
+                SizedBox(
+                  width: height * 0.3,
+                  height: height * 0.3,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
                 ),
-              ),
+                SizedBox(width: 8),
+                Text(
+                  'Auto Searching... (${_autoSearchAttempts}/${_maxAutoSearchAttempts})',
+                  style: TextStyle(
+                    fontSize: height * 0.3,
+                    color: Colors.white,
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  isScanning ? 'Scanning...' : 'Search',
+                  style: TextStyle(
+                    fontSize: height * 0.4,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

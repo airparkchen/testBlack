@@ -122,6 +122,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _stepperController.addListener(_onStepperControllerChanged);
     _startEllipsisAnimation();
 
+    print('🎯 WifiSettingFlowPage 初始化，當前配置的 SSID: ${WifiScannerComponent.configuredSSID}');
+
     // 修改：更完整的繞過限制處理
     if (_shouldBypassRestrictions) {
       // 如果繞過限制，直接設定為已認證並停止載入
@@ -1101,19 +1103,27 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
 // 修改精靈完成處理 - 縮短等待時間
   void _handleWizardCompleted() async {
-    // 這個方法現在只負責最終的導航
+    print('🎯 _handleWizardCompleted 被調用');
+
     try {
-      // 導航到 InitializationPage
       if (mounted) {
+        print('🎯 導航到 InitializationPage 並標記需要自動搜尋');
+
+        // 🔥 關鍵修改：導航時傳遞自動搜尋參數
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const InitializationPage()),
+          MaterialPageRoute(
+            builder: (context) => const InitializationPage(
+              shouldAutoSearch: true, // 🔥 新增參數，表示需要自動搜尋
+            ),
+          ),
               (route) => false,
         );
       }
     } catch (e) {
-      print('導航過程中發生錯誤: $e');
+      print('❌ 導航過程中發生錯誤: $e');
     }
   }
+
   // 省略號動畫
   void _startEllipsisAnimation() {
     _ellipsisTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {

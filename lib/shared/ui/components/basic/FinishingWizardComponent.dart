@@ -171,21 +171,17 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
         // 更新 Process 04 的進度
         _processes[3] = ProcessInfo('Process 04', _apiProgress);
 
-        // 🔥 修復：當 API 進度達到100%時，先執行完成回調（API邏輯），再顯示對話框
+        // 🔥 修正：當 API 進度達到100%時，先顯示對話框，再執行完成邏輯
         if (_apiProgress >= 100.0 && !_isCompleted) {
           _isCompleted = true;
-          // 延遲一小段時間確保UI更新完成
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (widget.onCompleted != null && mounted) {
-              // 先執行原來的完成回調（這會執行 API 邏輯）
-              widget.onCompleted!();
 
-              // API 執行完成後，顯示重連對話框
-              Future.delayed(const Duration(seconds: 1), () {
-                if (mounted) {
-                  _showReconnectDialogWithNavigation();
-                }
-              });
+          print('🎯 API 進度達到 100%，準備顯示重連對話框');
+
+          // 🔥 重要修正：延遲一小段時間確保UI更新完成，然後直接顯示對話框
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              print('🎯 顯示重連對話框');
+              _showReconnectDialogWithNavigation();
             }
           });
         }
@@ -195,12 +191,13 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
 
   // 🔥 修復：顯示重連對話框並處理導航
   void _showReconnectDialogWithNavigation() {
-    // 直接使用 WifiScannerComponent.configuredSSID 靜態變量
     String configuredSSID = WifiScannerComponent.configuredSSID ?? 'your configured network';
+
+    print('🎯 準備顯示重連對話框，配置的 SSID: $configuredSSID');
 
     showDialog(
       context: context,
-      barrierDismissible: false, // 禁止點擊外部關閉
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: const Color(0xFF2A2A2A),
@@ -275,9 +272,14 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
           actions: [
             ElevatedButton(
               onPressed: () {
+                print('🎯 用戶點擊 OK，關閉對話框並執行完成邏輯');
                 Navigator.of(context).pop(); // 關閉對話框
-                // 🔥 修復：點擊OK後不再觸發onCompleted，因為已經執行過了
-                // 這裡可以添加其他邏輯，比如直接導航到特定頁面
+
+                // 🔥 修正：在用戶點擊 OK 後執行完成邏輯，並傳遞自動搜尋標記
+                if (widget.onCompleted != null) {
+                  print('🎯 執行 onCompleted 回調，標記需要自動搜尋');
+                  widget.onCompleted!();
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF9747FF),
