@@ -2704,7 +2704,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     required double verticalPadding,
   }) {
     final screenSize = MediaQuery.of(context).size;
-    final componentHeight = contentHeight * 0.85;
+    final componentHeight = contentHeight * 0.25;   //符合1條process
+    // final componentHeight = contentHeight * 0.85;  //4條process
 
     return Column(
       children: [
@@ -2739,10 +2740,17 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                   _progressUpdateFunction = updateFunction;
                   // 延遲到下一個 frame 執行配置流程，避免在 build 期間調用 setState
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    // 等待前 3 個 process 完成（9 秒）後再開始 API
-                    Timer(const Duration(seconds: 9), () {
+                    // 🔥 修改：從原本的9秒改為2秒，配合新的單一Process模式
+                    Timer(const Duration(seconds: 2), () {
                       _executeConfigurationWithProgress();
                     });
+
+                    /* 保留原本的觸發時機（可能之後又會要求改回4條）
+                  // 等待前 3 個 process 完成（9 秒）後再開始 API
+                  Timer(const Duration(seconds: 9), () {
+                    _executeConfigurationWithProgress();
+                  });
+                  */
                   });
                 },
                 onCompleted: _handleWizardCompleted,

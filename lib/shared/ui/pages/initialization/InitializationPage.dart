@@ -437,7 +437,7 @@ class _InitializationPageState extends State<InitializationPage>
                   height: wifiListHeight,
                   child: WifiScannerComponent(
                     controller: _scannerController,
-                    maxDevicesToShow: 8,
+                    maxDevicesToShow: 100,   //控制Wifi Scan的SSID數量
                     height: wifiListHeight,
                     onScanComplete: _handleScanComplete,
                     onDeviceSelected: _handleDeviceSelected,
