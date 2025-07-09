@@ -426,7 +426,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  // ==================== 🔥 修正：頁面構建方法（恢復原本的 Ethernet 頁面特殊處理） ====================
+  // ==================== 🔥 修正：頁面構建方法（整合Ethernet功能） ====================
 
   Widget _buildEthernetPage(
       EthernetPageData pageData,
@@ -438,13 +438,74 @@ class _DashboardComponentState extends State<DashboardComponent>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 第三頁 Ethernet 的處理（保持原有）
+          // 🔥 整合：第三頁 Ethernet 的完整處理（從檔案1恢復）
           if (pageData.pageTitle.contains("Ethernet")) ...[
+            // 🔥 第三頁：顯示 Ethernet 標題
             _buildSectionTitle("Ethernet", bottomInset),
+
+            // 🔥 加上橫線分隔（跟 WiFi 一樣）
             _buildDivider(bottomInset),
-            // ... Ethernet 內容處理
+
+            // 🔥 根據是否有 LAN 資料決定顯示內容
+            if (pageData.connections.isNotEmpty) ...[
+              // 有 LAN 資料：顯示 LAN 埠列表（跟 WiFi 頻段一樣的排版）
+              ...pageData.connections.map((connection) {
+                return Padding(
+                  padding: EdgeInsets.symmetric(vertical: bottomInset > 0 ? 4 : 6),
+                  child: Row(
+                    children: [
+                      // 左側空間（讓 LAN 埠名稱看起來居中）
+                      Expanded(flex: 1, child: SizedBox()),
+
+                      // 中間：LAN 埠名稱（如 "2.5Gbps"）
+                      Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: Text(
+                            connection.speed,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white.withOpacity(0.7),
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 右側：連接狀態（如 "Connected"）
+                      Expanded(
+                        flex: 3,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            connection.status,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: _getStatusColor(connection.status),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ] else ...[
+              // 沒有 LAN 資料：顯示提示訊息
+              SizedBox(height: 40),
+              Center(
+                child: Text(
+                  'No LAN data available',
+                  style: TextStyle(
+                    fontSize: bottomInset > 0 ? 14 : 16,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                ),
+              ),
+            ],
           ] else ...[
-            // 🔥 第一頁和第二頁的處理
+            // 🔥 第一頁和第二頁的處理（保持檔案2的新功能）
             ...pageData.connections.asMap().entries.map((entry) {
               int index = entry.key;
               EthernetConnection connection = entry.value;
@@ -507,7 +568,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     return relatedItems.contains(speed) || speed.contains('Gbps') || speed.contains('Mbps');
   }
 
-  // ==================== 🔥 重寫：連接項目構建（保持原排版邏輯） ====================
+  // ==================== 🔥 重寫：連接項目構建（保持檔案2的新功能） ====================
 
   /// 🔥 修正：專門為第二頁SSID設計的雙行佈局項目
   Widget _buildSSIDItem(EthernetConnection connection, double bottomInset) {
@@ -790,7 +851,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     }
 
     final RegExp frequencyRegex = RegExp(r'[_]?([\d\.]+G(?:Hz)?|MLO)$', caseSensitive: false);
-    final match = frequencyRegex.firstMatch(ssid);
+        final match = frequencyRegex.firstMatch(ssid);
     if (match != null) {
       return match.group(0) ?? '';
     }
@@ -798,12 +859,10 @@ class _DashboardComponentState extends State<DashboardComponent>
     return '';
   }
 
-
   /// 判斷是否為單行項目
   bool _isSingleLineItem(String speed) {
     return speed == 'Model Name' || speed == 'Internet';
   }
-
 
   /// 🎯 獲取狀態顏色
   Color _getStatusColor(String status) {

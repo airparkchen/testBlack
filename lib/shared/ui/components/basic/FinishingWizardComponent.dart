@@ -68,8 +68,8 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
 
   // 單一Process模式初始化
   void _initializeSingleProcessMode() {
-    // 只使用 1 個 process，名稱改為 'Process 01'
-    final processNames = ['Process 01'];
+    // 只使用 1 個 process，名稱改為 'Process'
+    final processNames = ['Process'];
 
     // 初始化進程列表
     _processes = processNames.map((name) => ProcessInfo(name, 0.0)).toList();
@@ -195,7 +195,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
       setState(() {
         _apiProgress = progress.clamp(0.0, 100.0);
 
-        _processes[0] = ProcessInfo('Process 01', _apiProgress);
+        _processes[0] = ProcessInfo('Process', _apiProgress);
 
         // 當 API 進度達到100%時，先顯示對話框，再執行完成邏輯
         if (_apiProgress >= 100.0 && !_isCompleted) {

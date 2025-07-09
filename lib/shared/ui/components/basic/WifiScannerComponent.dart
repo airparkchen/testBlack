@@ -506,22 +506,22 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
               style: const TextStyle(fontSize: 14, color: Color(0xFFFF00E5)),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // 添加手動檢查權限按鈕
-                ElevatedButton(
-                  onPressed: () {
-                    _checkPermissionStatusOnResume();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Check Permission'),
-                ),
-
-                const SizedBox(width: 12),
+            // Row(
+            //   mainAxisAlignment: MainAxisAlignment.center,
+            //   children: [
+            //     // 添加手動檢查權限按鈕
+            //     ElevatedButton(
+            //       onPressed: () {
+            //         _checkPermissionStatusOnResume();
+            //       },
+            //       style: ElevatedButton.styleFrom(
+            //         backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
+            //         foregroundColor: Colors.white,
+            //       ),
+            //       child: const Text('Check Permission'),
+            //     ),
+            //
+            //     const SizedBox(width: 12),
 
                 // 只有在非永久拒絕的情況下才顯示重試按鈕
                 if (!_permissionDeniedPermanently)
@@ -556,8 +556,8 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                 ),
               ],
             ),
-          ],
-        ),
+          // ],
+        // ),
       );
     }
 

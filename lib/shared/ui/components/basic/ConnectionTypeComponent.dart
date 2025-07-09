@@ -115,6 +115,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
 
       // 🔧 修改：將驗證延遲到 build 完成後
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        _validateStaticIpConfiguration();
         _validateForm();
       });
     }
@@ -239,46 +240,175 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     }
   }
 
-  // Set up listeners for all input controllers
+  // 🆕 新增：檢查子網掩碼是否合理
+  bool _isValidSubnetMaskValue(String mask) {
+    // 基本格式檢查
+    if (!_validateSubnetMask(mask)) {
+      return false;
+    }
+
+    // 禁止 0.0.0.0
+    if (mask == '0.0.0.0') {
+      return false;
+    }
+
+    return true;
+  }
+
+  // 🆕 新增：檢查 IP 和 Gateway 關係
+  bool _isValidIpGatewayRelation(String ip, String gateway, String mask) {
+    // 如果 IP 和 Gateway 不同，總是允許
+    if (ip != gateway) {
+      return true;
+    }
+
+    // 如果相同，只有在 /32 掩碼時才允許
+    return mask == '255.255.255.255';
+  }
+
+  // 🆕 新增：統一的靜態IP驗證
+  void _validateStaticIpConfiguration() {
+    if (_selectedConnectionType != 'Static IP') return;
+
+    print('🔍 開始驗證靜態IP配置...');
+
+    final ip = _staticIpConfig.ipAddress;
+    final mask = _staticIpConfig.subnetMask;
+    final gateway = _staticIpConfig.gateway;
+    final primaryDns = _staticIpConfig.primaryDns;
+    final secondaryDns = _staticIpConfig.secondaryDns;
+
+    print('當前配置: IP=$ip, Mask=$mask, Gateway=$gateway, DNS=$primaryDns');
+
+    // 🔧 關鍵修復：用於追蹤是否有任何錯誤
+    bool hasAnyError = false;
+
+    // 重置所有錯誤狀態
+    _isIpError = false;
+    _isSubnetError = false;
+    _isGatewayError = false;
+    _isPrimaryDnsError = false;
+    _isSecondaryDnsError = false;
+
+    _ipErrorText = '';
+    _subnetErrorText = '';
+    _gatewayErrorText = '';
+    _primaryDnsErrorText = '';
+    _secondaryDnsErrorText = '';
+
+    // 1. 基本格式檢查
+    if (ip.isNotEmpty && !_validateIpFormat(ip)) {
+      _isIpError = true;
+      _ipErrorText = 'Please enter a valid IP address';
+      hasAnyError = true;
+      print('❌ IP格式錯誤: $ip');
+    }
+
+    if (mask.isNotEmpty && !_isValidSubnetMaskValue(mask)) {
+      _isSubnetError = true;
+      _subnetErrorText = mask == '0.0.0.0'
+          ? 'Subnet mask cannot be 0.0.0.0'
+          : 'Please enter a valid subnet mask';
+      hasAnyError = true;
+      print('❌ 子網掩碼錯誤: $mask');
+    }
+
+    if (gateway.isNotEmpty && !_validateIpFormat(gateway)) {
+      _isGatewayError = true;
+      _gatewayErrorText = 'Please enter a valid gateway address';
+      hasAnyError = true;
+      print('❌ Gateway格式錯誤: $gateway');
+    }
+
+    if (primaryDns.isNotEmpty && !_validateIpFormat(primaryDns)) {
+      _isPrimaryDnsError = true;
+      _primaryDnsErrorText = 'Please enter a valid DNS address';
+      hasAnyError = true;
+      print('❌ DNS格式錯誤: $primaryDns');
+    }
+
+    if (secondaryDns.isNotEmpty && !_validateIpFormat(secondaryDns)) {
+      _isSecondaryDnsError = true;
+      _secondaryDnsErrorText = 'Please enter a valid DNS address';
+      hasAnyError = true;
+      print('❌ 次要DNS格式錯誤: $secondaryDns');
+    }
+
+    // 2. 業務邏輯檢查（只有在基本格式正確且欄位不為空時才檢查）
+    if (!hasAnyError && ip.isNotEmpty && mask.isNotEmpty && gateway.isNotEmpty) {
+
+      // 2a. 檢查 IP 和 Gateway 關係
+      if (!_isValidIpGatewayRelation(ip, gateway, mask)) {
+        _isGatewayError = true;
+        _gatewayErrorText = 'IP address and Gateway cannot be the same (except for /32 host routes)';
+        hasAnyError = true;
+        print('❌ IP和Gateway關係錯誤');
+      }
+
+      // 2b. 檢查同一子網（只有在前面檢查都通過時）
+      else if (!_isInSameSubnet(ip, gateway, mask)) {
+        _isGatewayError = true;
+        _gatewayErrorText = 'Gateway must be in the same subnet as IP address';
+        hasAnyError = true;
+        print('❌ Gateway不在同一子網');
+      }
+    }
+
+    // 3. 檢查必填項是否完整
+    final hasAllRequired = ip.isNotEmpty &&
+        mask.isNotEmpty &&
+        gateway.isNotEmpty &&
+        primaryDns.isNotEmpty;
+
+    print('必填項檢查: ${hasAllRequired ? "✅" : "❌"} (IP=${ip.isNotEmpty}, Mask=${mask.isNotEmpty}, Gateway=${gateway.isNotEmpty}, DNS=${primaryDns.isNotEmpty})');
+    print('錯誤檢查: ${hasAnyError ? "❌ 有錯誤" : "✅ 無錯誤"}');
+
+    // 🔧 關鍵修復：表單完成狀態 = 必填項完整 AND 沒有任何錯誤
+    final newFormComplete = hasAllRequired && !hasAnyError;
+
+    print('表單完成狀態: ${newFormComplete ? "✅" : "❌"} (必填項=$hasAllRequired, 無錯誤=${!hasAnyError})');
+
+    // 4. 更新狀態並通知
+    setState(() {
+      _isFormComplete = newFormComplete;
+    });
+
+    _notifySelectionChanged();
+  }
+
+  // 🔧 修改：Set up listeners for all input controllers
   void _setupControllerListeners() {
     _ipController.addListener(() {
       _staticIpConfig.ipAddress = _ipController.text;
-      _validateIpField(_ipController.text, 'IP Address');
-      _validateForm();
+      print('📝 IP變更: "${_ipController.text}"');
+      _validateStaticIpConfiguration();
     });
 
     _subnetController.addListener(() {
       _staticIpConfig.subnetMask = _subnetController.text;
-      _validateIpField(_subnetController.text, 'Subnet Mask');
-      _validateForm();
+      print('📝 掩碼變更: "${_subnetController.text}"');
+      _validateStaticIpConfiguration();
     });
 
     _gatewayController.addListener(() {
       _staticIpConfig.gateway = _gatewayController.text;
-      _validateIpField(_gatewayController.text, 'Gateway');
-      _validateForm();
+      print('📝 Gateway變更: "${_gatewayController.text}"');
+      _validateStaticIpConfiguration();
     });
 
     _primaryDnsController.addListener(() {
       _staticIpConfig.primaryDns = _primaryDnsController.text;
-      _validateIpField(_primaryDnsController.text, 'Primary DNS');
-      _validateForm();
+      print('📝 DNS變更: "${_primaryDnsController.text}"');
+      _validateStaticIpConfiguration();
     });
 
     _secondaryDnsController.addListener(() {
       _staticIpConfig.secondaryDns = _secondaryDnsController.text;
-      if (_secondaryDnsController.text.isNotEmpty) {
-        _validateIpField(_secondaryDnsController.text, 'Secondary DNS');
-      } else {
-        setState(() {
-          _isSecondaryDnsError = false;
-          _secondaryDnsErrorText = '';
-        });
-      }
-      _validateForm();
+      print('📝 次要DNS變更: "${_secondaryDnsController.text}"');
+      _validateStaticIpConfiguration();
     });
 
-    // Add listeners for PPPoE-related controllers
+    // PPPoE 監聽器保持不變
     _pppoeUsernameController.addListener(() {
       _pppoeConfig.username = _pppoeUsernameController.text;
       _validatePppoeUsername();
@@ -376,63 +506,42 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     });
   }
 
-  // 驗證表單
+  // 🔧 修改：簡化的驗證表單
   void _validateForm() {
+    final bool hasAnyVisibleError = _isIpError || _isSubnetError ||
+        _isGatewayError || _isPrimaryDnsError ||
+        _isSecondaryDnsError;
+
+    print('🔄 _validateForm 被調用');
+
     bool isValid = true;
-
-    if (_selectedConnectionType == 'Static IP') {
-      // 檢查所有必填項是否已填寫
-      final bool hasEmptyRequiredFields =
-          _staticIpConfig.ipAddress.isEmpty ||
-              _staticIpConfig.subnetMask.isEmpty ||
-              _staticIpConfig.gateway.isEmpty ||
-              _staticIpConfig.primaryDns.isEmpty;
-
-      if (hasEmptyRequiredFields) {
-        isValid = false;
-      } else {
-        // 檢查所有必填項格式是否正確
-        bool ipValid = _validateIpFormat(_staticIpConfig.ipAddress);
-        bool subnetValid = _validateSubnetMask(_staticIpConfig.subnetMask);
-        bool gatewayValid = _validateIpFormat(_staticIpConfig.gateway);
-        bool primaryDnsValid = _validateIpFormat(_staticIpConfig.primaryDns);
-
-        // 檢查 IP 和 Gateway 是否在同一子網
-        bool sameSubnet = true;
-        if (ipValid && subnetValid && gatewayValid) {
-          sameSubnet = _isInSameSubnet(_staticIpConfig.ipAddress, _staticIpConfig.gateway, _staticIpConfig.subnetMask);
-        }
-
-        // 次要 DNS 是選填的，只有填了才檢查格式
-        bool secondaryDnsValid = true;
-        if (_staticIpConfig.secondaryDns.isNotEmpty) {
-          secondaryDnsValid = _validateIpFormat(_staticIpConfig.secondaryDns);
-        }
-
-        isValid = ipValid && subnetValid && gatewayValid && primaryDnsValid && secondaryDnsValid && sameSubnet;
-
-        // 如果 IP 和 Gateway 不在同一子網，顯示錯誤
-        if (!sameSubnet && ipValid && subnetValid && gatewayValid) {
-          setState(() {
-            _isGatewayError = true;
-            _gatewayErrorText = 'Gateway must be in the same subnet as IP address';
-          });
-        }
-      }
-    } else if (_selectedConnectionType == 'PPPoE') {
-      // 驗證 PPPoE 配置
-      bool usernameValid = _isValidPppoeUsername(_pppoeConfig.username);
-      bool passwordValid = _isValidPppoePassword(_pppoeConfig.password);
-
-      isValid = usernameValid && passwordValid;
+    if (hasAnyVisibleError) {
+      isValid = false;
     }
 
-    if (isValid != _isFormComplete) {
+    if (_selectedConnectionType == 'Static IP') {
+      // 靜態IP的驗證已經在 _validateStaticIpConfiguration 中完成
+      // 這裡直接使用結果
+      isValid = _isFormComplete;
+    } else if (_selectedConnectionType == 'PPPoE') {
+      // PPPoE 驗證
+      bool usernameValid = _isValidPppoeUsername(_pppoeConfig.username);
+      bool passwordValid = _isValidPppoePassword(_pppoeConfig.password);
+      isValid = usernameValid && passwordValid;
+
       setState(() {
         _isFormComplete = isValid;
       });
-      _notifySelectionChanged();
+    } else {
+      // DHCP 或其他類型
+      isValid = true;
+      setState(() {
+        _isFormComplete = isValid;
+      });
     }
+
+    print('最終驗證結果: ${isValid ? "✅" : "❌"}');
+    _notifySelectionChanged();
   }
 
   // 檢查 IP 格式是否正確
@@ -519,6 +628,8 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   }
 
   void _notifySelectionChanged() {
+    print('📢 通知父組件: 類型="$_selectedConnectionType", 完成狀態=$_isFormComplete');
+
     if (widget.onSelectionChanged != null) {
       widget.onSelectionChanged!(
         _selectedConnectionType,
@@ -526,8 +637,29 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
         _selectedConnectionType == 'Static IP' ? _staticIpConfig : null,
         _selectedConnectionType == 'PPPoE' ? _pppoeConfig : null,
       );
+      print('✅ 已發送狀態到父組件');
+    } else {
+      print('⚠️ onSelectionChanged 回調為空');
     }
   }
+
+  bool validateBeforeNext() {
+    print('🎯 Next按鈕點擊前驗證');
+
+    if (_selectedConnectionType == 'Static IP') {
+      _validateStaticIpConfiguration();
+      print('靜態IP驗證完成，結果: ${_isFormComplete ? "✅" : "❌"}');
+      return _isFormComplete;
+    } else if (_selectedConnectionType == 'PPPoE') {
+      _validateForm();
+      print('PPPoE驗證完成，結果: ${_isFormComplete ? "✅" : "❌"}');
+      return _isFormComplete;
+    } else {
+      print('其他類型，自動通過');
+      return true;
+    }
+  }
+
   // 🔧 新增：檢查明顯無效的 IP 地址
   bool _isObviouslyInvalidIp(String ip) {
     return ip == '0.0.0.0' || ip == '255.255.255.255';
@@ -735,8 +867,6 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
 
   // 構建連接類型下拉選擇框
   Widget _buildConnectionTypeDropdown() {
-    final screenSize = MediaQuery.of(context).size;
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.4),
@@ -774,9 +904,10 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
         dropdownColor: Colors.black.withOpacity(0.8),
         onChanged: (String? newValue) {
           if (newValue != null && newValue != _selectedConnectionType) {
+            print('🔄 連接類型變更: $_selectedConnectionType -> $newValue');
+
             setState(() {
               _selectedConnectionType = newValue;
-              _isFormComplete = (newValue != 'Static IP') && (newValue != 'PPPoE');
 
               // 重置所有錯誤狀態
               _isIpError = false;
@@ -786,7 +917,27 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
               _isSecondaryDnsError = false;
               _isPppoeUsernameError = false;
               _isPppoePasswordError = false;
+
+              // 根據新類型設定初始完成狀態
+              if (newValue == 'Static IP') {
+                // 靜態IP需要驗證
+                _isFormComplete = false;
+                // 觸發驗證
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _validateStaticIpConfiguration();
+                });
+              } else if (newValue == 'PPPoE') {
+                // PPPoE需要驗證
+                _isFormComplete = false;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _validateForm();
+                });
+              } else {
+                // DHCP等其他類型
+                _isFormComplete = true;
+              }
             });
+
             _notifySelectionChanged();
           }
         },

@@ -1269,17 +1269,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         pppoePassword = '';
       }
 
-      // 重新驗證當前配置
-      bool isCurrentConfigValid = false;
-      if (type == 'DHCP') {
-        isCurrentConfigValid = true; // DHCP 不需要額外配置
-      } else if (type == 'Static IP') {
-        isCurrentConfigValid = _isStaticIpConfigValid();
-      } else if (type == 'PPPoE') {
-        isCurrentConfigValid = _isPppoeConfigValid();
-      }
+      // 直接使用子組件傳來的 isComplete 狀態
+      isCurrentStepComplete = isComplete;
 
-      isCurrentStepComplete = isCurrentConfigValid;
 
       // 準備API提交格式
       _prepareWanSettingsForSubmission();
@@ -1711,14 +1703,42 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   // 修改表單驗證
   bool _validateCurrentStep(List<String> currentComponents) {
     if (_shouldBypassRestrictions) {
-      // 繞過限制時，總是返回 true
       setState(() {
         isCurrentStepComplete = true;
       });
       return true;
     }
-    // 檢查 AccountPasswordComponent
-    if (currentComponents.contains('AccountPasswordComponent')) {
+
+    // 檢查 ConnectionTypeComponent
+    if (currentComponents.contains('ConnectionTypeComponent')) {
+      // 強制檢查子組件狀態
+      if (!isCurrentStepComplete) {
+        print('❌ ConnectionTypeComponent 驗證失敗: isCurrentStepComplete = $isCurrentStepComplete');
+
+        // 可以在這裡添加額外的錯誤檢查
+        String errorMessage = _getConnectionTypeError();
+
+        // 檢查是否有視覺錯誤顯示但狀態不一致的情況
+        if (connectionType == 'Static IP') {
+          // 可以在這裡添加額外的檢查邏輯
+          print('檢查靜態IP配置狀態...');
+          print('  IP: ${staticIpConfig.ipAddress}');
+          print('  子網掩碼: ${staticIpConfig.subnetMask}');
+          print('  Gateway: ${staticIpConfig.gateway}');
+          print('  DNS: ${staticIpConfig.primaryDns}');
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        return false;
+      }
+
+      print('✅ ConnectionTypeComponent 驗證通過');
+    }
+
+    // 其他組件的驗證邏輯保持不變...
+    else if (currentComponents.contains('AccountPasswordComponent')) {
       if (!_validateForm()) {
         List<String> detailOptions = _getStepDetailOptions();
         if (detailOptions.isEmpty) {
@@ -1736,18 +1756,6 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       });
     }
 
-    // 檢查 ConnectionTypeComponent
-    else if (currentComponents.contains('ConnectionTypeComponent')) {
-      if (!isCurrentStepComplete) {
-        String errorMessage = _getConnectionTypeError();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
-        return false;
-      }
-    }
-
-    // 檢查 SetSSIDComponent
     else if (currentComponents.contains('SetSSIDComponent')) {
       if (!isCurrentStepComplete) {
         String errorMessage = _getSSIDError();
