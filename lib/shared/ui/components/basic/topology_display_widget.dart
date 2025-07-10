@@ -15,6 +15,7 @@ import 'package:whitebox/shared/services/dashboard_data_service.dart';
 import 'package:whitebox/shared/services/unified_mesh_data_manager.dart';
 import 'package:whitebox/shared/services/dashboard_event_notifier.dart';
 import 'package:whitebox/shared/models/dashboard_data_models.dart';
+import 'package:whitebox/shared/utils/jwt_auto_relogin.dart';
 
 /// 智能單位格式化工具
 /// 根據速度數值自動選擇合適的單位顯示
@@ -612,12 +613,18 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
     );
   }
 
-  /// 🎯 修改：更新速度數據（
+  /// 更新速度數據（
   void updateSpeedData() {
     if (!mounted) return;
 
     if (NetworkTopoConfig.useRealData) {
-      // 🎯 修改：現在只調用插值更新，不更新 Internet 狀態
+      // 檢查網路狀態
+      final networkStatus = JwtAutoRelogin.instance.networkStatus;
+      if (networkStatus == NetworkStatus.disconnected) {
+        print('⏸️ 網路斷線，跳過速度數據更新');
+        return; // \直接返回，不執行任何更新
+      }
+
       _realSpeedDataGenerator?.update().then((_) {
         if (mounted) {
           setState(() {
@@ -635,7 +642,7 @@ class TopologyDisplayWidgetState extends State<TopologyDisplayWidget> {
   }
 }
 
-// 🎯 新增：建構白色羽化分界線的方法
+// 建構白色羽化分界線的方法
 Widget _buildDividerLine(BoxConstraints constraints, double chartWidth) {
   // 計算分界線的 X 位置（70% 的位置）
   final double dividerX = constraints.maxWidth * 0.7;
@@ -651,18 +658,18 @@ Widget _buildDividerLine(BoxConstraints constraints, double chartWidth) {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            // 🎯 頂部：透明
+            // 頂部：透明
             Colors.white.withOpacity(0.0),
-            // 🎯 中間：白色（最亮的部分）
+            // 中間：白色（最亮的部分）
             Colors.white.withOpacity(0.4),
             Colors.white.withOpacity(1.0),
             Colors.white.withOpacity(0.4),
-            // 🎯 底部：漸變至透明
+            // 底部：漸變至透明
             Colors.white.withOpacity(0.0),
           ],
           stops: [0.0, 0.3, 0.5, 0.7, 1.0], // 控制漸變的分佈
         ),
-        // 🎯 可選：添加羽化效果的模糊
+        // 添加羽化效果的模糊
         boxShadow: [
           BoxShadow(
             color: Colors.white.withOpacity(0.2),
@@ -831,7 +838,7 @@ class SpeedChartWidget extends StatelessWidget {
   }
 }
 
-/// 🎯 雙線速度標籤小部件
+/// 雙線速度標籤小部件
 class DualSpeedLabelWidget extends StatelessWidget {
   final double uploadSpeed;
   final double downloadSpeed;
@@ -943,7 +950,7 @@ class DualSpeedLabelWidget extends StatelessWidget {
   }
 }
 
-/// 🎯 雙線速度曲線繪製器
+/// 雙線速度曲線繪製器
 class DualSpeedCurvePainter extends CustomPainter {
   final List<double> uploadData;
   final List<double> downloadData;
@@ -975,7 +982,7 @@ class DualSpeedCurvePainter extends CustomPainter {
 
     final double endX = size.width * endAtPercent;
 
-    // 🎯 繪製上傳速度曲線（橘色）- 先繪製背景層
+    // 繪製上傳速度曲線（橘色）- 先繪製背景層
     _drawSpeedCurve(
       canvas,
       size,
@@ -983,11 +990,11 @@ class DualSpeedCurvePainter extends CustomPainter {
       range,
       endX,
       currentUpload,
-      Color(0xFFFF6D2F), // 🎯 修正：確保是橘色 #FF6D2F
+      Color(0xFFFF6D2F), // 確保是橘色 #FF6D2F
       'upload',
     );
 
-    // 🎯 繪製下載速度曲線（藍色）- 後繪製前景層，重疊時優先顯示
+    // 繪製下載速度曲線（藍色）- 後繪製前景層，重疊時優先顯示
     _drawSpeedCurve(
       canvas,
       size,
@@ -1016,7 +1023,7 @@ class DualSpeedCurvePainter extends CustomPainter {
     final double stepX = endX / (data.length - 1);
     final List<Offset> points = [];
 
-    // 🎯 計算曲線上的所有點
+    // 計算曲線上的所有點
     for (int i = 0; i < data.length; i++) {
       final double x = i * stepX;
       final double normalizedValue = (data[i] - minSpeed) / range;
@@ -1026,7 +1033,7 @@ class DualSpeedCurvePainter extends CustomPainter {
 
     if (points.isEmpty) return;
 
-    // 🎯 建立平滑曲線路徑
+    // 建立平滑曲線路徑
     path.moveTo(points[0].dx, points[0].dy);
 
     if (points.length > 1) {
@@ -1043,7 +1050,7 @@ class DualSpeedCurvePainter extends CustomPainter {
       }
     }
 
-    // 🎯 創建從左到右的透明度漸變著色器
+    // 創建從左到右的透明度漸變著色器
     final Shader transparencyGradient = LinearGradient(
       begin: Alignment.centerLeft,   // 從左邊開始
       end: Alignment.centerRight,    // 到右邊結束
@@ -1056,7 +1063,7 @@ class DualSpeedCurvePainter extends CustomPainter {
       stops: [0.0, 0.3, 0.7, 1.0],      // 控制漸變分布
     ).createShader(Rect.fromLTWH(0, 0, endX, size.height));
 
-    // 🎯 外層發光效果 - 大範圍模糊
+    // 外層發光效果 - 大範圍模糊
     final Paint outerGlowPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0
@@ -1074,7 +1081,7 @@ class DualSpeedCurvePainter extends CustomPainter {
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0)
       ..strokeCap = StrokeCap.round;
 
-    // 🎯 中層發光效果 - 中等模糊
+    // 中層發光效果 - 中等模糊
     final Paint middleGlowPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0
@@ -1092,7 +1099,7 @@ class DualSpeedCurvePainter extends CustomPainter {
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2.0)
       ..strokeCap = StrokeCap.round;
 
-    // 🎯 主線條 - 清晰的線條
+    // 主線條 - 清晰的線條
     final Paint mainPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
@@ -1100,12 +1107,12 @@ class DualSpeedCurvePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // 🎯 繪製順序：從外到內，從模糊到清晰
+    // 繪製順序：從外到內，從模糊到清晰
     canvas.drawPath(path, outerGlowPaint);   // 最外層發光
     canvas.drawPath(path, middleGlowPaint);  // 中層發光
     canvas.drawPath(path, mainPaint);        // 主線條
 
-    // 🎯 調試：印出顏色資訊確認
+    // 調試：印出顏色資訊確認
     // print('🎨 繪製 $curveType 曲線:');
     // print('   主要顏色: ${primaryColor.toString()}');
     // print('   透明度: 0.0 -> 1.0 (左到右)');
@@ -1125,8 +1132,8 @@ class DualSpeedCurvePainter extends CustomPainter {
   }
 }
 
-/// 🎯 真實數據速度圖表小部件（雙線版本 + 重疊處理）
-/// 🎯 真實數據速度圖表小部件（雙線版本 + 重疊處理）
+/// 真實數據速度圖表小部件（雙線版本 + 重疊處理）
+/// 真實數據速度圖表小部件（雙線版本 + 重疊處理）
 class RealSpeedChartWidget extends StatelessWidget {
   final RealSpeedService.RealSpeedDataGenerator dataGenerator;
   final AnimationController animationController;
@@ -1141,7 +1148,7 @@ class RealSpeedChartWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 🎯 獲取雙線資料，保留原始精度
+    // 獲取雙線資料，保留原始精度
     final double currentUpload = dataGenerator.currentUpload;
     final double currentDownload = dataGenerator.currentDownload;
     final List<double> uploadData = dataGenerator.uploadData;
@@ -1153,15 +1160,15 @@ class RealSpeedChartWidget extends StatelessWidget {
         final double actualHeight = constraints.maxHeight;
         final double chartEndX = actualWidth * endAtPercent;
 
-        // 🎯 可調整的圓點位置參數
-        final double uploadDotOffset = -1.0;    // 🎯 上傳圓點左右偏移（負數向左，正數向右）
-        final double downloadDotOffset = -1.0;   // 🎯 下載圓點左右偏移（負數向左，正數向右）
-        final double overlapDotOffset = 0.0;    // 🎯 重疊時圓點的偏移
+        // 可調整的圓點位置參數
+        final double uploadDotOffset = -1.0;    // 上傳圓點左右偏移（負數向左，正數向右）
+        final double downloadDotOffset = -1.0;   // 下載圓點左右偏移（負數向左，正數向右）
+        final double overlapDotOffset = 0.0;    // 重疊時圓點的偏移
 
-        // 🎯 可調整的垂直線位置參數
-        final double uploadLineOffset = -1.0;   // 🎯 上傳垂直線左右偏移
-        final double downloadLineOffset = 1.0;  // 🎯 下載垂直線左右偏移
-        final double overlapLineOffset = 0.0;   // 🎯 重疊時垂直線的偏移
+        // 可調整的垂直線位置參數
+        final double uploadLineOffset = -1.0;   // 上傳垂直線左右偏移
+        final double downloadLineOffset = 1.0;  // 下載垂直線左右偏移
+        final double overlapLineOffset = 0.0;   // 重疊時垂直線的偏移
 
         // 計算圓點位置
         final double range = dataGenerator.maxSpeed - dataGenerator.minSpeed;
@@ -1199,14 +1206,14 @@ class RealSpeedChartWidget extends StatelessWidget {
               ),
             ),
 
-            // 🎯 註解掉垂直線：移除圓點底下的線條
+            // 註解掉垂直線：移除圓點底下的線條
             // if (!isOverlapping) ...[
             //   // 上傳速度垂直線（橙色）
             //   if (uploadData.isNotEmpty)
             //     Positioned(
             //       top: uploadDotY + 8,
             //       bottom: 0,
-            //       left: chartEndX + uploadLineOffset,  // 🎯 使用可調整參數
+            //       left: chartEndX + uploadLineOffset,  // 使用可調整參數
             //       child: Container(
             //         width: 1,
             //         decoration: BoxDecoration(
@@ -1228,7 +1235,7 @@ class RealSpeedChartWidget extends StatelessWidget {
             //   Positioned(
             //     top: downloadDotY + 8,
             //     bottom: 0,
-            //     left: chartEndX + (isOverlapping ? overlapLineOffset : downloadLineOffset), // 🎯 使用可調整參數
+            //     left: chartEndX + (isOverlapping ? overlapLineOffset : downloadLineOffset), // 使用可調整參數
             //     child: Container(
             //       width: 1,
             //       decoration: BoxDecoration(
@@ -1244,20 +1251,20 @@ class RealSpeedChartWidget extends StatelessWidget {
             //     ),
             //   ),
 
-            // 🎯 圓點：縮小尺寸，外框改為與內部顏色一致
+            // 圓點：縮小尺寸，外框改為與內部顏色一致
             if (!isOverlapping) ...[
               // 上傳速度圓點（橙色）
               if (uploadData.isNotEmpty)
                 Positioned(
-                  top: uploadDotY - 4,  // 🎯 調整位置以配合縮小的尺寸
-                  left: chartEndX - 4 + uploadDotOffset,  // 🎯 調整位置以配合縮小的尺寸
+                  top: uploadDotY - 4,  // 調整位置以配合縮小的尺寸
+                  left: chartEndX - 4 + uploadDotOffset,  // 調整位置以配合縮小的尺寸
                   child: Container(
-                    width: 8,   // 🎯 從 12 縮小到 8
-                    height: 8,  // 🎯 從 12 縮小到 8
+                    width: 8,   // 從 12 縮小到 8
+                    height: 8,  // 從 12 縮小到 8
                     decoration: BoxDecoration(
                       color: Colors.orange,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.orange, width: 1), // 🎯 外框改為橙色
+                      border: Border.all(color: Colors.orange, width: 1), // 外框改為橙色
                     ),
                   ),
                 ),
@@ -1266,20 +1273,20 @@ class RealSpeedChartWidget extends StatelessWidget {
             // 下載速度圓點（藍色）
             if (downloadData.isNotEmpty)
               Positioned(
-                top: downloadDotY - 4,  // 🎯 調整位置以配合縮小的尺寸
-                left: chartEndX - 4 + (isOverlapping ? overlapDotOffset : downloadDotOffset), // 🎯 調整位置以配合縮小的尺寸
+                top: downloadDotY - 4,  // 調整位置以配合縮小的尺寸
+                left: chartEndX - 4 + (isOverlapping ? overlapDotOffset : downloadDotOffset), // 調整位置以配合縮小的尺寸
                 child: Container(
-                  width: 8,   // 🎯 從 12 縮小到 8
-                  height: 8,  // 🎯 從 12 縮小到 8
+                  width: 8,   // 從 12 縮小到 8
+                  height: 8,  // 從 12 縮小到 8
                   decoration: BoxDecoration(
                     color: Color(0xFF00EEFF),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Color(0xFF00EEFF), width: 1), // 🎯 外框改為藍色
+                    border: Border.all(color: Color(0xFF00EEFF), width: 1), // 外框改為藍色
                   ),
                 ),
               ),
 
-            // 🎯 註解掉：雙線速度標籤
+            // 註解掉：雙線速度標籤
             // if (uploadData.isNotEmpty && downloadData.isNotEmpty)
             //   Positioned(
             //     top: math.min(uploadDotY, downloadDotY) - 60,
