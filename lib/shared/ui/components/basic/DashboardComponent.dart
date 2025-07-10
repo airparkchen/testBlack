@@ -614,11 +614,11 @@ class _DashboardComponentState extends State<DashboardComponent>
     );
   }
 
-  /// 🎯 新增：只處理SSID名稱的省略，保護頻率不被動到
+  /// 只處理SSID名稱的省略，保護頻率不被動到
   String _formatSSIDNameOnly(String ssidName) {
     if (ssidName.isEmpty) return ssidName;
 
-    // 🎯 計算最大顯示長度
+    // 計算最大顯示長度
     // 根據您的需求：SSID名稱不能超過頻率標籤的起始位置
     // 假設 "SSID(2.4GHz)" 大約佔據 12 個字元寬度
     // 右側SSID應該不超過大約 15-16 個字元避免重疊
@@ -628,7 +628,7 @@ class _DashboardComponentState extends State<DashboardComponent>
       return ssidName;  // 🎯 長度適中，完整顯示
     }
 
-    // 🎯 智能省略：保留前面和後面，特別保護頻率後綴
+    // 智能省略：保留前面和後面，特別保護頻率後綴
     // 檢查是否有頻率後綴（如 _2.4G, _5G, _6G）
     final frequencyPattern = RegExp(r'_\d+\.?\d*G$');
     final match = frequencyPattern.firstMatch(ssidName);
@@ -642,16 +642,16 @@ class _DashboardComponentState extends State<DashboardComponent>
       final availableLength = maxSSIDLength - frequencySuffix.length - 3; // 3 for "..."
 
       if (nameWithoutSuffix.length <= availableLength) {
-        return ssidName;  // 🎯 即使有後綴也能完整顯示
+        return ssidName;  // 即使有後綴也能完整顯示
       } else {
-        // 🎯 省略中間部分，保留前面 + "..." + 頻率後綴
+        // 省略中間部分，保留前面 + "..." + 頻率後綴
         final frontLength = (availableLength * 0.6).floor();  // 前面佔60%
         final frontPart = nameWithoutSuffix.substring(0, frontLength);
         return '$frontPart...$frequencySuffix';
         // 例如："Apple_Home_Network_5G" -> "Apple...5G"
       }
     } else {
-      // 🔥 沒有頻率後綴，使用前後保留的省略方式
+      // 沒有頻率後綴，使用前後保留的省略方式
       const int frontChars = 8;   // 前面字元數
       const int backChars = 5;    // 後面字元數
 
@@ -667,7 +667,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     }
   }
 
-  /// 🔥 修正：連接項目構建，保持原有的排版格式
+  /// 修正：連接項目構建，保持原有的排版格式
   Widget _buildConnectionItem(EthernetConnection connection, double bottomInset, bool isFirstItem, bool isLastSSID) {
     String connectionType = connection.connectionType ?? '';
 
@@ -724,14 +724,14 @@ class _DashboardComponentState extends State<DashboardComponent>
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                _formatSSIDWithSmartEllipsis(connection.status),
+                connection.status, // 直接顯示完整SSID，不再使用省略處理
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: _getSSIDFontSize(connection.status), // 動態字體大小
                   color: Colors.white.withOpacity(0.9),
                   fontWeight: FontWeight.w500,
                 ),
                 maxLines: 1,
-                overflow: TextOverflow.visible,
+                overflow: TextOverflow.visible, // 或改為 TextOverflow.ellipsis 作為最後保險
               ),
             ),
 
@@ -799,6 +799,20 @@ class _DashboardComponentState extends State<DashboardComponent>
         ],
       ),
     );
+  }
+
+  double _getSSIDFontSize(String ssid) {
+    final length = ssid.length;
+
+    if (length <= 20) {
+      return 16.0; // 標準大小
+    } else if (length <= 25) {
+      return 14.0; // 中等長度，稍微縮小
+    } else if (length <= 32) {
+      return 12.0; // 較長，更小字體
+    } else {
+      return 10.0; // 非常長，最小字體
+    }
   }
 
   /// 🎯 新增：格式化SSID，限制長度並加上省略號

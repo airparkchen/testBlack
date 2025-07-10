@@ -428,6 +428,9 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       if (_pppoeUsernameController.text.isEmpty) {
         _isPppoeUsernameError = true;
         _pppoeUsernameErrorText = 'Please enter a username';
+      } else if (_pppoeUsernameController.text.length > 32) {
+        _isPppoeUsernameError = true;
+        _pppoeUsernameErrorText = 'PPPoE username must be 32 characters or less';
       } else if (!_isValidPppoeUsername(_pppoeUsernameController.text)) {
         _isPppoeUsernameError = true;
         _pppoeUsernameErrorText = 'Username can only contain letters, numbers, dots, underscores, hyphens, and @ symbol';
@@ -444,6 +447,9 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       if (_pppoePasswordController.text.isEmpty) {
         _isPppoePasswordError = true;
         _pppoePasswordErrorText = 'Please enter a password';
+      } else if (_pppoePasswordController.text.length > 32) {
+        _isPppoePasswordError = true;
+        _pppoePasswordErrorText = 'PPPoE password must be 32 characters or less';
       } else if (!_isValidPppoePassword(_pppoePasswordController.text)) {
         _isPppoePasswordError = true;
         _pppoePasswordErrorText = 'Password contains invalid characters';

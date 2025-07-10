@@ -1350,7 +1350,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 // PPPoE 用戶名驗證
   bool _isValidPppoeUsername(String username) {
     if (username.isEmpty) return false;
-    if (username.length > 64) return false;
+    if (username.length > 32) return false;
 
     // PPPoE 用戶名通常允許字母、數字、點、下劃線、連字符和@符號
     final RegExp usernameRegex = RegExp(r'^[a-zA-Z0-9._@-]+$');
@@ -1360,7 +1360,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 // PPPoE 密碼驗證
   bool _isValidPppoePassword(String password) {
     if (password.isEmpty) return false;
-    if (password.length > 64) return false;
+    if (password.length > 32) return false;
 
     // PPPoE 密碼允許大部分可打印字符，使用十六進制範圍定義
     // 包含: 空格(0x20) + 所有可打印字符(0x21-0x7E)
@@ -1771,7 +1771,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
   // 獲取連接類型錯誤訊息
   String _getConnectionTypeError() {
-    if (connectionType == 'Static IP') {
+    if (connectionType == 'Static IP') {   //Static IP錯誤判定
       if (staticIpConfig.ipAddress.isEmpty) {
         return 'Please enter an IP address';
       } else if (!_isValidIpAddress(staticIpConfig.ipAddress)) {
@@ -1793,13 +1793,16 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       } else if (staticIpConfig.secondaryDns.isNotEmpty && !_isValidIpAddress(staticIpConfig.secondaryDns)) {
         return 'Please enter a valid secondary DNS server address';
       }
-    } else if (connectionType == 'PPPoE') {
+    } else if (connectionType == 'PPPoE') {   //PPPOE錯誤判定
       if (pppoeUsername.isEmpty) {
         return 'Please enter a PPPoE username';
       } else if (!_isValidPppoeUsername(pppoeUsername)) {
         return 'Username can only contain letters, numbers, dots, underscores, hyphens, and @ symbol';
       } else if (pppoePassword.isEmpty) {
         return 'Please enter a PPPoE password';
+      } else if (pppoePassword.length > 32) {
+        // 新增：專門針對32字元限制的錯誤提示
+        return 'PPPoE password must be 32 characters or less';
       } else if (!_isValidPppoePassword(pppoePassword)) {
         return 'Password contains invalid characters';
       }
@@ -1829,6 +1832,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     return pppoeUsername.isNotEmpty &&
         _isValidPppoeUsername(pppoeUsername) &&
         pppoePassword.isNotEmpty &&
+        pppoePassword.length <= 32 &&
         _isValidPppoePassword(pppoePassword);
   }
 
@@ -1855,8 +1859,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         return 'Please enter a password';
       } else if (ssidPassword.length < 8) {
         return 'Password must be at least 8 characters';
-      } else if (ssidPassword.length > 64) {
-        return 'Password must be 64 characters or less';
+      } else if (ssidPassword.length > 32) {
+        return 'Password must be 32 characters or less';
       } else {
         // 驗證密碼字符
         final RegExp validChars = RegExp(
@@ -2289,8 +2293,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         return false;
       }
 
-      if (ssidPassword.length > 64) {
-        print('❌ SSID 驗證失敗: 密碼長度超過 64 字元');
+      if (ssidPassword.length > 32) {
+        print('❌ SSID 驗證失敗: 密碼長度超過 32 字元');
         return false;
       }
 
