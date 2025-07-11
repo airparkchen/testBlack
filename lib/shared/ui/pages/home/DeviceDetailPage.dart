@@ -673,6 +673,20 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     );
   }
 
+  double _getSSIDFontSizeForDeviceDetail(String ssid) {
+    final length = ssid.length;
+
+    if (length <= 20) {
+      return 12.0; // 標準大小
+    } else if (length <= 25) {
+      return 11.0; // 中等長度，稍微縮小
+    } else if (length <= 32) {
+      return 10.0; // 較長，更小字體
+    } else {
+      return 10.0; // 非常長，最小字體
+    }
+  }
+
   /// 建構客戶端資訊
   Widget _buildClientInfo(ClientDevice client) {
     return Column(
@@ -698,7 +712,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           _formatConnectionDisplay(client),
           style: TextStyle(
             color: Colors.white.withOpacity(0.9),
-            fontSize: 12,
+            fontSize: _getSSIDFontSizeForDeviceDetail(_formatConnectionDisplay(client)),
             height: 1.3,
           ),
           maxLines: 1,
@@ -780,7 +794,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
       // 4. 組合 SSID_頻段 格式
       if (ssid.isNotEmpty && frequency.isNotEmpty) {
-        return '${ssid}_${frequency}';
+        return '${ssid} /${frequency}';
       } else if (ssid.isNotEmpty) {
         return ssid;
       } else if (frequency.isNotEmpty) {

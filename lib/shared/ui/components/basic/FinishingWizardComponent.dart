@@ -36,10 +36,9 @@ class FinishingWizardComponent extends StatefulWidget {
 }
 
 class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
-  // 🔥 修改：改為單一Process
   late List<ProcessInfo> _processes;
   Timer? _timer;
-  int _currentProcessIndex = 0; // 🔥 修正：添加缺少的變數（舊模式需要）
+  int _currentProcessIndex = 0;
   double _currentProgress = 0.0;
   String _currentStatus = 'Initializing...';
   bool _isCompleted = false;
@@ -58,43 +57,23 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     _isNewMode = widget.onProgressControllerReady != null;
 
     if (_isNewMode) {
-      // 🔥 新模式：單一Process，延遲2秒後開始API
-      _initializeSingleProcessMode();
+      // 🔥 新模式：混合模式 - Process 01-03 時間控制，Process 04 API 控制
+      _initializeHybridMode();
     } else {
       // 舊模式：內部定時器控制進度（保持原有邏輯）
       _initializeOldMode();
     }
   }
 
-  // 單一Process模式初始化
-  void _initializeSingleProcessMode() {
-    // 只使用 1 個 process，名稱改為 'Process'
-    final processNames = ['Process'];
-
-    // 初始化進程列表
-    _processes = processNames.map((name) => ProcessInfo(name, 0.0)).toList();
-
-    // 將進度更新函數傳給父組件
-    if (widget.onProgressControllerReady != null) {
-      widget.onProgressControllerReady!(_updateApiProgress);
-    }
-
-    // 🔥 延遲2秒後直接進入API階段
-    Timer(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _isApiPhase = true; // 進入 API 階段
-        });
-        print('🔥 延遲2秒完成，開始API階段');
-      }
-    });
-  }
-
-  /* 🔥 保留原本4個Process的混合模式邏輯（備註保存）
-  // 新增：混合模式初始化
+  // 混合模式初始化 - Process 01-03 時間控制，Process 04 API 控制
   void _initializeHybridMode() {
-    // 固定使用 4 個 process
-    final processNames = ['Process 01', 'Process 02', 'Process 03', 'Process 04'];
+    // 更新為新的 process 名稱
+    final processNames = [
+      'Submitting network settings...',
+      'Submitting wireless settings...',
+      'Changing user password...',
+      'Completing configuration...'
+    ];
 
     // 初始化進程列表
     _processes = processNames.map((name) => ProcessInfo(name, 0.0)).toList();
@@ -113,7 +92,10 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     _timer = Timer.periodic(Duration(milliseconds: updateInterval), (timer) {
       if (_currentProcessIndex >= 3) { // 只跑前 3 個 process
         _timer?.cancel();
-        _isApiPhase = true; // 進入 API 階段
+        setState(() {
+          _isApiPhase = true; // 進入 API 階段
+        });
+        print('前 3 個 Process 完成，開始 API 階段');
         return;
       }
 
@@ -135,7 +117,6 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
       });
     });
   }
-  */
 
   // 舊模式初始化（保留原有邏輯）
   void _initializeOldMode() {
@@ -189,13 +170,24 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     });
   }
 
-  // 🔥 修改：單一Process的API進度更新方法
+  //Process 04 的 API 進度更新方法
   void _updateApiProgress(double progress, {String? status}) {
     if (mounted && _isApiPhase) {
       setState(() {
         _apiProgress = progress.clamp(0.0, 100.0);
 
-        _processes[0] = ProcessInfo('Process', _apiProgress);
+        // 根據進度動態更新第 4 個 process 的文字
+        String process4Text;
+        if (_apiProgress < 40.0) {
+          // 30% - 40%：配置階段
+          process4Text = 'Completing configuration...';
+        } else {
+          // 40% - 100%：重啟等待階段
+          process4Text = 'Restarting device...';
+        }
+
+        // 更新第 4 個 process (index 3) 的進度和文字
+        _processes[3] = ProcessInfo(process4Text, _apiProgress);
 
         // 當 API 進度達到100%時，先顯示對話框，再執行完成邏輯
         if (_apiProgress >= 100.0 && !_isCompleted) {
@@ -215,7 +207,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     }
   }
 
-  // 🔥 修復：顯示重連對話框並處理導航
+  // 顯示重連對話框並處理導航
   void _showReconnectDialogWithNavigation() {
     String configuredSSID = WifiScannerComponent.configuredSSID ?? 'your configured network';
 
@@ -335,26 +327,19 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
 
-    // 🔥 修改卡片高度：原本裝4條，現在裝1條
-    // 原本: screenSize.height * 1.6
-    // 修改: 根據Process數量調整高度
+    // 🔥 修改卡片高度：恢復為 4 條 Process 的高度
     double cardHeight;
     if (widget.height != null) {
       cardHeight = widget.height!;
     } else {
       if (_isNewMode) {
-        // 🔥 單一Process模式：縮小卡片高度
-        cardHeight = screenSize.height * 0.4; // 原本的1/4高度
+        // 🔥 混合模式：恢復為 4 條 Process 的高度
+        cardHeight = screenSize.height * 0.85; // 恢復為支援 4 條的高度
       } else {
         // 舊模式：保持原有高度
         cardHeight = screenSize.height * 1.6;
       }
     }
-
-    /* 🔥 保留原本的卡片高度計算邏輯（備註保存）
-    // 使用傳入的高度參數或默認值（保持原有邏輯）
-    double cardHeight = widget.height ?? (screenSize.height * 1.6);
-    */
 
     // 使用 buildStandardCard 替代原始的 Container（保持原有樣式）
     return _appTheme.whiteBoxTheme.buildStandardCard(
@@ -367,21 +352,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     );
   }
 
-  // 🔥 修改：新模式內容（單一Process模式）
-  Widget _buildNewModeContent() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 🔥 只顯示 1 個 process（完全像原本的 Process 04）
-          ..._processes.map((process) => _buildProcessItem(process)),
-        ],
-      ),
-    );
-  }
-
-  /* 🔥 保留原本的新模式內容（備註保存）
-  // 新模式內容（混合模式：Process 01-03 固定速率，Process 04 API 控制）
+  // 🔥 修改：新模式內容（混合模式：4 條 Process）
   Widget _buildNewModeContent() {
     return SingleChildScrollView(
       child: Column(
@@ -393,7 +364,6 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
       ),
     );
   }
-  */
 
   // 舊模式內容（保留原有邏輯）
   Widget _buildOldModeContent() {
