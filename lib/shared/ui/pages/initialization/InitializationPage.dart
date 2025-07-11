@@ -36,7 +36,7 @@ class _InitializationPageState extends State<InitializationPage>
   // 追蹤自動搜尋狀態
   bool _isAutoSearching = false;
   int _autoSearchAttempts = 0;
-  static const int _maxAutoSearchAttempts = 3; // 最多嘗試 3 次
+  static const int _maxAutoSearchAttempts = 5; // 最多嘗試 3 次
 
   // 追蹤自動搜尋是否已完成
   bool _autoSearchCompleted = false;

@@ -20,6 +20,8 @@ import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart'
 import 'package:whitebox/shared/ui/pages/initialization/LoginPage.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/components/basic/WifiScannerComponent.dart';
+import 'package:whitebox/shared/utils/ssid_monitor.dart';
+import 'package:whitebox/main.dart';
 
 class WifiSettingFlowPage extends StatefulWidget {
   // 新增：總開關，用於繞過所有限制
@@ -120,6 +122,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _loadConfig();
     _pageController = PageController(initialPage: currentStepIndex);
     _stepperController.addListener(_onStepperControllerChanged);
+    SSIDMonitor.instance.initialize(MyApp.navigatorKey);
     _startEllipsisAnimation();
 
     print('🎯 WifiSettingFlowPage 初始化，當前配置的 SSID: ${WifiScannerComponent.configuredSSID}');
@@ -149,6 +152,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _stepperController.removeListener(_onStepperControllerChanged);
     _stepperController.dispose();
     _ellipsisTimer.cancel();
+    SSIDMonitor.instance.stopMonitoring();
     // 重置初始化狀態，以便下次進入頁面重新執行
     hasInitialized = false;
     super.dispose();
@@ -327,6 +331,14 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           if (jwtToken != null && jwtToken!.isNotEmpty) {
             WifiApiService.setJwtToken(jwtToken!);
           }
+          // 🆕 測試：登入成功後立即啟動 SSID 監控
+          if (currentSSID.isNotEmpty) {
+            print('🧪 測試：登入成功後啟動 SSID 監控，目標 SSID: $currentSSID');
+            SSIDMonitor.instance.startMonitoring(currentSSID);
+          } else {
+            print('❌ 測試失敗：當前 SSID 為空');
+          }
+
         } else {
           print("SRP 登入失敗，嘗試傳統登入");
 
@@ -363,6 +375,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
                 isAuthenticated = true;
                 _updateStatus("Login successful");
                 hasInitialized = true;
+                // 🆕 測試：傳統登入成功後也啟動 SSID 監控
+                if (currentSSID.isNotEmpty) {
+                  print('🧪 測試：傳統登入成功後啟動 SSID 監控，目標 SSID: $currentSSID');
+                  SSIDMonitor.instance.startMonitoring(currentSSID);
+                } else {
+                  print('❌ 測試失敗：當前 SSID 為空（傳統登入）');
+                }
               } else {
                 _updateStatus("Login failed: $message");
                 _handleAuthenticationFailure("Login failed: $message");
@@ -1016,6 +1035,10 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           _progressUpdateFunction!(30.0);
         }
 
+        // 🆕 Step 3.5: 停止 SSID 監控（在 configFinish 之前）
+        print('🔍 準備停止 SSID 監控（設備即將重啟）');
+        SSIDMonitor.instance.stopMonitoring();
+
         // Step 4: 完成配置 (30% -> 40%)
         _progressUpdateFunction!(30.0, status: 'Completing configuration...');
         await WifiApiService.configFinish();
@@ -1034,6 +1057,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       print('配置過程中發生錯誤: $e');
       _progressUpdateFunction!(100.0, status: 'Configuration failed');
 
+      // 發生錯誤時也要停止監控
+      SSIDMonitor.instance.stopMonitoring();
       // 保留原有的錯誤處理邏輯
       if (_shouldBypassRestrictions) {
         if (mounted) {
@@ -1072,7 +1097,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
 // 新增：帶進度的等待方法
   Future<void> _waitWithProgress() async {
-    const int totalWaitSeconds = 182; // 182 秒
+    const int totalWaitSeconds = 190; // 190 秒
     const int updateIntervalMs = 500; // 每 500 毫秒更新一次進度
     const int totalUpdates = totalWaitSeconds * 1000 ~/ updateIntervalMs;
 
@@ -1106,14 +1131,17 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     print('🎯 _handleWizardCompleted 被調用');
 
     try {
-      if (mounted) {
-        print('🎯 導航到 InitializationPage 並標記需要自動搜尋');
+      // 🆕 啟動 SSID 監控
+      if (ssid.isNotEmpty) {
+        SSIDMonitor.instance.startMonitoring(ssid);
+        print('🔍 已啟動 SSID 監控: $ssid');
+      }
 
-        // 🔥 關鍵修改：導航時傳遞自動搜尋參數
+      if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (context) => const InitializationPage(
-              shouldAutoSearch: true, // 🔥 新增參數，表示需要自動搜尋
+              shouldAutoSearch: true,
             ),
           ),
               (route) => false,
