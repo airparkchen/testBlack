@@ -324,7 +324,25 @@ class _InitializationPageState extends State<InitializationPage>
   void _openQrCodeScanner() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const QrCodeScannerPage()),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const QrCodeScannerPage(),
+        transitionDuration: const Duration(milliseconds: 250),
+        reverseTransitionDuration: const Duration(milliseconds: 250),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0); // 從右側滑入
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+
+          var tween = Tween(begin: begin, end: end).chain(
+            CurveTween(curve: curve),
+          );
+
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+      ),
     );
 
     if (result != null) {
@@ -456,7 +474,7 @@ class _InitializationPageState extends State<InitializationPage>
                   children: [
                     // QR 碼掃描按鈕
                     _buildImageActionButton(
-                      label: 'QRcode',
+                      label: 'QR Code',
                       imagePath: 'assets/images/icon/QRcode.png',
                       onPressed: _openQrCodeScanner,
                       width: buttonWidth,
