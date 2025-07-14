@@ -486,7 +486,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
                   'WiFi Connection Required',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

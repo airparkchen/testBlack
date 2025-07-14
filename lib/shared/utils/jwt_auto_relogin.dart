@@ -230,7 +230,7 @@ class JwtAutoRelogin {
             ],
           ),
           backgroundColor: Colors.purple.withOpacity(0.8),
-          duration: Duration(seconds: 3),
+          duration: Duration(seconds: 1),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),

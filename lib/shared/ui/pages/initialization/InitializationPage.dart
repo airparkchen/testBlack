@@ -287,24 +287,56 @@ class _InitializationPageState extends State<InitializationPage>
       final blankState = systemInfo['blank_state'];
 
       if (blankState == "0") {
+        // 使用滑入動畫跳轉到 LoginPage
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => LoginPage(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => LoginPage(
               onBackPressed: () => Navigator.of(context).pop(),
             ),
+            transitionDuration: const Duration(milliseconds: 1000),
+            reverseTransitionDuration: const Duration(milliseconds: 1000),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              const begin = Offset(1.0, 0.0); // 從右側滑入
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+
+              var tween = Tween(begin: begin, end: end).chain(
+                CurveTween(curve: curve),
+              );
+
+              return SlideTransition(
+                position: animation.drive(tween),
+                child: child,
+              );
+            },
           ),
         );
       } else {
-        // blank_state 為 1 或其他值，開啟原來的 WifiSettingFlowPage
+        // 使用滑入動畫跳轉到 WifiSettingFlowPage
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => const WifiSettingFlowPage(
-              // 🔧 新增：啟用資料保留功能
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => const WifiSettingFlowPage(
               preserveDataOnBack: true,  // 返回時保留資料
               preserveDataOnNext: true,  // 前進時保留下一步資料
             ),
+            transitionDuration: const Duration(milliseconds: 1000),
+            reverseTransitionDuration: const Duration(milliseconds: 1000),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              const begin = Offset(1.0, 0.0); // 從右側滑入
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+
+              var tween = Tween(begin: begin, end: end).chain(
+                CurveTween(curve: curve),
+              );
+
+              return SlideTransition(
+                position: animation.drive(tween),
+                child: child,
+              );
+            },
           ),
         );
       }
@@ -378,26 +410,58 @@ class _InitializationPageState extends State<InitializationPage>
       final blankState = systemInfo['blank_state'];
 
       if (blankState == "0") {
+        // 使用滑入動畫跳轉到 LoginPage
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => LoginPage(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => LoginPage(
               onBackPressed: () {
                 Navigator.of(context).pop(); // 返回到 InitializationPage
               },
             ),
+            transitionDuration: const Duration(milliseconds: 250),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              const begin = Offset(1.0, 0.0); // 從右側滑入
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+
+              var tween = Tween(begin: begin, end: end).chain(
+                CurveTween(curve: curve),
+              );
+
+              return SlideTransition(
+                position: animation.drive(tween),
+                child: child,
+              );
+            },
           ),
         );
       } else {
-        // blank_state 為 1 或其他值，開啟原來的 WifiSettingFlowPage
+        // 使用滑入動畫跳轉到 WifiSettingFlowPage
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => const WifiSettingFlowPage(
-              // 🔧 新增：啟用資料保留功能
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => const WifiSettingFlowPage(
               preserveDataOnBack: true,  // 返回時保留資料
               preserveDataOnNext: true,  // 前進時保留下一步資料
             ),
+            transitionDuration: const Duration(milliseconds: 250),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              const begin = Offset(1.0, 0.0); // 從右側滑入
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+
+              var tween = Tween(begin: begin, end: end).chain(
+                CurveTween(curve: curve),
+              );
+
+              return SlideTransition(
+                position: animation.drive(tween),
+                child: child,
+              );
+            },
           ),
         );
       }
@@ -412,6 +476,7 @@ class _InitializationPageState extends State<InitializationPage>
       print('獲取系統資訊失敗: $e');
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
