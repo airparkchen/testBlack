@@ -239,7 +239,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
                   'Configuration Complete',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -254,7 +254,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
                 'Configuration has been completed successfully.',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 16,
+                  fontSize: 14,
                 ),
               ),
               const SizedBox(height: 12),
@@ -262,7 +262,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
                 'Please reconnect to the WiFi network:',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 16,
+                  fontSize: 14,
                 ),
               ),
               const SizedBox(height: 8),
