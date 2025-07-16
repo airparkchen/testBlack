@@ -18,6 +18,7 @@
   import 'package:whitebox/shared/theme/app_theme.dart';
   import 'package:whitebox/shared/ui/pages/home/DashboardPage.dart';
   import 'package:whitebox/shared/utils/jwt_auto_relogin.dart';
+  // import 'package:whitebox/shared/ui/pages/test/SpeedTestDemoPage.dart';
 
   class BackgroundSettings {
     static String currentBackground = AppBackgrounds.mainBackground;

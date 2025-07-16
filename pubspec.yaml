@@ -79,6 +79,8 @@ dependencies:
   device_info_plus: ^10.1.2
   permission_handler: ^11.3.1
   url_launcher: ^6.2.4
+  # speedtest
+  flutter_inappwebview: ^6.0.0
 
 
 
