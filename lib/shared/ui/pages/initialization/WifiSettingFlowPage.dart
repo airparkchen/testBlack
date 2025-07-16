@@ -1887,8 +1887,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         return 'Please enter a password';
       } else if (ssidPassword.length < 8) {
         return 'Password must be at least 8 characters';
-      } else if (ssidPassword.length > 32) {
-        return 'Password must be 32 characters or less';
+      } else if (ssidPassword.length > 63) {
+        return 'Password must be 63 characters or less';
       } else {
         // 驗證密碼字符
         final RegExp validChars = RegExp(
@@ -2752,7 +2752,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       children: [
         // 標題
         Container(
-          height: titleHeight,
+          height: titleHeight * 1.1,
           width: double.infinity,
           alignment: Alignment.center,
           child: Text(

@@ -804,11 +804,11 @@ class _DashboardComponentState extends State<DashboardComponent>
   double _getSSIDFontSize(String ssid) {
     final length = ssid.length;
 
-    if (length <= 20) {
+    if (length <= 10) {
       return 16.0; // 標準大小
-    } else if (length <= 25) {
+    } else if (length <= 15) {
       return 14.0; // 中等長度，稍微縮小
-    } else if (length <= 32) {
+    } else if (length <= 20) {
       return 12.0; // 較長，更小字體
     } else {
       return 10.0; // 非常長，最小字體

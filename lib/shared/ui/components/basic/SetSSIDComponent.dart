@@ -221,9 +221,9 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
       } else if (password.length < 8) {
         _isPasswordError = true;
         _passwordErrorText = 'Password must be at least 8 characters';
-      } else if (password.length > 64) {
+      } else if (password.length > 63) {
         _isPasswordError = true;
-        _passwordErrorText = 'Password must be 64 characters or less';
+        _passwordErrorText = 'Password must be 63 characters or less';
       } else if (!_isValidCharacters(password)) {
         _isPasswordError = true;
         _passwordErrorText = 'Password contains invalid characters';
@@ -289,8 +289,8 @@ class _SetSSIDComponentState extends State<SetSSIDComponent> {
       return 'Password too short (minimum 8 characters)';
     }
 
-    if (password.length > 64) {
-      return 'Password too long (maximum 64 characters)';
+    if (password.length > 63) {
+      return 'Password too long (maximum 63 characters)';
     }
 
     if (!_isValidCharacters(password)) {
