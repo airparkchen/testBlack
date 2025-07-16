@@ -377,11 +377,11 @@ class _InitializationPageState extends State<InitializationPage>
       ),
     );
 
-    if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('QR 碼掃描結果: $result')),
-      );
-    }
+    // if (result != null) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(content: Text('QR 碼掃描結果: $result')),
+    //   );
+    // }
   }
 
   // 處理手動新增
