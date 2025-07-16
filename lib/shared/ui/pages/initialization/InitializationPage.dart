@@ -294,8 +294,8 @@ class _InitializationPageState extends State<InitializationPage>
             pageBuilder: (context, animation, secondaryAnimation) => LoginPage(
               onBackPressed: () => Navigator.of(context).pop(),
             ),
-            transitionDuration: const Duration(milliseconds: 1000),
-            reverseTransitionDuration: const Duration(milliseconds: 1000),
+            transitionDuration: const Duration(milliseconds: 250),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               const begin = Offset(1.0, 0.0); // 從右側滑入
               const end = Offset.zero;
@@ -321,8 +321,8 @@ class _InitializationPageState extends State<InitializationPage>
               preserveDataOnBack: true,  // 返回時保留資料
               preserveDataOnNext: true,  // 前進時保留下一步資料
             ),
-            transitionDuration: const Duration(milliseconds: 1000),
-            reverseTransitionDuration: const Duration(milliseconds: 1000),
+            transitionDuration: const Duration(milliseconds: 250),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               const begin = Offset(1.0, 0.0); // 從右側滑入
               const end = Offset.zero;
