@@ -32,6 +32,9 @@ class SSIDMonitor {
   bool _isDialogShowing = false;
   GlobalKey<NavigatorState>? _navigatorKey;
 
+  //全域錯誤對話框狀態管理
+  static bool _globalErrorDialogShowing = false;
+  static bool _configurationFailed = false;
   // ==================== 監控配置 ====================
 
   // 檢查間隔（秒）
@@ -40,6 +43,32 @@ class SSIDMonitor {
   // 連續失敗次數閾值（避免偶發性檢查失敗）
   static const int _failureThreshold = 3;
   int _consecutiveFailures = 0;
+
+  // ==================== 新增：全域錯誤狀態管理方法 ====================
+
+  /// 設置全域錯誤對話框狀態
+  static void setGlobalErrorDialogShowing(bool showing) {
+    _globalErrorDialogShowing = showing;
+    print('🚨 SSIDMonitor: 全域錯誤對話框狀態設置為 $showing');
+  }
+
+  /// 設置配置失敗狀態
+  static void setConfigurationFailed(bool failed) {
+    _configurationFailed = failed;
+    print('🚨 SSIDMonitor: 配置失敗狀態設置為 $failed');
+  }
+
+  /// 檢查是否可以顯示 SSID 錯誤對話框
+  static bool canShowSSIDErrorDialog() {
+    return !_globalErrorDialogShowing && !_configurationFailed;
+  }
+
+  /// 重置全域錯誤狀態
+  static void resetGlobalErrorState() {
+    _globalErrorDialogShowing = false;
+    _configurationFailed = false;
+    print('🔄 SSIDMonitor: 已重置全域錯誤狀態');
+  }
 
   // ==================== 公開方法 ====================
 
@@ -74,6 +103,9 @@ class SSIDMonitor {
 
     // 停止之前的監控
     stopMonitoring();
+
+    // 重置全域錯誤狀態（開始新的監控時）
+    resetGlobalErrorState();
 
     // 開始新的監控
     _targetSSID = targetSSID;
@@ -214,10 +246,18 @@ class SSIDMonitor {
 
   /// 顯示 SSID 斷線彈窗
   void _showDisconnectedDialog(String? currentSSID, String? error) {
+    // 檢查全域錯誤狀態
+    if (!canShowSSIDErrorDialog()) {
+      print('⚠️ SSIDMonitor: 已有其他錯誤對話框或配置失敗，跳過 SSID 斷線對話框');
+      return;
+    }
     if (_isDialogShowing || _navigatorKey?.currentContext == null) return;
 
     final BuildContext context = _navigatorKey!.currentContext!;
     _isDialogShowing = true;
+
+    // 設置全域錯誤對話框狀態
+    setGlobalErrorDialogShowing(true);
 
     print('📱 SSIDMonitor: 顯示 SSID 斷線彈窗');
 
@@ -347,6 +387,9 @@ class SSIDMonitor {
     }
 
     _isDialogShowing = false;
+
+    //重置全域錯誤對話框狀態
+    setGlobalErrorDialogShowing(false);
   }
 
   /// 跳轉到初始化頁面
@@ -357,6 +400,9 @@ class SSIDMonitor {
       // 關閉彈窗
       Navigator.of(dialogContext).pop();
       _isDialogShowing = false;
+
+      // 重置全域錯誤對話框狀態
+      setGlobalErrorDialogShowing(false);
 
       // 停止監控
       stopMonitoring();

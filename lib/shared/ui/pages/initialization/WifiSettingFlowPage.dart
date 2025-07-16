@@ -44,6 +44,7 @@ class WifiSettingFlowPage extends StatefulWidget {
 class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   final AppTheme _appTheme = AppTheme();
 
+  bool _configurationFailed = false;  // 追蹤配置是否失敗
   bool _forceWPA3Only = true;  // 設為 true 時只有 WPA3 選項
   bool showDebugMessages = true; // 或設為 false 以關閉調試訊息
   //追蹤用戶是否已經修改過設置(DHCP/Static_IP/PPPOE)
@@ -153,9 +154,110 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     _stepperController.dispose();
     _ellipsisTimer.cancel();
     SSIDMonitor.instance.stopMonitoring();
+    SSIDMonitor.resetGlobalErrorState();    //重置全域錯誤狀態
     // 重置初始化狀態，以便下次進入頁面重新執行
     hasInitialized = false;
     super.dispose();
+  }
+
+  bool _hasApiError(Map<String, dynamic> result) {
+    // 檢查是否包含 error 字段
+    if (result.containsKey('error')) {
+      return true;
+    }
+
+    // 檢查 status_code 是否不是 "000" (成功)
+    if (result.containsKey('status_code') && result['status_code'] != '000') {
+      return true;
+    }
+
+    return false;
+  }
+
+  void _showSimpleErrorDialog(String stepName, String errorMessage) {
+    // 檢查 SSIDMonitor 的全域狀態
+    if (!SSIDMonitor.canShowSSIDErrorDialog()) {
+      print('⚠️ 已有其他錯誤對話框顯示，跳過 Setup Failed 對話框: $stepName');
+      return;
+    }
+
+    // 設置全域錯誤狀態
+    SSIDMonitor.setGlobalErrorDialogShowing(true);
+    SSIDMonitor.setConfigurationFailed(true);
+
+    print('🚨 顯示 Setup Failed 對話框: $stepName');
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A2A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: const Color(0xFF9747FF).withOpacity(0.5),
+              width: 1,
+            ),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: const Color(0xFFFF6B6B),
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Setup Failed',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            _getSimpleErrorMessage(errorMessage, stepName),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 16,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // 關閉對話框
+                // 重置全域錯誤狀態
+                SSIDMonitor.setGlobalErrorDialogShowing(false);
+                SSIDMonitor.setConfigurationFailed(false);
+                // 返回到 InitializationPage
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const InitializationPage(),
+                  ),
+                      (route) => false,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF9747FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Back to Setup',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
 //!!!!!!流程寫死的部分/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,16 +266,14 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   Future<void> _changePassword() async {
     if (password.isEmpty) {
       _updateStatus("錯誤: 沒有設置新密碼");
-      _updateStatus("錯誤: 沒有設置新密碼");
       return;
     }
 
-    setState(() {
-      isLoading = true;
-      _updateStatus("正在更改密碼...");
-    });
-
     try {
+      setState(() {
+        _updateStatus("正在更改密碼...");
+      });
+
       _updateStatus("\n===== 開始變更密碼流程 =====");
       _updateStatus("用戶名: $userName");
       _updateStatus("新密碼: [已隱藏]");
@@ -183,13 +283,28 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           newPassword: password
       );
 
-      if (result['success']) {
-        _updateStatus("密碼變更成功!");
-        _updateStatus("密碼已成功變更");
-      } else {
-        _updateStatus("密碼變更失敗: ${result['message']}");
-        _updateStatus("密碼變更失敗");
+      // 檢查密碼變更結果
+      if (!result['success']) {
+        String errorMsg = result['message'] ?? 'Password change failed';
+        _configurationFailed = true;  // 🔥 新增：設置失敗標記
+        _showSimpleErrorDialog('Password Change', errorMsg);
+        throw Exception('Password change failed');
       }
+
+      // 如果有 data 字段，也檢查其中的錯誤
+      if (result['data'] != null && result['data'] is Map<String, dynamic>) {
+        Map<String, dynamic> data = result['data'];
+        if (_hasApiError(data)) {
+          String errorMsg = data['error']?.toString() ??
+              'Password change failed (Status: ${data['status_code'] ?? 'Unknown'})';
+          _configurationFailed = true;  // 🔥 新增：設置失敗標記
+          _showSimpleErrorDialog('Password Change', errorMsg);
+          throw Exception('Password change failed');
+        }
+      }
+
+      _updateStatus("密碼變更成功!");
+      _updateStatus("密碼已成功變更");
 
       if (result['data'] != null) {
         _updateStatus("服務器響應: ${json.encode(result['data'])}");
@@ -197,12 +312,10 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
       _updateStatus("===== 變更密碼流程結束 =====");
     } catch (e) {
-      _updateStatus("變更密碼過程中發生錯誤: $e");
-      _updateStatus("變更密碼失敗");
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
+      print('變更密碼過程中發生錯誤: $e');
+      _configurationFailed = true;
+      _showSimpleErrorDialog('Password Change', e.toString());
+      rethrow;
     }
   }
 
@@ -772,26 +885,42 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         _updateStatus("正在更新網絡設置...");
       });
 
-      // 確保使用最新準備的設置
       _prepareWanSettingsForSubmission();
-
       print('即將提交的網絡設置: ${json.encode(_currentWanSettings)}');
 
-      // 調用API提交網絡設置
       final result = await WifiApiService.updateWanEth(_currentWanSettings);
-
       print('網絡設置更新結果: ${json.encode(result)}');
+
+      // 檢查 API 錯誤
+      if (_hasApiError(result)) {
+        String errorMsg = result['error']?.toString() ??
+            'Network settings update failed (Status: ${result['status_code'] ?? 'Unknown'})';
+        _configurationFailed = true;  // 🔥 新增：設置失敗標記
+        _showSimpleErrorDialog('Network Settings', errorMsg);
+        throw Exception('Network settings update failed');
+      }
 
       setState(() {
         _updateStatus("網絡設置已更新");
       });
     } catch (e) {
       print('提交WAN設置時出錯: $e');
-      setState(() {
-        _updateStatus("更新網絡設置失敗: $e");
-      });
+
+      // 🔥 新增：設置配置失敗狀態
+      _configurationFailed = true;
+
+      // 如果是網路連接錯誤，也顯示通知
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection failed') ||
+          e.toString().contains('Network is unreachable')) {
+        _showSimpleErrorDialog('Network Settings',
+            'Connection to router failed. Please check your network connection and try again.');
+      }
+
+      rethrow; // 重新拋出錯誤以中斷流程
     }
   }
+
 
   Future<void> _submitWirelessSettings() async {
     try {
@@ -802,15 +931,13 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       print('🔍 提交無線設置前的密碼確認:');
       print('  - 當前 ssidPassword 變數: "$ssidPassword"');
 
-      // 準備無線設置提交數據
+      // ... 原有的無線設置準備代碼保持不變 ...
       Map<String, dynamic> wirelessConfig = {};
 
-      // 保留原始結構中的其他字段
       if (_currentWirelessSettings.containsKey('wifi_mlo')) {
         wirelessConfig['wifi_mlo'] = _currentWirelessSettings['wifi_mlo'];
       }
 
-      // 設置VAPs數組
       List<Map<String, dynamic>> vaps = [];
 
       if (_currentWirelessSettings.containsKey('vaps') &&
@@ -822,35 +949,30 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
           Map<String, dynamic> originalVap = Map<String, dynamic>.from(_currentWirelessSettings['vaps'][i]);
 
           if (i == 0) {
-            // 既然只支援 WPA3，固定使用 'sae' 安全類型
-            String apiSecurityType = 'sae'; // WPA3 Personal
+            String apiSecurityType = 'sae';
 
             print('🔍 密碼同步檢查:');
             print('  - 當前 ssidPassword 變數: "$ssidPassword"');
             print('  - 原始 VAP 密碼: "${originalVap['password']}"');
 
-            // 更新值
             originalVap['ssid'] = ssid;
             originalVap['security_type'] = apiSecurityType;
-            originalVap['password'] = ssidPassword; // WPA3 需要密碼
+            originalVap['password'] = ssidPassword;
 
             print('  - 更新後 VAP 密碼: "${originalVap['password']}"');
           }
 
           vaps.add(originalVap);
         }
-      }
-      else {
+      } else {
         print("創建新的VAP結構");
         Map<String, dynamic> newVap = {
           'vap_index': 1,
           'vap_type': 'primary',
           'vap_enabled': 'true',
-          'security_type': 'sae', // WPA3 Personal
+          'security_type': 'sae',
           'ssid': ssid,
           'password': ssidPassword
-          // TODO: 未來 API 團隊會添加 band 字段支援，屆時需要在此處添加：
-          // 'band': "2g", // 或 "5g", "6g" 根據需要
         };
 
         vaps.add(newVap);
@@ -867,10 +989,18 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       final result = await WifiApiService.updateWirelessBasic(wirelessConfig);
       print('無線設置更新結果: ${json.encode(result)}');
 
+      // 🔥 新增：檢查 API 錯誤
+      if (_hasApiError(result)) {
+        String errorMsg = result['error']?.toString() ??
+            'Wireless settings update failed (Status: ${result['status_code'] ?? 'Unknown'})';
+        _showSimpleErrorDialog('Wireless Settings', errorMsg);
+        throw Exception('Wireless settings update failed');
+      }
+
       // 在無線設置提交成功後，記錄配置的 SSID
       if (result != null && !result.containsKey('error')) {
         WifiScannerComponent.setConfiguredSSID(ssid);
-        print('已記錄配置完成的 SSID: $ssid');
+        print('📡 記錄配置完成的SSID: $ssid');
       }
 
       setState(() {
@@ -878,9 +1008,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       });
     } catch (e) {
       print('提交無線設置時出錯: $e');
-      setState(() {
-        _updateStatus("更新無線設置失敗: $e");
-      });
+      _configurationFailed = true;
+      _showSimpleErrorDialog('Wireless Settings', e.toString());
+      rethrow;
     }
   }
 
@@ -1011,41 +1141,70 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   Future<void> _executeConfigurationWithProgress() async {
     if (_progressUpdateFunction == null) return;
 
+    // 重置配置失敗狀態
+    _configurationFailed = false;
+    SSIDMonitor.resetGlobalErrorState();
+
     try {
       if (!_shouldBypassRestrictions) {
         // Step 1: 提交網路設定 (0% -> 10%)
         _progressUpdateFunction!(0.0, status: 'Submitting network settings...');
-        await _submitWanSettings(); // 使用原有方法，保留所有 setState 邏輯
+        await _submitWanSettings();
         _progressUpdateFunction!(10.0);
         await Future.delayed(const Duration(seconds: 1));
 
         // Step 2: 提交無線設定 (10% -> 20%)
         _progressUpdateFunction!(10.0, status: 'Submitting wireless settings...');
-        await _submitWirelessSettings(); // 使用原有方法，保留所有 setState 邏輯
+        await _submitWirelessSettings();
         _progressUpdateFunction!(20.0);
         await Future.delayed(const Duration(seconds: 1));
 
         // Step 3: 變更密碼 (20% -> 30%)
         if (password.isNotEmpty && confirmPassword.isNotEmpty && password == confirmPassword) {
           _progressUpdateFunction!(20.0, status: 'Changing user password...');
-          await _changePassword(); // 使用原有方法，保留所有 setState 邏輯
+          await _changePassword();
           _progressUpdateFunction!(30.0);
           await Future.delayed(const Duration(seconds: 1));
         } else {
           _progressUpdateFunction!(30.0);
         }
 
-        // 🆕 Step 3.5: 停止 SSID 監控（在 configFinish 之前）
+        // Step 3.5: 停止 SSID 監控
         print('🔍 準備停止 SSID 監控（設備即將重啟）');
         SSIDMonitor.instance.stopMonitoring();
 
         // Step 4: 完成配置 (30% -> 40%)
-        _progressUpdateFunction!(30.0, status: 'Completing configuration...');
-        await WifiApiService.configFinish();
+        try {
+          final result = await WifiApiService.configFinish();
+
+          // 檢查 configFinish 結果
+          if (result != null && _hasApiError(result)) {
+            String errorMsg = result['error']?.toString() ??
+                'Configuration finish failed (Status: ${result['status_code'] ?? 'Unknown'})';
+            _configurationFailed = true;  // 🔥 新增：設置失敗標記
+            _showSimpleErrorDialog('Configuration Finish', errorMsg);
+            return; // 中斷流程
+          }
+
+        } catch (e) {
+          print('完成配置時出錯: $e');
+          _configurationFailed = true;  // 🔥 新增：設置失敗標記
+
+          // 如果是網路連接錯誤，也顯示通知
+          if (e.toString().contains('SocketException') ||
+              e.toString().contains('Connection failed') ||
+              e.toString().contains('Network is unreachable')) {
+            _showSimpleErrorDialog('Configuration Finish',
+                'Connection to router failed. Please check your network connection and try again.');
+          }
+
+          return; // 中斷流程
+        }
+
         _progressUpdateFunction!(40.0, status: 'Applying settings, please wait...');
         await Future.delayed(const Duration(seconds: 1));
 
-        // Step 5: 等待設定生效 (40% -> 100% 在 218 秒內完成)
+        // Step 5: 等待設定生效 (40% -> 100%)
         await _waitWithProgress();
 
       } else {
@@ -1054,54 +1213,18 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
       }
 
     } catch (e) {
-      print('配置過程中發生錯誤: $e');
-      _progressUpdateFunction!(100.0, status: 'Configuration failed');
-
-      // 發生錯誤時也要停止監控
-      SSIDMonitor.instance.stopMonitoring();
-      // 保留原有的錯誤處理邏輯
-      if (_shouldBypassRestrictions) {
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const LoginPage()),
-                (route) => false,
-          );
-        }
-      } else {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text('Setup Failed'),
-                content: Text('Unable to complete setup: $e'),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('OK'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                            (route) => false,
-                      );
-                    },
-                  ),
-                ],
-              );
-            },
-          );
-        }
-      }
+      print('完成配置時出錯: $e');
+      _configurationFailed = true;
+      _showSimpleErrorDialog('Configuration Finish', e.toString());
+      return;
     }
   }
 
 // 新增：帶進度的等待方法
   Future<void> _waitWithProgress() async {
-    const int totalWaitSeconds = 190; // 190 秒
-    const int updateIntervalMs = 500; // 每 500 毫秒更新一次進度
+    const int totalWaitSeconds = 190;
+    const int updateIntervalMs = 500;
     const int totalUpdates = totalWaitSeconds * 1000 ~/ updateIntervalMs;
-
-    // 從 40% 到 100%，需要增加 60%
     const double progressIncrement = 60.0 / totalUpdates;
 
     double currentProgress = 40.0;
@@ -1109,21 +1232,33 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     for (int i = 0; i < totalUpdates && mounted; i++) {
       await Future.delayed(const Duration(milliseconds: updateIntervalMs));
 
+      // 🔥 新增：檢查配置是否失敗，如果失敗就停止等待
+      if (_configurationFailed) {
+        print('🛑 配置失敗，停止等待進度');
+        return;
+      }
+
       currentProgress += progressIncrement;
       if (currentProgress > 100.0) currentProgress = 100.0;
 
-      // 計算剩餘時間
       int remainingSeconds = totalWaitSeconds - (i * updateIntervalMs ~/ 1000);
       String status = 'Applying settings... (${remainingSeconds}s remaining)';
 
       _progressUpdateFunction!(currentProgress, status: status);
 
-      // 如果達到 100% 就提前結束
       if (currentProgress >= 100.0) break;
     }
 
-    // 確保最終達到 100%
-    _progressUpdateFunction!(100.0, status: 'Configuration completed');
+    // 🔥 新增：只有在配置未失敗時才設置為 100%
+    if (!_configurationFailed) {
+      _progressUpdateFunction!(100.0, status: 'Configuration completed');
+    }
+  }
+
+  String _getSimpleErrorMessage(String originalError, String stepName) {
+    // 所有錯誤都統一為簡潔的訊息
+    return 'Unable to complete setup due to connection failure.\n\n'
+        'Please check if the device is powered on and WiFi is connected properly, then try again.';
   }
 
 // 修改精靈完成處理 - 縮短等待時間
