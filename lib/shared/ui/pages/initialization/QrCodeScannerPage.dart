@@ -31,11 +31,11 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
   String? _scannedPassword;
   String? _scannedSecurity;
   bool _showNextButton = false; // 控制是否顯示 Next 按鈕
+  bool _waitingForConnection = false; // 新增：等待用戶連接 WiFi 的狀態
+  bool _isDialogShowing = false; // 🎯 新增：追蹤是否有對話框正在顯示
 
   // ========== Auto Focus 相關變數 ==========
   Timer? _autoFocusTimer;
-  // bool _isTorchOn = false; // 手電筒變數
-
 
   @override
   void initState() {
@@ -60,11 +60,85 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
 
     if (state == AppLifecycleState.resumed) {
       print('🔍 QR Scanner 頁面回到前台');
-      // ========== 新增：重新啟動 Auto Focus ==========
+      // 重新啟動 Auto Focus
       _startAutoFocus();
+
+      // 🎯 新增：如果正在等待連接，自動檢測 WiFi
+      if (_waitingForConnection && _scannedSSID != null) {
+        print('🔍 檢測到回到前台，開始自動檢測 WiFi 連接');
+        _autoCheckWiFiConnection();
+      }
     } else if (state == AppLifecycleState.paused) {
-      // ========== 新增：暫停 Auto Focus ==========
+      // 暫停 Auto Focus
       _stopAutoFocus();
+    }
+  }
+
+  // 🎯 新增：自動檢測 WiFi 連接
+  Future<void> _autoCheckWiFiConnection() async {
+    // 🎯 如果已經有對話框在顯示，不要重複檢查
+    if (_isDialogShowing) {
+      print('🔍 對話框已經在顯示中，跳過自動檢查');
+      return;
+    }
+
+    // 延遲一點時間讓系統穩定
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted || _scannedSSID == null) return;
+
+    print('🔍 開始自動檢測 WiFi 連接狀態');
+
+    // 🎯 設置對話框顯示狀態
+    _isDialogShowing = true;
+
+    // 顯示載入狀態
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        );
+      },
+    );
+
+    try {
+      // 檢查當前連接的 WiFi
+      final currentSSID = await _getCurrentWifiSSID();
+      print('🔍 當前 SSID: "$currentSSID", 目標 SSID: "$_scannedSSID"');
+
+      // 關閉載入對話框
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (currentSSID != null && _compareSSID(currentSSID, _scannedSSID!)) {
+        print('🔍 ✅ SSID 比對成功！自動執行系統檢查');
+
+        // 🎯 重置狀態
+        _waitingForConnection = false;
+        _isDialogShowing = false;
+
+        // 執行系統資訊檢查（等同於點擊 Next）
+        await _performSystemInfoCheck();
+      } else {
+        // SSID 比對失敗，顯示增強版的連接失敗對話框
+        _showEnhancedConnectionFailureDialog(currentSSID);
+      }
+
+    } catch (e) {
+      // 關閉載入對話框
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      print('🔍 自動檢查連接時發生錯誤: $e');
+
+      // 🎯 重置對話框狀態
+      _isDialogShowing = false;
+
+      _showErrorDialog('檢查失敗', '無法檢查當前 WiFi 連接狀態');
     }
   }
 
@@ -115,13 +189,12 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
     });
   }
 
-  // ========== 新增：停止自動對焦 ==========
   void _stopAutoFocus() {
     _autoFocusTimer?.cancel();
     _autoFocusTimer = null;
   }
 
-  // ========== 新增：手動對焦 ==========
+  // 手動對焦
   Future<void> _handleTapToFocus() async {
     print('🎯 觸發手動對焦');
 
@@ -154,7 +227,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
   }
 
   // 處理 WiFi QR Code
-  void _handleWiFiQR(String qrCode) {
+  void _handleWiFiQR(String qrCode) async {
     print('🔍 QR Code: $qrCode');
 
     // 解析 QR Code 資訊
@@ -199,21 +272,83 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
         // 不設置 isScanning = false，讓相機繼續運作
       });
 
-      // 顯示 WiFi 資訊提示對話框
-      _showWiFiInfoDialog(ssid, password, security);
+      // 🎯 新增：立即檢查當前 WiFi 連接狀態
+      await _checkInitialWiFiConnection(ssid, password, security);
     } else {
       print('🔍 SSID 解析失敗');
       _showErrorDialog('QR Code 解析失敗', '無法從 QR Code 中獲取有效的 WiFi 資訊');
     }
   }
 
-  // 顯示 WiFi 資訊提示對話框
-  void _showWiFiInfoDialog(String ssid, String password, String security) {
+  // 🎯 新增：檢查初始 WiFi 連接狀態
+  Future<void> _checkInitialWiFiConnection(String ssid, String password, String security) async {
+    print('🔍 檢查初始 WiFi 連接狀態...');
+
+    // 顯示載入狀態
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        );
+      },
+    );
+
+    try {
+      // 檢查當前連接的 WiFi
+      final currentSSID = await _getCurrentWifiSSID();
+      print('🔍 當前 SSID: "$currentSSID", 目標 SSID: "$ssid"');
+
+      // 關閉載入對話框
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (currentSSID != null && _compareSSID(currentSSID, ssid)) {
+        print('🔍 ✅ 已經連接到正確的 WiFi！直接執行系統檢查');
+
+        // 直接執行系統資訊檢查
+        await _performSystemInfoCheck();
+      } else {
+        print('🔍 ❌ 尚未連接到正確的 WiFi，顯示設定對話框');
+
+        // 設置等待連接狀態
+        setState(() {
+          _waitingForConnection = true;
+        });
+
+        // 顯示 "Go to Settings" 對話框
+        _showWiFiInfoDialogModified(ssid, password, security);
+      }
+
+    } catch (e) {
+      // 關閉載入對話框
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      print('🔍 檢查初始連接時發生錯誤: $e');
+
+      // 發生錯誤時也顯示設定對話框
+      setState(() {
+        _waitingForConnection = true;
+      });
+
+      _showWiFiInfoDialogModified(ssid, password, security);
+    }
+  }
+
+  // 🎯 修改：只有 "Go to Settings" 按鈕的對話框
+  void _showWiFiInfoDialogModified(String ssid, String password, String security) {
     if (!mounted) return;
+
+    // 🎯 設置對話框顯示狀態
+    _isDialogShowing = true;
 
     showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false, // 🎯 不允許點擊外部關閉
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: const Color(0xFF2A2A2A),
@@ -259,10 +394,9 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
               const SizedBox(height: 12),
               _buildInfoRow('SSID:', ssid),
               _buildInfoRow('Password:', password.isNotEmpty ? password : 'No password'),
-              // _buildInfoRow('Security:', security.isNotEmpty ? security : 'Open'),
               const SizedBox(height: 16),
               const Text(
-                'Please go to Settings and connect to this WiFi network, then use the Next button to continue.',
+                'Please go to Settings and connect to this WiFi network. The app will automatically detect the connection when you return.',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
@@ -271,20 +405,11 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text(
-                'OK',
-                style: TextStyle(
-                  color: Color(0xFF9747FF),
-                  fontSize: 16,
-                ),
-              ),
-            ),
+            // 🎯 只保留 "Go to Settings" 按鈕
             ElevatedButton(
               onPressed: () async {
+                // 🎯 關閉對話框時重置狀態
+                _isDialogShowing = false;
                 Navigator.of(context).pop();
                 try {
                   await AppSettings.openAppSettingsPanel(AppSettingsPanelType.wifi);
@@ -348,6 +473,8 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
       qrResult = '';
       isScanning = true;
       _showNextButton = false;
+      _waitingForConnection = false; // 🎯 重置等待狀態
+      _isDialogShowing = false; // 🎯 重置對話框狀態
       _scannedSSID = null;
       _scannedPassword = null;
       _scannedSecurity = null;
@@ -411,7 +538,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
     return cleanedCurrent == cleanedSelected;
   }
 
-  // 處理 Next 按鈕點擊（與 manual input 相同邏輯）
+  // 處理 Next 按鈕點擊（保留原有邏輯）
   void _handleNext() async {
     if (_scannedSSID == null) return;
 
@@ -439,11 +566,11 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
       if (currentSSID != null && _compareSSID(currentSSID, _scannedSSID!)) {
         print('🔍 ✅ SSID 比對成功！');
 
-        // 呼叫 API 獲取系統資訊（與 InitializationPage 的 manual input 相同邏輯）
+        // 呼叫 API 獲取系統資訊
         await _performSystemInfoCheck();
       } else {
-        // SSID 比對失敗，顯示提示對話框
-        _showConnectionFailureDialog(currentSSID);
+        // SSID 比對失敗，顯示增強版的提示對話框
+        _showEnhancedConnectionFailureDialog(currentSSID);
       }
 
     } catch (e) {
@@ -457,7 +584,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
     }
   }
 
-  // 執行系統資訊檢查（與 InitializationPage 相同邏輯）
+  // 執行系統資訊檢查
   Future<void> _performSystemInfoCheck() async {
     // 顯示載入狀態
     showDialog(
@@ -524,8 +651,8 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
     }
   }
 
-  // 顯示連接失敗對話框
-  void _showConnectionFailureDialog(String? currentSSID) {
+  // 🎯 新增：顯示增強版的連接失敗對話框
+  void _showEnhancedConnectionFailureDialog(String? currentSSID) {
     if (!mounted) return;
 
     String currentWifiText = currentSSID ?? 'No WiFi connected';
@@ -567,13 +694,31 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Please connect to "$_scannedSSID" to continue.',
+                'Please connect to the scanned WiFi network to continue.',
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 16,
                 ),
               ),
+              const SizedBox(height: 16),
+              // 🎯 新增：QR Code WiFi 資訊
+              const Text(
+                'QR Code WiFi:',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                _scannedSSID ?? 'Unknown',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
               const SizedBox(height: 12),
+              // 原有的 Current WiFi 資訊
               const Text(
                 'Current WiFi:',
                 style: TextStyle(
@@ -594,7 +739,10 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
           actions: [
             TextButton(
               onPressed: () {
+                // 🎯 關閉對話框時重置狀態
+                _isDialogShowing = false;
                 Navigator.of(context).pop();
+                // 🎯 保持等待狀態，不重置
               },
               child: const Text(
                 'Cancel',
@@ -606,6 +754,8 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
             ),
             ElevatedButton(
               onPressed: () async {
+                // 🎯 關閉對話框時重置狀態
+                _isDialogShowing = false;
                 Navigator.of(context).pop();
                 try {
                   await AppSettings.openAppSettingsPanel(AppSettingsPanelType.wifi);
@@ -628,7 +778,10 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
           ],
         );
       },
-    );
+    ).then((_) {
+      // 🎯 對話框關閉後重置狀態（防止意外情況）
+      _isDialogShowing = false;
+    });
   }
 
   // 顯示錯誤對話框
@@ -883,93 +1036,8 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
                         ),
                       ),
 
-                      // 如果有掃描到 QR Code，顯示資訊
-                      if (_showNextButton && _scannedSSID != null)
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 40),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFF9747FF).withOpacity(0.5),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.wifi,
-                                    color: const Color(0xFF9747FF),
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'QR Code WiFi Info:',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              // SSID 行
-                              Row(
-                                children: [
-                                  const Text(
-                                    'SSID: ',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      '$_scannedSSID',
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              // Password 行
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Password: ',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      _scannedPassword != null && _scannedPassword!.isNotEmpty
-                                          ? _scannedPassword!
-                                          : 'No password',
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+                      // 🎯 移除：原本的 QR Code WiFi Info 顯示區域
+                      // 這個部分已經被完全移除，不再顯示在 UI 中
                     ],
                   ),
                 ),
@@ -1021,7 +1089,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
       );
     }
 
-    // ========== 修改：整個相機視圖都可以點擊對焦 ==========
+    // 整個相機視圖都可以點擊對焦
     return GestureDetector(
       onTap: _handleTapToFocus, // 點擊整個區域都會觸發對焦
       child: Stack(
@@ -1060,31 +1128,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
               ),
             ),
 
-          // ========== 手電筒控制按鈕（暫時備註，未來可能使用） ==========
-          // Positioned(
-          //   top: 10,
-          //   right: 10,
-          //   child: GestureDetector(
-          //     onTap: () {
-          //       // 防止事件冒泡到父層的 GestureDetector
-          //       _toggleTorch();
-          //     },
-          //     child: Container(
-          //       padding: const EdgeInsets.all(8),
-          //       decoration: BoxDecoration(
-          //         color: Colors.black.withOpacity(0.6),
-          //         borderRadius: BorderRadius.circular(8),
-          //       ),
-          //       child: Icon(
-          //         _isTorchOn ? Icons.flash_on : Icons.flash_off,
-          //         color: _isTorchOn ? Colors.yellow : Colors.white,
-          //         size: 24,
-          //       ),
-          //     ),
-          //   ),
-          // ),
-
-          // ========== 修改：Tap to Focus 提示（可點擊） ==========
+          // Tap to Focus 提示
           if (isScanning)
             Positioned(
               bottom: 10,
@@ -1124,7 +1168,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
             Positioned(
               top: 10,
               left: 10,
-              right: 10, // 原本為手電筒按鈕留的空間，現在暫時不需要
+              right: 10,
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -1172,24 +1216,4 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
       ),
     );
   }
-
-// =============================================================================
-// 切換手電筒方法（暫時備註，未來可能用的到）
-// =============================================================================
-
-// ========== 備註：切換手電筒方法 ==========
-// Future<void> _toggleTorch() async {
-//   try {
-//     if (_controller != null) {
-//       await _controller!.toggleTorch();
-//       setState(() {
-//         _isTorchOn = !_isTorchOn;
-//       });
-//       print(' 手電筒已${_isTorchOn ? '開啟' : '關閉'}');
-//     }
-//   } catch (e) {
-//     print(' 切換手電筒失敗: $e');
-//   }
-// }
-
 }
