@@ -573,16 +573,25 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: ListView.separated(
-        padding: EdgeInsets.zero,
-        itemCount: discoveredDevices.length,
-        separatorBuilder: (context, index) => Divider(
-          height: 1,
-          color: Colors.white.withOpacity(0.1),
+      child: RawScrollbar(
+        thumbVisibility: false,  // 只在需要時顯示
+        thickness: 4.0,
+        radius: const Radius.circular(2.0),
+        thumbColor: const Color(0xFF9747FF).withOpacity(0.6),  // 您的主題色但更透明
+        trackVisibility: false,
+        crossAxisMargin: -12.0,  // 滾動條距離右邊界的距離
+        mainAxisMargin: 0.0,
+        child: ListView.separated(
+          padding: EdgeInsets.zero,
+          itemCount: discoveredDevices.length,
+          separatorBuilder: (context, index) => Divider(
+            height: 1,
+            color: Colors.white.withOpacity(0.1),
+          ),
+          itemBuilder: (context, index) {
+            return _buildDeviceListItem(discoveredDevices[index]);
+          },
         ),
-        itemBuilder: (context, index) {
-          return _buildDeviceListItem(discoveredDevices[index]);
-        },
       ),
     );
   }

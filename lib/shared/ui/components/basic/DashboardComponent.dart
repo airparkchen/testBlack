@@ -215,7 +215,7 @@ class _DashboardComponentState extends State<DashboardComponent>
     return _getDefaultEthernetPages();
   }
 
-  /// 🔥 修正：將新 API 資料轉換為 EthernetPageData 格式（保持原布局）
+  /// 將新 API 資料轉換為 EthernetPageData 格式（保持原布局）
   List<EthernetPageData> _convertApiDataToEthernetPages(DashboardData apiData) {
     final pages = <EthernetPageData>[];
 
@@ -730,8 +730,8 @@ class _DashboardComponentState extends State<DashboardComponent>
                   color: Colors.white.withOpacity(0.9),
                   fontWeight: FontWeight.w500,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.visible, // 或改為 TextOverflow.ellipsis 作為最後保險
+                maxLines: 2,   //允許SSID 跑到第二行 避免過長
+                overflow: TextOverflow.ellipsis, // 或改為 TextOverflow.ellipsis 作為最後保險
               ),
             ),
 
