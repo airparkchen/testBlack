@@ -259,7 +259,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
               const SizedBox(height: 12),
               _buildInfoRow('SSID:', ssid),
               _buildInfoRow('Password:', password.isNotEmpty ? password : 'No password'),
-              _buildInfoRow('Security:', security.isNotEmpty ? security : 'Open'),
+              // _buildInfoRow('Security:', security.isNotEmpty ? security : 'Open'),
               const SizedBox(height: 16),
               const Text(
                 'Please go to Settings and connect to this WiFi network, then use the Next button to continue.',
