@@ -247,6 +247,11 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       return false;
     }
 
+    // 禁止 255.255.255.255
+    if (mask == '255.255.255.255') {
+      return false;
+    }
+
     // 禁止 0.0.0.0
     if (mask == '0.0.0.0') {
       return false;
@@ -257,13 +262,12 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
 
   // 🆕 新增：檢查 IP 和 Gateway 關係
   bool _isValidIpGatewayRelation(String ip, String gateway, String mask) {
-    // 如果 IP 和 Gateway 不同，總是允許
-    if (ip != gateway) {
-      return true;
+    // IP 和 Gateway 不能相同
+    if (ip == gateway) {
+      return false;
     }
 
-    // 如果相同，只有在 /32 掩碼時才允許
-    return mask == '255.255.255.255';
+    return true;
   }
 
   // 🆕 新增：統一的靜態IP驗證
@@ -306,9 +310,13 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
 
     if (mask.isNotEmpty && !_isValidSubnetMaskValue(mask)) {
       _isSubnetError = true;
-      _subnetErrorText = mask == '0.0.0.0'
-          ? 'Subnet mask cannot be 0.0.0.0'
-          : 'Please enter a valid subnet mask';
+      if (mask == '255.255.255.255') {
+        _subnetErrorText = 'Subnet mask cannot be 255.255.255.255';
+      } else if (mask == '0.0.0.0') {
+        _subnetErrorText = 'Subnet mask cannot be 0.0.0.0';
+      } else {
+        _subnetErrorText = 'Please enter a valid subnet mask';
+      }
       hasAnyError = true;
       print('❌ 子網掩碼錯誤: $mask');
     }
@@ -340,7 +348,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
       // 2a. 檢查 IP 和 Gateway 關係
       if (!_isValidIpGatewayRelation(ip, gateway, mask)) {
         _isGatewayError = true;
-        _gatewayErrorText = 'IP address and Gateway cannot be the same (except for /32 host routes)';
+        _gatewayErrorText = 'IP address and Gateway cannot be the same ';
         hasAnyError = true;
         print('❌ IP和Gateway關係錯誤');
       }
@@ -363,7 +371,7 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
     print('必填項檢查: ${hasAllRequired ? "✅" : "❌"} (IP=${ip.isNotEmpty}, Mask=${mask.isNotEmpty}, Gateway=${gateway.isNotEmpty}, DNS=${primaryDns.isNotEmpty})');
     print('錯誤檢查: ${hasAnyError ? "❌ 有錯誤" : "✅ 無錯誤"}');
 
-    // 🔧 關鍵修復：表單完成狀態 = 必填項完整 AND 沒有任何錯誤
+    // 關鍵修復：表單完成狀態 = 必填項完整 AND 沒有任何錯誤
     final newFormComplete = hasAllRequired && !hasAnyError;
 
     print('表單完成狀態: ${newFormComplete ? "✅" : "❌"} (必填項=$hasAllRequired, 無錯誤=${!hasAnyError})');
@@ -574,6 +582,12 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   // 子網掩碼驗證方法
   bool _validateSubnetMask(String mask) {
     if (!_validateIpFormat(mask)) return false;
+
+    // 禁止 255.255.255.255
+    if (mask == '255.255.255.255') return false;
+
+    // 禁止 0.0.0.0
+    if (mask == '0.0.0.0') return false;
 
     // 檢查是否為有效的子網掩碼
     List<String> segments = mask.split('.');

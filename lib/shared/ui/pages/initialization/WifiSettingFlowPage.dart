@@ -1475,6 +1475,9 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
   bool _isValidSubnetMask(String mask) {
     if (!_isValidIpAddress(mask)) return false;
 
+    // 禁止 255.255.255.255 (/32 遮罩)
+    if (mask == '255.255.255.255') return false;
+
     // 檢查是否為有效的子網掩碼
     List<String> segments = mask.split('.');
     List<int> bytes = segments.map((s) => int.parse(s)).toList();
@@ -1487,6 +1490,8 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
 
     // 檢查模式：應該是1...10...0或全1或全0
     if (!RegExp(r'^1*0*$').hasMatch(binary)) return false;
+
+    if (mask == '0.0.0.0') return false;
 
     return true;
   }
@@ -1941,12 +1946,21 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         return 'Please enter a valid IP address (e.g., 192.168.1.100)';
       } else if (staticIpConfig.subnetMask.isEmpty) {
         return 'Please enter a subnet mask';
+      } else if (staticIpConfig.subnetMask == '255.255.255.255') {
+        // 🔥 新增：特殊錯誤訊息
+        return 'Subnet mask cannot be 255.255.255.255';
+      } else if (staticIpConfig.subnetMask == '0.0.0.0') {
+        // 🔥 新增：特殊錯誤訊息
+        return 'Subnet mask cannot be 0.0.0.0';
       } else if (!_isValidSubnetMask(staticIpConfig.subnetMask)) {
         return 'Please enter a valid subnet mask (e.g., 255.255.255.0)';
       } else if (staticIpConfig.gateway.isEmpty) {
         return 'Please enter a gateway address';
       } else if (!_isValidIpAddress(staticIpConfig.gateway)) {
         return 'Please enter a valid gateway address';
+      } else if (staticIpConfig.ipAddress == staticIpConfig.gateway) {
+        // 🔥 新增：IP和Gateway相同的錯誤訊息
+        return 'IP address and gateway cannot be the same';
       } else if (!_isInSameSubnet(staticIpConfig.ipAddress, staticIpConfig.gateway, staticIpConfig.subnetMask)) {
         return 'IP address and gateway must be in the same subnet';
       } else if (staticIpConfig.primaryDns.isEmpty) {
@@ -1983,6 +1997,7 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
         _isValidSubnetMask(staticIpConfig.subnetMask) &&
         staticIpConfig.gateway.isNotEmpty &&
         _isValidIpAddress(staticIpConfig.gateway) &&
+        staticIpConfig.ipAddress != staticIpConfig.gateway &&
         _isInSameSubnet(staticIpConfig.ipAddress, staticIpConfig.gateway, staticIpConfig.subnetMask) &&
         staticIpConfig.primaryDns.isNotEmpty &&
         _isValidIpAddress(staticIpConfig.primaryDns) &&
