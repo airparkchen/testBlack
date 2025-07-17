@@ -32,6 +32,11 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
   String? _scannedSecurity;
   bool _showNextButton = false; // 控制是否顯示 Next 按鈕
 
+  // ========== Auto Focus 相關變數 ==========
+  Timer? _autoFocusTimer;
+  // bool _isTorchOn = false; // 手電筒變數
+
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +50,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
     print('🔍 QR Scanner 頁面銷毀');
     WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
+    _autoFocusTimer?.cancel();
     super.dispose();
   }
 
@@ -54,6 +60,11 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
 
     if (state == AppLifecycleState.resumed) {
       print('🔍 QR Scanner 頁面回到前台');
+      // ========== 新增：重新啟動 Auto Focus ==========
+      _startAutoFocus();
+    } else if (state == AppLifecycleState.paused) {
+      // ========== 新增：暫停 Auto Focus ==========
+      _stopAutoFocus();
     }
   }
 
@@ -75,11 +86,69 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
       _controller = MobileScannerController(
         detectionSpeed: DetectionSpeed.normal,
         facing: CameraFacing.back,
+        torchEnabled: false,
+        returnImage: false,
+        detectionTimeoutMs: 1000,
+        formats: [BarcodeFormat.qrCode], // 只掃描 QR Code，提升效能
       );
+
+      // 啟動 Auto Focus
+      _startAutoFocus();
     } catch (e) {
       print('🔍 Camera initialization failed: $e');
       setState(() {
         _isCameraInitFailed = true;
+      });
+    }
+  }
+
+  void _startAutoFocus() {
+    _autoFocusTimer?.cancel();
+    _autoFocusTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      try {
+        if (_controller != null && mounted) {
+          await _controller!.resetZoomScale();
+        }
+      } catch (e) {
+        print('🔍 Auto focus 錯誤: $e');
+      }
+    });
+  }
+
+  // ========== 新增：停止自動對焦 ==========
+  void _stopAutoFocus() {
+    _autoFocusTimer?.cancel();
+    _autoFocusTimer = null;
+  }
+
+  // ========== 新增：手動對焦 ==========
+  Future<void> _handleTapToFocus() async {
+    print('🎯 觸發手動對焦');
+
+    try {
+      if (_controller != null) {
+        // 暫停自動對焦
+        _stopAutoFocus();
+
+        // 執行對焦操作
+        await _controller!.resetZoomScale();
+
+        print('🎯 對焦完成');
+
+        // 1秒後重新啟動自動對焦
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            _startAutoFocus();
+          }
+        });
+      }
+    } catch (e) {
+      print('🎯 對焦失敗: $e');
+      // 即使失敗也要重新啟動自動對焦
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          _startAutoFocus();
+        }
       });
     }
   }
@@ -657,6 +726,8 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
     final backButtonWidth = size.width * (150 / buttonWidthProportion);
     final nextButtonWidth = size.width * (150 / buttonWidthProportion);
 
+    final titleFontSize = size.width < 375 ? 20.0 : 26.0;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
@@ -672,9 +743,14 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
                 SizedBox(
                   height: textHeight,
                   child: Center(
-                    child: Text(
-                      'Wi-Fi QR Code Scanner',
-                      style: AppTextStyles.heading1,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Wi-Fi QR Code Scanner',
+                        style: AppTextStyles.heading1.copyWith(
+                          fontSize: titleFontSize,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -945,93 +1021,175 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
       );
     }
 
-    // 正常顯示相機和掃描結果
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // 相機視圖
-        MobileScanner(
-          controller: _controller!,
-          onDetect: (capture) {
-            final List<Barcode> barcodes = capture.barcodes;
-            if (barcodes.isNotEmpty && isScanning) {
-              final String rawValue = barcodes.first.rawValue ?? 'Unable to read';
+    // ========== 修改：整個相機視圖都可以點擊對焦 ==========
+    return GestureDetector(
+      onTap: _handleTapToFocus, // 點擊整個區域都會觸發對焦
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 相機視圖
+          MobileScanner(
+            controller: _controller!,
+            onDetect: (capture) {
+              final List<Barcode> barcodes = capture.barcodes;
+              if (barcodes.isNotEmpty && isScanning) {
+                final String rawValue = barcodes.first.rawValue ?? 'Unable to read';
 
-              print('🔍 偵測到 QR Code: $rawValue');
+                print('🔍 偵測到 QR Code: $rawValue');
 
-              // 檢查是否為 WiFi QR Code
-              if (rawValue.startsWith('WIFI:')) {
-                // 暫停掃描但不停止相機
-                setState(() {
-                  isScanning = false;
-                });
-                _handleWiFiQR(rawValue);
+                // 檢查是否為 WiFi QR Code
+                if (rawValue.startsWith('WIFI:')) {
+                  // 暫停掃描但不停止相機
+                  setState(() {
+                    isScanning = false;
+                  });
+                  _handleWiFiQR(rawValue);
+                }
               }
-            }
-          },
-        ),
-
-        // 掃描框
-        if (isScanning)
-          Container(
-            width: width * 0.6,
-            height: height * 0.6,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white, width: 3),
-              borderRadius: BorderRadius.circular(12),
-            ),
+            },
           ),
 
-        // 掃描成功指示（不阻擋相機視圖）
-        if (!isScanning && qrResult.isNotEmpty)
-          Positioned(
-            top: 10,
-            left: 10,
-            right: 10,
-            child: Container(
-              padding: const EdgeInsets.all(8),
+          // 掃描框
+          if (isScanning)
+            Container(
+              width: width * 0.6,
+              height: height * 0.6,
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white, width: 3),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'WiFi QR Code detected!',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+            ),
+
+          // ========== 手電筒控制按鈕（暫時備註，未來可能使用） ==========
+          // Positioned(
+          //   top: 10,
+          //   right: 10,
+          //   child: GestureDetector(
+          //     onTap: () {
+          //       // 防止事件冒泡到父層的 GestureDetector
+          //       _toggleTorch();
+          //     },
+          //     child: Container(
+          //       padding: const EdgeInsets.all(8),
+          //       decoration: BoxDecoration(
+          //         color: Colors.black.withOpacity(0.6),
+          //         borderRadius: BorderRadius.circular(8),
+          //       ),
+          //       child: Icon(
+          //         _isTorchOn ? Icons.flash_on : Icons.flash_off,
+          //         color: _isTorchOn ? Colors.yellow : Colors.white,
+          //         size: 24,
+          //       ),
+          //     ),
+          //   ),
+          // ),
+
+          // ========== 修改：Tap to Focus 提示（可點擊） ==========
+          if (isScanning)
+            Positioned(
+              bottom: 10,
+              left: 10,
+              child: GestureDetector(
+                onTap: _handleTapToFocus, // 點擊文字也會觸發對焦
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  // 重新掃描按鈕
-                  GestureDetector(
-                    onTap: _resetScanningState,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.touch_app,
+                        color: const Color(0xFF9747FF),
+                        size: 16,
                       ),
-                      child: const Text(
-                        'Scan Again',
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Tap to Focus',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // 掃描成功指示（不阻擋相機視圖）
+          if (!isScanning && qrResult.isNotEmpty)
+            Positioned(
+              top: 10,
+              left: 10,
+              right: 10, // 原本為手電筒按鈕留的空間，現在暫時不需要
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'WiFi QR Code detected!',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    // 重新掃描按鈕
+                    GestureDetector(
+                      onTap: _resetScanningState,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Scan Again',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
+
+// =============================================================================
+// 切換手電筒方法（暫時備註，未來可能用的到）
+// =============================================================================
+
+// ========== 備註：切換手電筒方法 ==========
+// Future<void> _toggleTorch() async {
+//   try {
+//     if (_controller != null) {
+//       await _controller!.toggleTorch();
+//       setState(() {
+//         _isTorchOn = !_isTorchOn;
+//       });
+//       print(' 手電筒已${_isTorchOn ? '開啟' : '關閉'}');
+//     }
+//   } catch (e) {
+//     print(' 切換手電筒失敗: $e');
+//   }
+// }
+
 }
