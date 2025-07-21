@@ -57,7 +57,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
     _isNewMode = widget.onProgressControllerReady != null;
 
     if (_isNewMode) {
-      // 🔥 新模式：混合模式 - Process 01-03 時間控制，Process 04 API 控制
+      // 混合模式 - Process 01-03 時間控制，Process 04 API 控制
       _initializeHybridMode();
     } else {
       // 舊模式：內部定時器控制進度（保持原有邏輯）
@@ -69,10 +69,10 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
   void _initializeHybridMode() {
     // 更新為新的 process 名稱
     final processNames = [
-      'Submitting network settings...',
-      'Submitting wireless settings...',
-      'Changing user password...',
-      'Completing configuration...'
+      'Configuring network...',
+      'Configuring wireless...',
+      'Updating password...',
+      'Saving settings...'
     ];
 
     // 初始化進程列表
