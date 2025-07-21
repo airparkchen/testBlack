@@ -9,7 +9,7 @@ import 'package:srp/client.dart' as client;
 // 引入 wifi_api 資料夾內的功能
 import 'wifi_api/login_process.dart';
 import 'wifi_api/password_service.dart';
-import '../utils/json_file_export_util.dart';
+// import '../utils/json_file_export_util.dart';   儲存log用的
 import '../utils/jwt_auto_relogin.dart';
 
 // 保留原本的結果類
@@ -547,17 +547,17 @@ class WifiApiService {
                 print('=== Mesh 拓撲 API 成功響應 ===');
                 _printLargeJson('Mesh 拓撲完整響應', jsonData);
 
-                try {
-                  print('📁 正在將 Mesh Topology raw data 輸出到 JSON 檔案...');
-                  final filePath = await JsonFileExportUtil
-                      .exportMeshTopologyData(jsonData);
-                  if (filePath != null) {
-                    print('🎉 Mesh Topology raw data 已成功輸出到檔案！');
-                    print('📂 檔案位置: $filePath');
-                  }
-                } catch (e) {
-                  print('⚠️ 輸出 JSON 檔案時發生錯誤: $e');
-                }
+                // try {
+                //   print('📁 正在將 Mesh Topology raw data 輸出到 JSON 檔案...');
+                //   final filePath = await JsonFileExportUtil
+                //       .exportMeshTopologyData(jsonData);
+                //   if (filePath != null) {
+                //     print('🎉 Mesh Topology raw data 已成功輸出到檔案！');
+                //     print('📂 檔案位置: $filePath');
+                //   }
+                // } catch (e) {
+                //   print('⚠️ 輸出 JSON 檔案時發生錯誤: $e');
+                // }
 
                 return jsonData;
               } catch (e) {
