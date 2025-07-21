@@ -765,15 +765,42 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
       // 2. 獲取頻段資訊
       String frequency = '';
-
       if (client.additionalInfo?['radio'] != null) {
         final radio = client.additionalInfo!['radio'].toString();
-        if (radio.contains('6G')) {
-          frequency = '6G';
-        } else if (radio.contains('5G')) {
-          frequency = '5G';
-        } else if (radio.contains('2.4G')) {
-          frequency = '2.4G';
+
+        // 處理多頻段情況
+        if (radio.contains(',')) {
+          // 多頻段：處理 "2.4G,5G,6G" 格式
+          final frequencies = radio.split(',').map((f) => f.trim()).toList();
+          final standardized = <String>[];
+
+          for (final freq in frequencies) {
+            if (freq.contains('2.4G')) {
+              standardized.add('2G');
+            } else if (freq.contains('5G')) {
+              standardized.add('5G');
+            } else if (freq.contains('6G')) {
+              standardized.add('6G');
+            }
+          }
+
+          if (standardized.isNotEmpty) {
+            // 排序並組合
+            standardized.sort((a, b) {
+              const order = {'2G': 0, '5G': 1, '6G': 2};
+              return (order[a] ?? 99).compareTo(order[b] ?? 99);
+            });
+            frequency = standardized.join('/');
+          }
+        } else {
+          // 單頻段處理
+          if (radio.contains('6G')) {
+            frequency = '6G';
+          } else if (radio.contains('5G')) {
+            frequency = '5G';
+          } else if (radio.contains('2.4G')) {
+            frequency = '2G';
+          }
         }
       }
 
@@ -783,16 +810,14 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         } else if (client.deviceType.contains('5GHz')) {
           frequency = '5G';
         } else if (client.deviceType.contains('2.4GHz')) {
-          frequency = '2.4G';
+          frequency = '2G';
         }
       }
 
-      // 3. 特殊情況：Ethernet 連接
       if (client.deviceType.contains('Ethernet') || client.deviceType.contains('ethernet')) {
         return 'Ethernet';
       }
 
-      // 4. 組合 SSID_頻段 格式
       if (ssid.isNotEmpty && frequency.isNotEmpty) {
         return '${ssid} /${frequency}';
       } else if (ssid.isNotEmpty) {
@@ -801,7 +826,6 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         return '${frequency} WiFi';
       }
 
-      // 5. 備用方案
       String fallback = client.deviceType;
       if (fallback.contains('SSID:')) {
         fallback = fallback.split('(SSID:')[0].trim();
