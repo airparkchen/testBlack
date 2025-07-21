@@ -180,7 +180,7 @@ class _FinishingWizardComponentState extends State<FinishingWizardComponent> {
         String process4Text;
         if (_apiProgress < 40.0) {
           // 30% - 40%：配置階段
-          process4Text = 'Completing configuration...';
+          process4Text = 'Saving settings...';
         } else {
           // 40% - 100%：重啟等待階段
           process4Text = 'Restarting device...';
