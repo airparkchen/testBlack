@@ -1014,86 +1014,87 @@ class _WifiSettingFlowPageState extends State<WifiSettingFlowPage> {
     }
   }
 
+  /// Android與IOS皆不可用
   // 修改 WiFi 重連方法
-  Future<void> _reconnectToWifi() async {
-    if (_shouldBypassRestrictions) {
-      // 繞過限制時，跳過 WiFi 連線檢查
-      print('跳過 WiFi 連線（繞過限制模式）');
-      setState(() {
-        _updateStatus('Wi-Fi connection bypassed');
-      });
-      return;
-    }
-
-    // 原有的 WiFi 連線邏輯
-    if (ssid.isEmpty || ssidPassword.isEmpty) {
-      print('No SSID or password set, skipping Wi-Fi connection');
-      _handleConnectionFailure('No SSID or password set');
-      return;
-    }
-    setState(() {
-      isConnecting = true;
-      _updateStatus('Connecting to Wi-Fi...');
-    });
-
-    try {
-      // 根據 securityOption 選擇安全類型
-      NetworkSecurity getNetworkSecurity() {
-        switch (securityOption) {
-          case 'WPA3 Personal':
-          case 'WPA2/WPA3 Personal':
-            return NetworkSecurity.WPA;
-          case 'WPA2 Personal':
-            return NetworkSecurity.WPA;
-          case 'no authentication':
-            return NetworkSecurity.NONE;
-          default:
-            return NetworkSecurity.WPA;
-        }
-      }
-
-      // 使用 wifi_iot 連接到 Wi-Fi，縮短超時時間為15秒
-      bool? isConnected = await WiFiForIoTPlugin.connect(
-        ssid,
-        password: ssidPassword,
-        security: getNetworkSecurity(),
-        joinOnce: true,
-        timeoutInSeconds: 15, // 縮短超時時間為15秒
-      );
-
-      if (isConnected != true) {
-        setState(() {
-          _updateStatus('Failed to connect to Wi-Fi');
-        });
-        _handleConnectionFailure('Failed to connect to Wi-Fi');
-        return;
-      }
-
-      // 確認當前連線的 SSID
-      String? currentWifiSSID = await WiFiForIoTPlugin.getWiFiAPSSID();
-      if (currentWifiSSID != ssid) {
-        setState(() {
-          _updateStatus('Connected to wrong Wi-Fi network');
-        });
-        _handleConnectionFailure('Connected to wrong Wi-Fi network');
-        return;
-      }
-
-      setState(() {
-        _updateStatus('Wi-Fi connected successfully');
-      });
-    } catch (e) {
-      print('Error connecting to Wi-Fi: $e');
-      setState(() {
-        _updateStatus('Error connecting to Wi-Fi: $e');
-      });
-      _handleConnectionFailure('Error connecting to Wi-Fi: $e');
-    } finally {
-      setState(() {
-        isConnecting = false;
-      });
-    }
-  }
+  // Future<void> _reconnectToWifi() async {
+  //   if (_shouldBypassRestrictions) {
+  //     // 繞過限制時，跳過 WiFi 連線檢查
+  //     print('跳過 WiFi 連線（繞過限制模式）');
+  //     setState(() {
+  //       _updateStatus('Wi-Fi connection bypassed');
+  //     });
+  //     return;
+  //   }
+  //
+  //   // 原有的 WiFi 連線邏輯
+  //   if (ssid.isEmpty || ssidPassword.isEmpty) {
+  //     print('No SSID or password set, skipping Wi-Fi connection');
+  //     _handleConnectionFailure('No SSID or password set');
+  //     return;
+  //   }
+  //   setState(() {
+  //     isConnecting = true;
+  //     _updateStatus('Connecting to Wi-Fi...');
+  //   });
+  //
+  //   try {
+  //     // 根據 securityOption 選擇安全類型
+  //     NetworkSecurity getNetworkSecurity() {
+  //       switch (securityOption) {
+  //         case 'WPA3 Personal':
+  //         case 'WPA2/WPA3 Personal':
+  //           return NetworkSecurity.WPA;
+  //         case 'WPA2 Personal':
+  //           return NetworkSecurity.WPA;
+  //         case 'no authentication':
+  //           return NetworkSecurity.NONE;
+  //         default:
+  //           return NetworkSecurity.WPA;
+  //       }
+  //     }
+  //
+  //     // 使用 wifi_iot 連接到 Wi-Fi，縮短超時時間為15秒
+  //     bool? isConnected = await WiFiForIoTPlugin.connect(
+  //       ssid,
+  //       password: ssidPassword,
+  //       security: getNetworkSecurity(),
+  //       joinOnce: true,
+  //       timeoutInSeconds: 15, // 縮短超時時間為15秒
+  //     );
+  //
+  //     if (isConnected != true) {
+  //       setState(() {
+  //         _updateStatus('Failed to connect to Wi-Fi');
+  //       });
+  //       _handleConnectionFailure('Failed to connect to Wi-Fi');
+  //       return;
+  //     }
+  //
+  //     // 確認當前連線的 SSID
+  //     String? currentWifiSSID = await WiFiForIoTPlugin.getWiFiAPSSID();
+  //     if (currentWifiSSID != ssid) {
+  //       setState(() {
+  //         _updateStatus('Connected to wrong Wi-Fi network');
+  //       });
+  //       _handleConnectionFailure('Connected to wrong Wi-Fi network');
+  //       return;
+  //     }
+  //
+  //     setState(() {
+  //       _updateStatus('Wi-Fi connected successfully');
+  //     });
+  //   } catch (e) {
+  //     print('Error connecting to Wi-Fi: $e');
+  //     setState(() {
+  //       _updateStatus('Error connecting to Wi-Fi: $e');
+  //     });
+  //     _handleConnectionFailure('Error connecting to Wi-Fi: $e');
+  //   } finally {
+  //     setState(() {
+  //       isConnecting = false;
+  //     });
+  //   }
+  // }
 
 // 修改連線失敗處理 - 顯示設定提示
   void _handleConnectionFailure(String errorMessage) {

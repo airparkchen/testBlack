@@ -6,6 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:io';
+import 'package:whitebox/shared/utils/platform_helper.dart';
 import 'package:app_settings/app_settings.dart';
 
 // WiFi掃描元件回調函數類型
@@ -506,28 +507,12 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
               style: const TextStyle(fontSize: 14, color: Color(0xFFFF00E5)),
             ),
             const SizedBox(height: 16),
-            // Row(
-            //   mainAxisAlignment: MainAxisAlignment.center,
-            //   children: [
-            //     // 添加手動檢查權限按鈕
-            //     ElevatedButton(
-            //       onPressed: () {
-            //         _checkPermissionStatusOnResume();
-            //       },
-            //       style: ElevatedButton.styleFrom(
-            //         backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
-            //         foregroundColor: Colors.white,
-            //       ),
-            //       child: const Text('Check Permission'),
-            //     ),
-            //
-            //     const SizedBox(width: 12),
-
-                // 只有在非永久拒絕的情況下才顯示重試按鈕
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                 if (!_permissionDeniedPermanently)
                   ElevatedButton(
                     onPressed: () {
-                      // 重置權限請求狀態以允許重試
                       setState(() {
                         _permissionRequested = false;
                         _isRequestingPermissions = false;
@@ -540,10 +525,8 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                     ),
                     child: const Text('Retry'),
                   ),
-
                 if (!_permissionDeniedPermanently)
                   const SizedBox(width: 12),
-
                 ElevatedButton(
                   onPressed: () async {
                     await openAppSettings();
@@ -556,9 +539,14 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                 ),
               ],
             ),
-          // ],
-        // ),
+          ],
+        ),
       );
+    }
+
+    // iOS 特殊處理：顯示引導介面
+    if (Platform.isIOS && discoveredDevices.isEmpty) {
+      return _buildIOSGuidanceInterface();
     }
 
     if (discoveredDevices.isEmpty) {
@@ -574,12 +562,12 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: RawScrollbar(
-        thumbVisibility: false,  // 只在需要時顯示
+        thumbVisibility: false,
         thickness: 4.0,
         radius: const Radius.circular(2.0),
-        thumbColor: const Color(0xFF9747FF).withOpacity(0.6),  // 您的主題色但更透明
+        thumbColor: const Color(0xFF9747FF).withOpacity(0.6),
         trackVisibility: false,
-        crossAxisMargin: -12.0,  // 滾動條距離右邊界的距離
+        crossAxisMargin: -12.0,
         mainAxisMargin: 0.0,
         child: ListView.separated(
           padding: EdgeInsets.zero,
@@ -592,6 +580,196 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
             return _buildDeviceListItem(discoveredDevices[index]);
           },
         ),
+      ),
+    );
+  }
+
+  // 🆕 iOS 引導介面
+  Widget _buildIOSGuidanceInterface() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 說明圖示
+          Icon(
+            Icons.wifi_off_rounded,
+            size: 64,
+            color: const Color(0xFF9747FF).withOpacity(0.8),
+          ),
+          const SizedBox(height: 24),
+
+          // 說明文字
+          const Text(
+            'WiFi Network Setup',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+
+          Text(
+            'iOS does not support automatic WiFi scanning.\nPlease choose one of the following options:',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.8),
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+
+          // 選項 1: 手動連接
+          _buildIOSOptionCard(
+            icon: Icons.settings,
+            title: 'Connect in Settings',
+            description: 'Go to WiFi settings and connect manually',
+            buttonText: 'Open WiFi Settings',
+            onPressed: () async {
+              try {
+                await AppSettings.openAppSettingsPanel(AppSettingsPanelType.wifi);
+              } catch (e) {
+                print('開啟 WiFi 設定失敗: $e');
+              }
+            },
+          ),
+
+          const SizedBox(height: 20),
+
+          // 選項 2: QR Code 掃描
+          _buildIOSOptionCard(
+            icon: Icons.qr_code_scanner,
+            title: 'Scan QR Code',
+            description: 'Use QR code to get WiFi information',
+            buttonText: 'Open QR Scanner',
+            onPressed: () {
+              // 呼叫父組件的回調，讓它處理導航
+              Navigator.of(context).pop(); // 回到上一個頁面
+              // 這裡可以添加導航到 QR Code 掃描頁面的邏輯
+            },
+          ),
+
+          const SizedBox(height: 32),
+
+          // 底部提示
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF9747FF).withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: const Color(0xFF9747FF),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'After connecting to WiFi, return to this app to continue setup.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🆕 iOS 選項卡片
+  Widget _buildIOSOptionCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required String buttonText,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF9747FF).withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        children: [
+          // 圖示
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: const Color(0xFF9747FF).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Icon(
+              icon,
+              size: 30,
+              color: const Color(0xFF9747FF),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 標題
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 描述
+          Text(
+            description,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withOpacity(0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+
+          // 按鈕
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF9747FF),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                buttonText,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -709,133 +887,11 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
     });
 
     try {
-      // 先檢查並請求權限（只執行一次）
-      if (!_permissionRequested && !_permissionDeniedPermanently) {
-        bool permissionsGranted = await _checkAndRequestPermissions();
-        _permissionRequested = true;
-
-        if (!permissionsGranted) {
-          setState(() {
-            // 使用更友善的錯誤訊息，避免閃爍
-            if (_permissionDeniedPermanently) {
-              errorMessage = 'Location permission is required for WiFi scanning\nPlease enable it in Settings';
-            } else {
-              errorMessage = 'WiFi scanning requires location permission\nPlease allow "Location" and "Nearby devices" permissions';
-            }
-            isScanning = false;
-          });
-
-          if (widget.onScanComplete != null) {
-            widget.onScanComplete!([], errorMessage);
-          }
-          return;
-        }
-      } else if (_permissionDeniedPermanently) {
-        // 如果權限已被永久拒絕，直接顯示錯誤而不再請求
-        setState(() {
-          errorMessage = 'Location permission is required for WiFi scanning\nPlease enable it in Settings';
-          isScanning = false;
-        });
-
-        if (widget.onScanComplete != null) {
-          widget.onScanComplete!([], errorMessage);
-        }
-        return;
-      }
-
-      // 繼續原有的掃描邏輯...
-      final canStart = await WiFiScan.instance.canStartScan();
-      print('canStartScan 狀態: $canStart');
-
-      if (canStart != CanStartScan.yes) {
-        String detailedError = _getStartScanErrorMessage(canStart);
-        setState(() {
-          errorMessage = detailedError;
-          isScanning = false;
-        });
-
-        if (widget.onScanComplete != null) {
-          widget.onScanComplete!([], detailedError);
-        }
-        return;
-      }
-
-      // 檢查是否可以獲取掃描結果
-      final canGetResults = await WiFiScan.instance.canGetScannedResults();
-      print('canGetScannedResults 狀態: $canGetResults');
-
-      if (canGetResults != CanGetScannedResults.yes) {
-        String detailedError = _getScanResultsErrorMessage(canGetResults);
-        setState(() {
-          errorMessage = detailedError;
-          isScanning = false;
-        });
-
-        if (widget.onScanComplete != null) {
-          widget.onScanComplete!([], detailedError);
-        }
-        return;
-      }
-
-      // 開始掃描
-      print('開始 WiFi 掃描...');
-      await WiFiScan.instance.startScan();
-
-      // 等待掃描完成
-      await Future.delayed(const Duration(milliseconds: 2000));
-
-      // 獲取掃描結果
-      final results = await WiFiScan.instance.getScannedResults();
-      print('掃描到 ${results.length} 個 WiFi 網路');
-
-      // 過濾和處理結果
-      final seenSsids = <String>{};
-      final uniqueResults = <WiFiAccessPoint>[];
-      final currentSSID = await _getCurrentWifiSSID();
-
-      for (var result in results) {
-        if (result.ssid.isNotEmpty && seenSsids.add(result.ssid)) {
-          uniqueResults.add(result);
-        }
-      }
-
-      uniqueResults.sort((a, b) {
-        // 第一優先：已連線的 SSID
-        bool aIsConnected = _compareSSID(currentSSID, a.ssid);
-        bool bIsConnected = _compareSSID(currentSSID, b.ssid);
-
-        if (aIsConnected && !bIsConnected) return -1;
-        if (!aIsConnected && bIsConnected) return 1;
-
-        // 第二優先：配置完成的 SSID
-        bool aIsConfigured = WifiScannerComponent.configuredSSID != null &&
-            a.ssid == WifiScannerComponent.configuredSSID;
-        bool bIsConfigured = WifiScannerComponent.configuredSSID != null &&
-            b.ssid == WifiScannerComponent.configuredSSID;
-
-        if (aIsConfigured && !bIsConfigured) return -1;
-        if (!aIsConfigured && bIsConfigured) return 1;
-
-        // 第三優先：EG180 開頭的 SSID
-        bool aIsEG180 = a.ssid.startsWith('EG180');
-        bool bIsEG180 = b.ssid.startsWith('EG180');
-
-        if (aIsEG180 && !bIsEG180) return -1;
-        if (!aIsEG180 && bIsEG180) return 1;
-
-        // 第四優先：信號強度
-        return b.level.compareTo(a.level);
-      });
-
-      final limitedResults = uniqueResults.take(widget.maxDevicesToShow).toList();
-
-      setState(() {
-        discoveredDevices = limitedResults;
-        isScanning = false;
-      });
-
-      if (widget.onScanComplete != null) {
-        widget.onScanComplete!(limitedResults, null);
+      // 🆕 添加平台檢測
+      if (PlatformHelper.supportsWifiScanning) {
+        await _startAndroidScan();
+      } else {
+        await _startIOSScan();
       }
     } catch (e) {
       print('WiFi 掃描錯誤: $e');
@@ -848,6 +904,149 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
       if (widget.onScanComplete != null) {
         widget.onScanComplete!([], error);
       }
+    }
+  }
+  //  Android 掃描邏輯
+  Future<void> _startAndroidScan() async {
+    // 先檢查並請求權限（只執行一次）
+    if (!_permissionRequested && !_permissionDeniedPermanently) {
+      bool permissionsGranted = await _checkAndRequestPermissions();
+      _permissionRequested = true;
+
+      if (!permissionsGranted) {
+        setState(() {
+          // 使用更友善的錯誤訊息，避免閃爍
+          if (_permissionDeniedPermanently) {
+            errorMessage = 'Location permission is required for WiFi scanning\nPlease enable it in Settings';
+          } else {
+            errorMessage = 'WiFi scanning requires location permission\nPlease allow "Location" and "Nearby devices" permissions';
+          }
+          isScanning = false;
+        });
+
+        if (widget.onScanComplete != null) {
+          widget.onScanComplete!([], errorMessage);
+        }
+        return;
+      }
+    } else if (_permissionDeniedPermanently) {
+      setState(() {
+        errorMessage = 'Location permission is required for WiFi scanning\nPlease enable it in Settings';
+        isScanning = false;
+      });
+
+      if (widget.onScanComplete != null) {
+        widget.onScanComplete!([], errorMessage);
+      }
+      return;
+    }
+
+    // 繼續原有的掃描邏輯
+    final canStart = await WiFiScan.instance.canStartScan();
+    print('canStartScan 狀態: $canStart');
+
+    if (canStart != CanStartScan.yes) {
+      String detailedError = _getStartScanErrorMessage(canStart);
+      setState(() {
+        errorMessage = detailedError;
+        isScanning = false;
+      });
+
+      if (widget.onScanComplete != null) {
+        widget.onScanComplete!([], detailedError);
+      }
+      return;
+    }
+
+    // 檢查是否可以獲取掃描結果
+    final canGetResults = await WiFiScan.instance.canGetScannedResults();
+    print('canGetScannedResults 狀態: $canGetResults');
+
+    if (canGetResults != CanGetScannedResults.yes) {
+      String detailedError = _getScanResultsErrorMessage(canGetResults);
+      setState(() {
+        errorMessage = detailedError;
+        isScanning = false;
+      });
+
+      if (widget.onScanComplete != null) {
+        widget.onScanComplete!([], detailedError);
+      }
+      return;
+    }
+
+    // 開始掃描
+    print('開始 WiFi 掃描...');
+    await WiFiScan.instance.startScan();
+
+    // 等待掃描完成
+    await Future.delayed(const Duration(milliseconds: 2000));
+
+    // 獲取掃描結果
+    final results = await WiFiScan.instance.getScannedResults();
+    print('掃描到 ${results.length} 個 WiFi 網路');
+
+    // 過濾和處理結果（保持原有邏輯）
+    final seenSsids = <String>{};
+    final uniqueResults = <WiFiAccessPoint>[];
+    final currentSSID = await _getCurrentWifiSSID();
+
+    for (var result in results) {
+      if (result.ssid.isNotEmpty && seenSsids.add(result.ssid)) {
+        uniqueResults.add(result);
+      }
+    }
+
+    uniqueResults.sort((a, b) {
+      // 第一優先：已連線的 SSID
+      bool aIsConnected = _compareSSID(currentSSID, a.ssid);
+      bool bIsConnected = _compareSSID(currentSSID, b.ssid);
+
+      if (aIsConnected && !bIsConnected) return -1;
+      if (!aIsConnected && bIsConnected) return 1;
+
+      // 第二優先：配置完成的 SSID
+      bool aIsConfigured = WifiScannerComponent.configuredSSID != null &&
+          a.ssid == WifiScannerComponent.configuredSSID;
+      bool bIsConfigured = WifiScannerComponent.configuredSSID != null &&
+          b.ssid == WifiScannerComponent.configuredSSID;
+
+      if (aIsConfigured && !bIsConfigured) return -1;
+      if (!aIsConfigured && bIsConfigured) return 1;
+
+      // 第三優先：EG180 開頭的 SSID
+      bool aIsEG180 = a.ssid.startsWith('EG180');
+      bool bIsEG180 = b.ssid.startsWith('EG180');
+
+      if (aIsEG180 && !bIsEG180) return -1;
+      if (!aIsEG180 && bIsEG180) return 1;
+
+      // 第四優先：信號強度
+      return b.level.compareTo(a.level);
+    });
+
+    final limitedResults = uniqueResults.take(widget.maxDevicesToShow).toList();
+
+    setState(() {
+      discoveredDevices = limitedResults;
+      isScanning = false;
+    });
+
+    if (widget.onScanComplete != null) {
+      widget.onScanComplete!(limitedResults, null);
+    }
+  }
+  // iOS 替代方案
+  Future<void> _startIOSScan() async {
+    print('iOS 平台：WiFi 掃描不可用，顯示引導選項');
+
+    setState(() {
+      discoveredDevices = []; // 清空列表，準備顯示引導介面
+      isScanning = false;
+    });
+
+    if (widget.onScanComplete != null) {
+      widget.onScanComplete!([], null);
     }
   }
 }

@@ -34,6 +34,10 @@
     <key>NSLocalNetworkUsageDescription</key>
     <string>需要本地網絡權限以發現和連接局域網設備</string>
 
+    <!-- WiFi 資訊存取權限 -->
+    <!-- iOS 12+ 需要此 entitlement 才能使用 CNCopyCurrentNetworkInfo -->
+    <key>com.apple.developer.networking.wifi-info</key>
+
     <!-- 以下是原有的配置 -->
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
