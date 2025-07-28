@@ -16,6 +16,8 @@ dependencies:
     sdk: flutter
   srp:
     path: ./srp
+  # 限制幀數
+  flutter_displaymode: ^0.6.0
   # 網路連接狀態管理套件（升級版本以解決相依性衝突）
   connectivity_plus: ^6.1.4
   # iOS 風格圖示

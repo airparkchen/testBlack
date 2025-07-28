@@ -2,6 +2,7 @@
   import 'package:flutter/material.dart';
   import 'package:flutter/rendering.dart';
   import 'package:flutter/services.dart';
+  import 'package:flutter_displaymode/flutter_displaymode.dart';   //幀數限制
   import 'package:whitebox/shared/ui/pages/initialization/WifiConnectionPage.dart';
   import 'package:whitebox/shared/ui/pages/initialization/QrCodeScannerPage.dart';
   import 'package:whitebox/shared/ui/pages/initialization/InitializationPage.dart';
@@ -27,14 +28,22 @@
     static bool showBackground = true;
   }
 
-  void main() {
+  void main() async {
+    // 確保 Flutter 綁定已初始化
     WidgetsFlutterBinding.ensureInitialized();
+
+    // 設定 60Hz 限制 (在所有其他設定之前) 幀數限制
+    await _setDisplayModeTo60Hz();
+
+    // 系統設定
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
     // 添加這行代碼來限制應用方向只能為縱向
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       systemNavigationBarColor: Colors.transparent, // 數值方式確保透明
       systemNavigationBarDividerColor: Colors.transparent,
@@ -43,6 +52,7 @@
       systemNavigationBarContrastEnforced: false,
       systemStatusBarContrastEnforced: false,
     ));
+
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     debugPrint = (String? message, {int? wrapWidth}) {
@@ -50,11 +60,13 @@
         print(message);
       }
     };
+
     debugPaintSizeEnabled = false;
     debugPaintBaselinesEnabled = false;
     debugPaintLayerBordersEnabled = false;
     debugPaintPointersEnabled = false;
     debugRepaintRainbowEnabled = false;
+
     runApp(const MyApp());
   }
 
@@ -67,7 +79,7 @@
     Widget build(BuildContext context) {
       JwtAutoRelogin.instance.initializeNavigator(
         navigatorKey,
-        initialRouteName: '/', // 🎯 對應到你的 InitializationPage
+        initialRouteName: '/', // 對應到 InitializationPage
       );
       return MaterialApp(
         navigatorKey: navigatorKey,
@@ -141,5 +153,29 @@
           return child;
         },
       );
+    }
+  }
+
+  //幀數限制
+  Future<void> _setDisplayModeTo60Hz() async {
+    try {
+      final modes = await FlutterDisplayMode.supported;
+      DisplayMode? targetMode;
+      double closestDiff = double.infinity;
+
+      for (final mode in modes) {
+        final diff = (mode.refreshRate - 60.0).abs();
+        if (diff < closestDiff) {
+          closestDiff = diff;
+          targetMode = mode;
+        }
+      }
+
+      if (targetMode != null) {
+        await FlutterDisplayMode.setPreferredMode(targetMode);
+        print('✅ 設定顯示模式為: ${targetMode.refreshRate}Hz');
+      }
+    } catch (e) {
+      print('❌ 設定顯示模式失敗: $e');
     }
   }
