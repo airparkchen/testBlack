@@ -22,8 +22,10 @@ dependencies:
   connectivity_plus: ^6.1.4
   # iOS 風格圖示
   cupertino_icons: ^1.0.8
-  # 行動裝置掃描器（條碼/QR碼）
+  #  # 行動裝置掃描器（條碼/QR碼）
   mobile_scanner: ^5.0.0
+  #  camera: ^0.10.3+2  # 相容 Android SDK 35
+  #  google_mlkit_barcode_scanning: ^0.7.0  # 較穩定版本
   # WiFi 掃描功能
   wifi_scan: ^0.4.1+2
   wifi_iot: ^0.3.18
@@ -83,6 +85,10 @@ dependencies:
   url_launcher: ^6.2.4
   # speedtest
   flutter_inappwebview: ^6.0.0
+  # 自動調整文字
+  auto_size_text: ^3.0.0
+  # 多語系
+#  flutter_localizations: ^0.1.0
 
 
 

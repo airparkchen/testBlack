@@ -367,12 +367,12 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
                 size: 24,
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'WiFi QR Code Detected',
+                  'WiFi QR Code detected',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: MediaQuery.of(context).size.width * 0.045,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -442,17 +442,23 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+          // 使用 IntrinsicWidth 讓標籤寬度自動適應文字長度
+          IntrinsicWidth(
+            child: Container(
+              constraints: BoxConstraints(
+                minWidth: MediaQuery.of(context).size.width * 0.25, // 最小寬度保持一致性
+              ),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
+          const SizedBox(width: 12), // 固定間距
           Expanded(
             child: Text(
               value,
@@ -1179,12 +1185,13 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
                   children: [
                     const Icon(Icons.check_circle, color: Colors.white, size: 20),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'WiFi QR Code detected!',
+                        maxLines: 1,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
+                          fontSize: MediaQuery.of(context).size.width * 0.035,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

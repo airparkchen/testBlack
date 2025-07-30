@@ -7,6 +7,71 @@ import 'package:flutter/material.dart';
 import 'package:whitebox/shared/api/wifi_api/login_process.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 
+// ==================== 🎯 配置模組 ====================
+class NetworkRetryConfig {
+  // 重試狀態控制配置
+  static const Duration retryTimeout = Duration(seconds: 5);
+  static const Duration retryDebounceTime = Duration(milliseconds: 1500);
+  static const Duration snackBarDisplayTime = Duration(seconds: 1);
+  static const Duration networkRestoredSnackBarTime = Duration(seconds: 2);
+
+  // 按鈕狀態配置
+  static const double disabledButtonOpacity = 0.5;
+  static const Color retryButtonColor = Color(0xFF9747FF);
+}
+
+// ==================== 🎯 網路重試狀態管理服務 ====================
+class NetworkRetryService {
+  // 重試狀態控制
+  bool _isRetrying = false;
+  DateTime? _lastRetryTime;
+
+  /// 檢查是否可以執行重試
+  bool canRetry() {
+    final now = DateTime.now();
+
+    // 如果正在重試中，不允許新的重試
+    if (_isRetrying) {
+      print('🚫 重試進行中，忽略點擊');
+      return false;
+    }
+
+    // 防抖處理：檢查與上次重試的時間間隔
+    if (_lastRetryTime != null) {
+      final timeSinceLastRetry = now.difference(_lastRetryTime!);
+      if (timeSinceLastRetry < NetworkRetryConfig.retryDebounceTime) {
+        print('🚫 重試太頻繁，忽略點擊 (間隔: ${timeSinceLastRetry.inMilliseconds}ms)');
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /// 開始重試操作
+  void startRetry() {
+    _isRetrying = true;
+    _lastRetryTime = DateTime.now();
+    print('🔄 開始網路重試操作');
+  }
+
+  /// 完成重試操作
+  void completeRetry() {
+    _isRetrying = false;
+    print('✅ 網路重試操作完成');
+  }
+
+  /// 檢查是否正在重試
+  bool get isRetrying => _isRetrying;
+
+  /// 重置重試狀態
+  void reset() {
+    _isRetrying = false;
+    _lastRetryTime = null;
+    print('🔄 重試狀態已重置');
+  }
+}
+
 /// 🎯 網路連線狀態
 enum NetworkStatus {
   connected,
@@ -14,7 +79,7 @@ enum NetworkStatus {
   unknown
 }
 
-/// 增強型 JWT 自動重新登入管理器 + 最小化網路功能
+// ==================== 🎯 增強的 JwtAutoRelogin 類別 ====================
 class JwtAutoRelogin {
   static JwtAutoRelogin? _instance;
   static JwtAutoRelogin get instance => _instance ??= JwtAutoRelogin._();
@@ -22,26 +87,21 @@ class JwtAutoRelogin {
   JwtAutoRelogin._();
 
   // ==================== 原本的 JWT 功能（不變） ====================
-
-  // 登入憑證（用於自動重新登入）
   String? _lastUsername;
   String? _lastPassword;
-
-  // 重新登入狀態控制
   bool _isRelogging = false;
   final List<Completer> _waitingCalls = [];
 
-  // ==================== 🎯 新增：最小化網路功能 ====================
-
-  // 網路狀態管理
+  // ==================== 🎯 增強的網路功能 ====================
   NetworkStatus _currentNetworkStatus = NetworkStatus.unknown;
-
-  // 網路斷線彈窗管理
   bool _isNetworkDialogShowing = false;
   GlobalKey<NavigatorState>? _navigatorKey;
   String? _initialRouteName;
 
-  /// 🎯 新增：初始化導航器
+  // 🎯 新增：網路重試服務
+  final NetworkRetryService _retryService = NetworkRetryService();
+
+  /// 新增：初始化導航器
   void initializeNavigator(GlobalKey<NavigatorState> navigatorKey, {String? initialRouteName}) {
     _navigatorKey = navigatorKey;
     _initialRouteName = initialRouteName ?? '/';
@@ -73,13 +133,15 @@ class JwtAutoRelogin {
         if (_isNetworkDialogShowing) {
           _hideNetworkDisconnectedDialog();
         }
+        // 🎯 新增：網路恢復時重置重試狀態
+        _retryService.reset();
         break;
       case NetworkStatus.unknown:
         break;
     }
   }
 
-  /// 🎯 新增：顯示網路斷線彈窗
+  /// 🎯 改進：顯示網路斷線彈窗 - 添加動態按鈕狀態
   void _showNetworkDisconnectedDialog() {
     if (_isNetworkDialogShowing) return;
 
@@ -93,53 +155,138 @@ class JwtAutoRelogin {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return WillPopScope(
-          onWillPop: () async => false,
-          child: AlertDialog(
-            backgroundColor: Colors.black87,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.wifi_off_rounded, color: Colors.red, size: 20),
-                SizedBox(width: 8),
-                Text('Network Connection Lost', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Please check your network connection and try again.', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14, height: 1.4)),
-                SizedBox(height: 16),
-                Text('• Check your WiFi connection\n• Verify router connectivity\n• Restart network settings if needed', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, height: 1.3)),
-              ],
-            ),
-            actions: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => _goToInitialPage(context),
-                      style: TextButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1))),
-                      child: Text('Restart', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return WillPopScope(
+              onWillPop: () async => false,
+              child: AlertDialog(
+                backgroundColor: Colors.black87,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
+                ),
+                title: Row(
+                  children: [
+                    Icon(Icons.wifi_off_rounded, color: Colors.red, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                        'Network Connection Lost',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold
+                        )
                     ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => _retryNetworkConnection(context),
-                      style: TextButton.styleFrom(backgroundColor: Color(0xFF9747FF).withOpacity(0.2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Color(0xFF9747FF), width: 1))),
-                      child: Text('Retry', style: TextStyle(color: Color(0xFF9747FF), fontWeight: FontWeight.w600, fontSize: 14)),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                        'Please check your network connection and try again.',
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 14,
+                            height: 1.4
+                        )
                     ),
+                    SizedBox(height: 16),
+                    Text(
+                        '• Check your WiFi connection\n• Verify router connectivity\n• Restart network settings if needed',
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 12,
+                            height: 1.3
+                        )
+                    ),
+                  ],
+                ),
+                actions: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => _goToInitialPage(context),
+                          style: TextButton.styleFrom(
+                              backgroundColor: Colors.white.withOpacity(0.1),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: BorderSide(
+                                      color: Colors.white.withOpacity(0.3),
+                                      width: 1
+                                  )
+                              )
+                          ),
+                          child: Text(
+                              'Restart',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14
+                              )
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: TextButton(
+                          // 🎯 關鍵改進：根據重試狀態動態控制按鈕
+                          onPressed: _retryService.isRetrying
+                              ? null
+                              : () => _retryNetworkConnection(context, setState),
+                          style: TextButton.styleFrom(
+                              backgroundColor: _retryService.isRetrying
+                                  ? NetworkRetryConfig.retryButtonColor.withOpacity(0.1)
+                                  : NetworkRetryConfig.retryButtonColor.withOpacity(0.2),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: BorderSide(
+                                      color: _retryService.isRetrying
+                                          ? NetworkRetryConfig.retryButtonColor.withOpacity(0.3)
+                                          : NetworkRetryConfig.retryButtonColor,
+                                      width: 1
+                                  )
+                              )
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_retryService.isRetrying) ...[
+                                SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        NetworkRetryConfig.retryButtonColor.withOpacity(0.7)
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                              ],
+                              Text(
+                                  _retryService.isRetrying ? 'Checking...' : 'Retry',
+                                  style: TextStyle(
+                                      color: _retryService.isRetrying
+                                          ? NetworkRetryConfig.retryButtonColor.withOpacity(0.7)
+                                          : NetworkRetryConfig.retryButtonColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14
+                                  )
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -151,6 +298,10 @@ class JwtAutoRelogin {
     if (context != null && _isNetworkDialogShowing) {
       Navigator.of(context).pop();
       _isNetworkDialogShowing = false;
+
+      // 🎯 重置重試狀態
+      _retryService.reset();
+
       print('✅ 網路恢復，關閉斷線彈窗');
       _showNetworkRestoredSnackBar(context);
     }
@@ -165,13 +316,18 @@ class JwtAutoRelogin {
             children: [
               Icon(Icons.wifi, color: Colors.green, size: 16),
               SizedBox(width: 8),
-              Text('Network connection restored', style: TextStyle(color: Colors.white, fontSize: 14)),
+              Text(
+                  'Network connection restored',
+                  style: TextStyle(color: Colors.white, fontSize: 14)
+              ),
             ],
           ),
           backgroundColor: Colors.green.withOpacity(0.8),
-          duration: Duration(seconds: 2),
+          duration: NetworkRetryConfig.networkRestoredSnackBarTime,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8)
+          ),
         ),
       );
     } catch (e) {
@@ -184,55 +340,117 @@ class JwtAutoRelogin {
     try {
       Navigator.of(context).pop();
       _isNetworkDialogShowing = false;
-      _navigatorKey?.currentState?.pushNamedAndRemoveUntil(_initialRouteName ?? '/', (route) => false);
+
+      // 🎯 重置重試狀態
+      _retryService.reset();
+
+      _navigatorKey?.currentState?.pushNamedAndRemoveUntil(
+          _initialRouteName ?? '/',
+              (route) => false
+      );
     } catch (e) {
       print('❌ 返回初始頁面失敗: $e');
     }
   }
 
-  /// 🎯 新增：重試網路連線
-  void _retryNetworkConnection(BuildContext context) {
-    print('🔄 嘗試重新檢測網路連線...');
+  /// 🎯 改進：重試網路連線 - 添加併發控制和狀態更新
+  void _retryNetworkConnection(BuildContext context, StateSetter setState) {
+    // 🎯 關鍵改進：檢查是否可以執行重試
+    if (!_retryService.canRetry()) {
+      return;
+    }
+
+    print('🔄 開始重試網路連線檢測...');
+
+    // 🎯 標記開始重試並更新 UI 狀態
+    _retryService.startRetry();
+    setState(() {}); // 更新彈窗中的按鈕狀態
+
     _performNetworkTest().then((isConnected) {
+      // 🎯 完成重試操作
+      _retryService.completeRetry();
+
       if (isConnected) {
+        print('✅ 網路重試成功，連線已恢復');
         _updateNetworkStatus(NetworkStatus.connected);
       } else {
+        print('❌ 網路重試失敗，仍無法連線');
+        // 🎯 只有在重試確實失敗時才顯示失敗訊息
         _showRetryFailedMessage(context);
       }
+
+      // 🎯 更新彈窗按鈕狀態
+      if (mounted(context)) {
+        setState(() {});
+      }
     }).catchError((e) {
+      print('❌ 網路重試發生異常: $e');
+
+      // 🎯 完成重試操作
+      _retryService.completeRetry();
+
+      // 🎯 異常情況下也顯示失敗訊息
       _showRetryFailedMessage(context);
+
+      // 🎯 更新彈窗按鈕狀態
+      if (mounted(context)) {
+        setState(() {});
+      }
     });
   }
 
-  /// 🎯 新增：執行網路測試
-  Future<bool> _performNetworkTest() async {
+  /// 🎯 新增：檢查 BuildContext 是否仍然有效
+  bool mounted(BuildContext context) {
     try {
-      final result = await WifiApiService.getSystemDashboard().timeout(Duration(seconds: 5));
-      if (result != null && !result.containsKey('error')) {
-        return true;
-      }
-      return false;
+      return context.mounted;
     } catch (e) {
       return false;
     }
   }
 
-  /// 🎯 新增：顯示重試失敗訊息
+  /// 🎯 新增：執行網路測試
+  Future<bool> _performNetworkTest() async {
+    try {
+      final result = await WifiApiService.getSystemDashboard()
+          .timeout(NetworkRetryConfig.retryTimeout);
+
+      if (result != null && !result.containsKey('error')) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('🌐 網路測試異常: $e');
+      return false;
+    }
+  }
+
+  /// 🎯 改進：顯示重試失敗訊息 - 更簡潔的實現
   void _showRetryFailedMessage(BuildContext context) {
     try {
+      // 🎯 確保在有效的 context 中顯示 SnackBar
+      if (!mounted(context)) {
+        print('⚠️ Context 無效，無法顯示重試失敗訊息');
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
               Icon(Icons.error_outline, color: Colors.red, size: 16),
               SizedBox(width: 8),
-              Text('Still unable to connect.', style: TextStyle(color: Colors.white, fontSize: 12)),
+              Text(
+                  'Still unable to connect.',
+                  style: TextStyle(color: Colors.white, fontSize: 12)
+              ),
             ],
           ),
           backgroundColor: Colors.purple.withOpacity(0.8),
-          duration: Duration(seconds: 1),
+          duration: NetworkRetryConfig.snackBarDisplayTime,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8)
+          ),
         ),
       );
     } catch (e) {
@@ -699,14 +917,19 @@ class JwtAutoRelogin {
     }
   }
 
-  /// 清除憑證（登出時使用）
+  // ==================== 🎯 清除和重置方法改進 ====================
+
+  /// 清除憑證（登出時使用） - 增強版
   void clearCredentials() {
     _lastUsername = null;
     _lastPassword = null;
     _isRelogging = false;
     _currentNetworkStatus = NetworkStatus.unknown;
 
-    // 🎯 新增：清除時也關閉可能顯示的網路彈窗
+    // 🎯 重置網路重試狀態
+    _retryService.reset();
+
+    // 🎯 關閉可能顯示的網路彈窗
     if (_isNetworkDialogShowing) {
       _hideNetworkDisconnectedDialog();
     }
@@ -719,23 +942,25 @@ class JwtAutoRelogin {
     }
     _waitingCalls.clear();
 
-    print('🗑️ JWT 自動重新登入：已清除登入憑證和網路狀態');
+    print('🗑️ JWT 自動重新登入：已清除登入憑證、網路狀態和重試狀態');
   }
 
-  /// 檢查是否有儲存的憑證
-  bool get hasCredentials => _lastUsername != null && _lastPassword != null;
+  /// 🎯 新增：檢查是否正在進行網路重試
+  bool get isNetworkRetrying => _retryService.isRetrying;
 
-  /// 檢查是否正在重新登入
-  bool get isRelogging => _isRelogging;
-
-  /// 🎯 新增：檢查是否正在顯示網路彈窗
-  bool get isNetworkDialogShowing => _isNetworkDialogShowing;
-
-  /// 🎯 新增：手動觸發網路狀態檢查
+  /// 🎯 新增：手動觸發網路狀態檢查 - 增強版
   Future<void> checkNetworkStatus() async {
+    // 🎯 如果正在重試，則不執行新的檢查
+    if (_retryService.isRetrying) {
+      print('🚫 網路重試進行中，跳過狀態檢查');
+      return;
+    }
+
     try {
       final isConnected = await _performNetworkTest();
-      _updateNetworkStatus(isConnected ? NetworkStatus.connected : NetworkStatus.disconnected);
+      _updateNetworkStatus(
+          isConnected ? NetworkStatus.connected : NetworkStatus.disconnected
+      );
     } catch (e) {
       print('❌ 手動網路檢查失敗: $e');
       _updateNetworkStatus(NetworkStatus.disconnected);

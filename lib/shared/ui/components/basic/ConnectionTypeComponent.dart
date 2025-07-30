@@ -562,6 +562,8 @@ class _ConnectionTypeComponentState extends State<ConnectionTypeComponent> {
   bool _validateIpFormat(String ip) {
     if (ip.isEmpty) return false;
 
+    if (ip == '0.0.0.0') return false;
+
     // 基本格式檢查：四個用點分隔的數字
     final RegExp ipRegex = RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$');
 
