@@ -7,7 +7,7 @@ import 'dart:ui';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
-import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
+// import 'package:whitebox/shared/ui/pages/home/Topo/speed_data_manager.dart';
 import 'package:whitebox/shared/ui/components/basic/topology_display_widget.dart';
 import 'package:whitebox/shared/ui/components/basic/device_list_widget.dart';
 // import 'package:whitebox/shared/services/real_data_integration_service.dart';   舊的API調用機制

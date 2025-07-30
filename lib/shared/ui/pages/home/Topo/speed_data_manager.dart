@@ -1,4 +1,4 @@
-// lib/shared/ui/pages/home/Topo/fake_data_generator.dart - 完整修正版本
+// lib/shared/ui/pages/home/Topo/speed_data_manager.dart - 完整修正版本
 // 移動 RealSpeedDataGenerator 到這裡，統一管理所有數據生成器
 
 import 'dart:math' as math;

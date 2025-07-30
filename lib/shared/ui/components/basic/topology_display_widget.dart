@@ -8,8 +8,8 @@ import 'dart:async';
 import 'package:whitebox/shared/ui/components/basic/NetworkTopologyComponent.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/pages/home/Topo/network_topo_config.dart';
-import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart';
-import 'package:whitebox/shared/ui/pages/home/Topo/fake_data_generator.dart' as RealSpeedService;
+import 'package:whitebox/shared/ui/pages/home/Topo/speed_data_manager.dart';
+import 'package:whitebox/shared/ui/pages/home/Topo/speed_data_manager.dart' as RealSpeedService;
 import 'package:whitebox/shared/services/real_data_integration_service.dart';
 import 'package:whitebox/shared/services/dashboard_data_service.dart';
 import 'package:whitebox/shared/services/unified_mesh_data_manager.dart';
@@ -1132,7 +1132,6 @@ class DualSpeedCurvePainter extends CustomPainter {
   }
 }
 
-/// 真實數據速度圖表小部件（雙線版本 + 重疊處理）
 /// 真實數據速度圖表小部件（雙線版本 + 重疊處理）
 class RealSpeedChartWidget extends StatelessWidget {
   final RealSpeedService.RealSpeedDataGenerator dataGenerator;
