@@ -5,7 +5,7 @@ class LocaleProvider with ChangeNotifier {
   // 支援的語言列表
   static const List<Locale> supportedLocales = [
     Locale('en'),       // 英文
-    Locale('ar'),       // 阿拉伯文
+    Locale('ja'),       // 日文
   ];
 
   // 初始語言設為英文

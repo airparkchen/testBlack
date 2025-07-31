@@ -6,6 +6,7 @@ import 'package:whitebox/shared/ui/components/basic/WifiScannerComponent.dart';
 import 'package:whitebox/shared/ui/pages/initialization/WifiSettingFlowPage.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import 'LoginPage.dart';
 
@@ -539,7 +540,7 @@ class _InitializationPageState extends State<InitializationPage>
                   children: [
                     // QR 碼掃描按鈕
                     _buildImageActionButton(
-                      label: 'QR Code',
+                      label: AppLocalizations.of(context)?.qrCode ??'QR Code',
                       imagePath: 'assets/images/icon/QRcode.png',
                       onPressed: _openQrCodeScanner,
                       width: buttonWidth,
@@ -550,7 +551,7 @@ class _InitializationPageState extends State<InitializationPage>
 
                     // 手動新增按鈕
                     _buildImageActionButton(
-                      label: 'Manual Input',
+                      label: AppLocalizations.of(context)?.manualInput ?? 'Manual Input',
                       imagePath: 'assets/images/icon/manual_input.png',
                       onPressed: _openManualAdd,
                       width: buttonWidth,
@@ -607,7 +608,7 @@ class _InitializationPageState extends State<InitializationPage>
                 ),
                 SizedBox(width: 8),
                 Text(
-                  'Auto Searching... (${_autoSearchAttempts}/${_maxAutoSearchAttempts})',
+                  '${AppLocalizations.of(context)!.autoSearching} (${_autoSearchAttempts}/${_maxAutoSearchAttempts})',
                   style: TextStyle(
                     fontSize: height * 0.3,
                     color: Colors.white,
@@ -615,7 +616,9 @@ class _InitializationPageState extends State<InitializationPage>
                 ),
               ] else ...[
                 Text(
-                  isScanning ? 'Scanning...' : 'Search',
+                  isScanning
+                      ? AppLocalizations.of(context)!.scanning
+                      : AppLocalizations.of(context)!.search,
                   style: TextStyle(
                     fontSize: height * 0.4,
                     color: Colors.white,

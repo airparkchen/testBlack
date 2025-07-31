@@ -19,7 +19,11 @@ import 'package:whitebox/shared/ui/pages/test/theme_test_page.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/pages/home/DashboardPage.dart';
 import 'package:whitebox/shared/utils/jwt_auto_relogin.dart';
-// import 'package:whitebox/shared/ui/pages/test/SpeedTestDemoPage.dart';
+import 'package:whitebox/shared/ui/components/basic/test/language_test_wrapper.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
+import 'package:whitebox/shared/providers/locale_provider.dart';
 
 class BackgroundSettings {
   static String currentBackground = AppBackgrounds.mainBackground;
@@ -81,18 +85,42 @@ class MyApp extends StatelessWidget {
       navigatorKey,
       initialRouteName: '/', // 對應到 InitializationPage
     );
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      title: 'WhiteBox App',
-      theme: ThemeData(
-        primarySwatch: Colors.grey,
-        scaffoldBackgroundColor: Colors.transparent,
-        fontFamily: 'Segoe UI',
+
+    // Provider 包裝
+    return ChangeNotifierProvider(
+      create: (context) => LocaleProvider(),
+      child: Consumer<LocaleProvider>(
+        builder: (context, localeProvider, child) {
+          return MaterialApp(
+            navigatorKey: navigatorKey,
+            title: 'WhiteBox App',
+
+            // 新增多語系支援
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: LocaleProvider.supportedLocales,
+            locale: localeProvider.locale,  // 🔥 現在這個變數有定義了
+
+            theme: ThemeData(
+              primarySwatch: Colors.grey,
+              scaffoldBackgroundColor: Colors.transparent,
+              fontFamily: 'Segoe UI',
+            ),
+            builder: (context, child) {
+              return AppBackgroundWrapper(
+                child: LanguageTestWrapper(
+                  child: child ?? Container(),
+                ),
+              );
+            },
+            home: const InitializationPage(),
+          );
+        },
       ),
-      builder: (context, child) {
-        return AppBackgroundWrapper(child: child ?? Container());
-      },
-      home: const InitializationPage(),
     );
   }
 }

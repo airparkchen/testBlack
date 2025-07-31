@@ -2,15 +2,17 @@
   <library name="KotlinJavaRuntime" type="repository">
     <properties maven-id="org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24" />
     <CLASSES>
-      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-stdlib.jar!/" />
-      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-reflect.jar!/" />
-      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-test.jar!/" />
+      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-stdlib-jdk8-1.9.24.jar!/" />
+      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-stdlib-1.9.24.jar!/" />
+      <root url="jar://$KOTLIN_BUNDLED$/lib/annotations-13.0.jar!/" />
+      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-stdlib-jdk7-1.9.24.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>
-      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-stdlib-sources.jar!/" />
-      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-reflect-sources.jar!/" />
-      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-test-sources.jar!/" />
+      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-stdlib-jdk8-1.9.24-sources.jar!/" />
+      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-stdlib-1.9.24-sources.jar!/" />
+      <root url="jar://$KOTLIN_BUNDLED$/lib/annotations-13.0-sources.jar!/" />
+      <root url="jar://$KOTLIN_BUNDLED$/lib/kotlin-stdlib-jdk7-1.9.24-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:io';
 import 'package:app_settings/app_settings.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 // WiFi掃描元件回調函數類型
 typedef OnWifiScanComplete = void Function(List<WiFiAccessPoint> devices, String? error);
@@ -359,9 +360,9 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                 size: 24,
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'WiFi Connection Required',
+                  AppLocalizations.of(context)!.wifiConnectionRequired,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -376,7 +377,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Please connect to "$selectedSSID" first.',
+                '${AppLocalizations.of(context)!.pleaseConnectTo} "$selectedSSID" ${AppLocalizations.of(context)!.first}.',
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 16,
@@ -389,8 +390,8 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text(
-                'Cancel',
+              child:  Text(
+              AppLocalizations.of(context)!.cancel,
                 style: TextStyle(
                   color: Colors.white60,
                   fontSize: 16,
@@ -410,8 +411,8 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text(
-                'Go to Settings',
+              child: Text(
+                AppLocalizations.of(context)!.goToSettings,
                 style: TextStyle(fontSize: 16),
               ),
             ),
@@ -421,41 +422,41 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
     );
   }
 
-  // 獲取開始掃描錯誤訊息
+// 獲取開始掃描錯誤訊息
   String _getStartScanErrorMessage(CanStartScan canStart) {
     switch (canStart) {
       case CanStartScan.notSupported:
-        return 'Device does not support WiFi scanning';
+        return AppLocalizations.of(context)!.deviceNotSupportWifiScanning;
       case CanStartScan.noLocationPermissionRequired:
-        return 'Location permission required\nPlease allow location access';
+        return AppLocalizations.of(context)!.locationPermissionRequired;
       case CanStartScan.noLocationPermissionDenied:
-        return 'Location permission denied\nPlease manually allow location permission in settings';
+        return AppLocalizations.of(context)!.locationPermissionDenied;
       case CanStartScan.noLocationPermissionUpgradeAccuracy:
-        return 'Precise location permission required\nPlease select "Precise location" in settings';
+        return AppLocalizations.of(context)!.preciseLocationPermissionRequired;
       case CanStartScan.noLocationServiceDisabled:
-        return 'Please turn on location service (GPS)';
+        return AppLocalizations.of(context)!.pleaseTurnOnLocationService;
       case CanStartScan.failed:
-        return 'WiFi scan failed\nPlease try again';
+        return AppLocalizations.of(context)!.wifiScanFailed;
       default:
-        return 'Unable to start WiFi scan: $canStart';
+        return '${AppLocalizations.of(context)!.unableToStartWifiScan}: $canStart';
     }
   }
 
-  // 獲取掃描結果錯誤訊息
+// 獲取掃描結果錯誤訊息
   String _getScanResultsErrorMessage(CanGetScannedResults canGet) {
     switch (canGet) {
       case CanGetScannedResults.notSupported:
-        return 'Device does not support getting WiFi scan results';
+        return AppLocalizations.of(context)!.deviceNotSupportGettingWifiScanResults;
       case CanGetScannedResults.noLocationPermissionRequired:
-        return 'Location permission required\nPlease allow location access';
+        return AppLocalizations.of(context)!.locationPermissionRequired;
       case CanGetScannedResults.noLocationPermissionDenied:
-        return 'Location permission denied\nPlease manually allow location permission in settings';
+        return AppLocalizations.of(context)!.locationPermissionDenied;
       case CanGetScannedResults.noLocationPermissionUpgradeAccuracy:
-        return 'Precise location permission required\nPlease select "Precise location" in settings';
+        return AppLocalizations.of(context)!.preciseLocationPermissionRequired;
       case CanGetScannedResults.noLocationServiceDisabled:
-        return 'Please turn on location service (GPS)';
+        return AppLocalizations.of(context)!.pleaseTurnOnLocationService;
       default:
-        return 'Unable to get WiFi scan results: $canGet';
+        return '${AppLocalizations.of(context)!.unableToGetWifiScanResults}: $canGet';
     }
   }
 
@@ -474,14 +475,14 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
   // 修改 UI 建構方法，添加手動刷新按鈕
   Widget _buildContent() {
     if (isScanning || _isRequestingPermissions) {
-      return const Center(
+      return  Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(color: Colors.white),
             SizedBox(height: 16),
             Text(
-              'Scanning WiFi networks...',
+                AppLocalizations.of(context)!.scanningWifiNetworks,
               style: TextStyle(fontSize: 14, color: Colors.white),
             ),
           ],
@@ -538,7 +539,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                       backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text('Retry'),
+                    child:  Text(AppLocalizations.of(context)!.retry),
                   ),
 
                 if (!_permissionDeniedPermanently)
@@ -552,7 +553,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                     backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Settings'),
+                  child:  Text(AppLocalizations.of(context)!.settings),
                 ),
               ],
             ),
@@ -562,9 +563,9 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
     }
 
     if (discoveredDevices.isEmpty) {
-      return const Center(
+      return  Center(
         child: Text(
-          'No WiFi networks found\nPlease scan again',
+          AppLocalizations.of(context)!.noWifiNetworksFound,
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 16, color: Colors.white),
         ),
@@ -718,9 +719,9 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
           setState(() {
             // 使用更友善的錯誤訊息，避免閃爍
             if (_permissionDeniedPermanently) {
-              errorMessage = 'Location permission is required for WiFi scanning\nPlease enable it in Settings';
+              errorMessage = AppLocalizations.of(context)!.locationPermissionRequiredForWifiScanning;
             } else {
-              errorMessage = 'WiFi scanning requires location permission\nPlease allow "Location" and "Nearby devices" permissions';
+              errorMessage = AppLocalizations.of(context)!.wifiScanningRequiresLocationPermission;
             }
             isScanning = false;
           });
@@ -733,7 +734,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
       } else if (_permissionDeniedPermanently) {
         // 如果權限已被永久拒絕，直接顯示錯誤而不再請求
         setState(() {
-          errorMessage = 'Location permission is required for WiFi scanning\nPlease enable it in Settings';
+          errorMessage = AppLocalizations.of(context)!.locationPermissionRequiredForWifiScanning;
           isScanning = false;
         });
 
@@ -839,7 +840,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
       }
     } catch (e) {
       print('WiFi 掃描錯誤: $e');
-      final error = 'Error occurred while scanning WiFi: $e';
+      final error = '${AppLocalizations.of(context)!.errorOccurredWhileScanningWifi}: $e';
       setState(() {
         errorMessage = error;
         isScanning = false;
