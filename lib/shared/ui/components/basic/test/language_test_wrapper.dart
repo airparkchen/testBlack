@@ -79,7 +79,7 @@ class LanguageTestWrapper extends StatefulWidget {
   const LanguageTestWrapper({
     Key? key,
     required this.child,
-    this.enabled = true,
+    this.enabled = false,  //多語系 開關 multi-Language button
   }) : super(key: key);
 
   @override
