@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- WiFi 資訊存取權限 (network_info_plus 套件需要) -->
+    <key>com.apple.developer.networking.wifi-info</key>
+    <true/>
+
+    <!-- 本地網絡存取權限 (對應 NSLocalNetworkUsageDescription) -->
+    <key>com.apple.developer.networking.multicast</key>
+    <true/>
+
+    <!-- 藍牙中央角色權限 (對應藍牙功能) -->
+    <key>com.apple.developer.bluetooth.central</key>
+    <true/>
+
+</dict>
+</plist>

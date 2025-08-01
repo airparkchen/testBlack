@@ -19,11 +19,12 @@ import 'package:whitebox/shared/ui/pages/test/theme_test_page.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
 import 'package:whitebox/shared/ui/pages/home/DashboardPage.dart';
 import 'package:whitebox/shared/utils/jwt_auto_relogin.dart';
-import 'package:whitebox/shared/ui/components/basic/test/language_test_wrapper.dart';
+import 'package:whitebox/shared/ui/components/basic/test/language_wrapper.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:whitebox/shared/providers/locale_provider.dart';
+import 'package:whitebox/shared/ui/pages/test/ios_wifi_scanner_test_page.dart';
 
 class BackgroundSettings {
   static String currentBackground = AppBackgrounds.mainBackground;

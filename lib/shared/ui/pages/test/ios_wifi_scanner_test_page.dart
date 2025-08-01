@@ -1,6 +1,7 @@
 // ios_wifi_scanner_test_page.dart
 // 模擬真實 WifiScannerComponent 的獨立測試頁面
 // 完全符合原始程式的 UI 設計和行為模式
+/// main.dart 替換成WifiScannerTestPage 即可測試
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

@@ -391,7 +391,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                 Navigator.of(context).pop();
               },
               child:  Text(
-              AppLocalizations.of(context)!.cancel,
+                AppLocalizations.of(context)!.cancel,
                 style: TextStyle(
                   color: Colors.white60,
                   fontSize: 16,
@@ -414,6 +414,91 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
               child: Text(
                 AppLocalizations.of(context)!.goToSettings,
                 style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // **新增：iOS WiFi 設定引導對話框 - 只有 "Connect in Settings" 選項**
+  void _showIOSWifiGuidanceDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A2A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: const Color(0xFF9747FF).withOpacity(0.5),
+              width: 1,
+            ),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                color: const Color(0xFF9747FF),
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'WiFi Network Setup',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'iOS does not support automatic WiFi scanning.\nPlease connect to WiFi manually in Settings.',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                AppLocalizations.of(context)!.cancel,
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await AppSettings.openAppSettingsPanel(AppSettingsPanelType.wifi);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF9747FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                AppLocalizations.of(context)!.goToSettings,
+                style: const TextStyle(fontSize: 16),
               ),
             ),
           ],
@@ -472,7 +557,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
     );
   }
 
-  // 修改 UI 建構方法，添加手動刷新按鈕
+  // 修改 UI 建構方法，添加 iOS 支援但保持原本結構
   Widget _buildContent() {
     if (isScanning || _isRequestingPermissions) {
       return  Center(
@@ -482,7 +567,7 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
             CircularProgressIndicator(color: Colors.white),
             SizedBox(height: 16),
             Text(
-                AppLocalizations.of(context)!.scanningWifiNetworks,
+              AppLocalizations.of(context)!.scanningWifiNetworks,
               style: TextStyle(fontSize: 14, color: Colors.white),
             ),
           ],
@@ -507,23 +592,9 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
               style: const TextStyle(fontSize: 14, color: Color(0xFFFF00E5)),
             ),
             const SizedBox(height: 16),
-            // Row(
-            //   mainAxisAlignment: MainAxisAlignment.center,
-            //   children: [
-            //     // 添加手動檢查權限按鈕
-            //     ElevatedButton(
-            //       onPressed: () {
-            //         _checkPermissionStatusOnResume();
-            //       },
-            //       style: ElevatedButton.styleFrom(
-            //         backgroundColor: const Color(0xFF9747FF).withOpacity(0.7),
-            //         foregroundColor: Colors.white,
-            //       ),
-            //       child: const Text('Check Permission'),
-            //     ),
-            //
-            //     const SizedBox(width: 12),
-
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                 // 只有在非永久拒絕的情況下才顯示重試按鈕
                 if (!_permissionDeniedPermanently)
                   ElevatedButton(
@@ -557,17 +628,69 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
                 ),
               ],
             ),
-          // ],
-        // ),
+          ],
+        ),
       );
     }
 
     if (discoveredDevices.isEmpty) {
-      return  Center(
-        child: Text(
-          AppLocalizations.of(context)!.noWifiNetworksFound,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 16, color: Colors.white),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // **修改：在 iOS 平台且無設備時，顯示 WiFi 設定按鈕**
+            if (Platform.isIOS) ...[
+              Icon(
+                Icons.wifi_off_rounded,
+                color: const Color(0xFF9747FF).withOpacity(0.8),
+                size: 48,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'WiFi Network Setup Required',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'iOS does not support automatic WiFi scanning',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  _showIOSWifiGuidanceDialog(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF9747FF),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Connect to WiFi',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            ] else ...[
+              // Android 原本的顯示
+              Text(
+                AppLocalizations.of(context)!.noWifiNetworksFound,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16, color: Colors.white),
+              ),
+            ],
+          ],
         ),
       );
     }

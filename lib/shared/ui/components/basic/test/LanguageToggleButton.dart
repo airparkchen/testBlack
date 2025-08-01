@@ -7,6 +7,7 @@ import 'package:whitebox/shared/theme/app_theme.dart';
 /// 語言功能配置 - 暫時內嵌在此文件中
 class LanguageFeatureConfig {
   /// 是否啟用語言切換功能
+  /// 記得也要去language_test_wrapper中開啟
   /// true: 顯示所有語言切換按鈕  false: 隱藏所有語言切換按鈕  開關按鈕
   static const bool enableLanguageSwitch = true;
 
