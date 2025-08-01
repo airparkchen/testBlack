@@ -103,7 +103,7 @@ class MyApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: LocaleProvider.supportedLocales,
-            locale: localeProvider.locale,  // 🔥 現在這個變數有定義了
+            locale: localeProvider.locale,  // 現在這個變數有定義了
 
             theme: ThemeData(
               primarySwatch: Colors.grey,

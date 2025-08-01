@@ -18,22 +18,32 @@ class LocaleProvider with ChangeNotifier {
     _loadSavedLocale();
   }
 
-  // 從存儲中加載上次使用的語言設定
+  // 修正成隨著系統更新
   Future<void> _loadSavedLocale() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final languageCode = prefs.getString('languageCode');
-      final countryCode = prefs.getString('countryCode');
 
       if (languageCode != null) {
-        _locale = Locale(languageCode, countryCode);
-        notifyListeners();
+        // 使用儲存的語言設定
+        _locale = Locale(languageCode);
+      } else {
+        // 沒有儲存設定時，使用系統語言
+        final systemLocale = WidgetsBinding.instance.platformDispatcher.locale;
+
+        // 檢查系統語言是否支援
+        if (systemLocale.languageCode == 'ja') {
+          _locale = const Locale('ja');
+        } else {
+          _locale = const Locale('en');  // 預設英文
+        }
       }
+
+      notifyListeners();
     } catch (e) {
       debugPrint('載入語言設定時出錯: $e');
     }
   }
-
   // 設置新的語言並儲存
   Future<void> setLocale(Locale locale) async {
     // 檢查是否支援該語言
