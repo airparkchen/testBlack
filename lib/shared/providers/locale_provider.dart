@@ -32,6 +32,8 @@ class LocaleProvider with ChangeNotifier {
         final systemLocale = WidgetsBinding.instance.platformDispatcher.locale;
 
         // 檢查系統語言是否支援
+        print("==========================================");
+        print(languageCode);
         if (systemLocale.languageCode == 'ja') {
           _locale = const Locale('ja');
         } else {

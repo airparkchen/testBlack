@@ -125,7 +125,7 @@ class _LanguageTestWrapperState extends State<LanguageTestWrapper>
   /// 當 LocaleProvider 的語言改變時呼叫
   void _onLocaleChanged() {
     // 確保在 widget 已經被 mount 到 tree 上的情況下才顯示 SnackBar
-    if (mounted && widget.enabled) {
+    if (mounted) {
       _showLanguageSwitchedMessage();
     }
   }

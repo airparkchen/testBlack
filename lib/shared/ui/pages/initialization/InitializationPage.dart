@@ -6,8 +6,7 @@ import 'package:whitebox/shared/ui/components/basic/WifiScannerComponent.dart';
 import 'package:whitebox/shared/ui/pages/initialization/WifiSettingFlowPage.dart';
 import 'package:whitebox/shared/api/wifi_api_service.dart';
 import 'package:whitebox/shared/theme/app_theme.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-
+import 'package:whitebox/shared/config/language/app_localizations.dart';
 import 'LoginPage.dart';
 
 class InitializationPage extends StatefulWidget {

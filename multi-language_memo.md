@@ -279,7 +279,7 @@ Text(appLocalizations.timeAgo(3)); // "3 hours ago" 或阿拉伯語對應文字
 Directionality(
   textDirection: TextDirection.ltr, // 強制從左到右
   child: YourWidget(),
-)
+)/home/parker6/Desktop/Parker/whiteboxapp_github
 ```
 
 ### 問題3: 找不到AppLocalizations類

@@ -1,4 +1,8 @@
+# l10n.yaml
 arb-dir: lib/shared/config/language
 template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
 output-class: AppLocalizations
+output-dir: lib/shared/config/language/  # 指定生成檔案的輸出目錄
+nullable-getter: false
+synthetic-package: false
