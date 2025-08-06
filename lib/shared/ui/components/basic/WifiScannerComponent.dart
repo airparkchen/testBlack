@@ -7,7 +7,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:io';
 import 'package:app_settings/app_settings.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:whitebox/shared/config/language/app_localizations.dart';
+import 'package:flutter/cupertino.dart';
 
 // WiFi掃描元件回調函數類型
 typedef OnWifiScanComplete = void Function(List<WiFiAccessPoint> devices, String? error);
@@ -81,6 +82,8 @@ class WifiScannerComponent extends StatefulWidget {
 class _WifiScannerComponentState extends State<WifiScannerComponent>
     with WidgetsBindingObserver {
 
+  // Scroll bar可滑動變數
+  late ScrollController _scrollController;
   // 狀態變數
   List<WiFiAccessPoint> discoveredDevices = [];
   bool isScanning = false;
@@ -109,6 +112,9 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
         startScan();
       });
     }
+
+    //scroll bar滑動功能
+    _scrollController = ScrollController();
   }
 
   @override
@@ -120,6 +126,8 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
     if (widget.controller != null) {
       widget.controller!._unregisterState();
     }
+
+    _scrollController.dispose();
 
     super.dispose();
   }
@@ -553,7 +561,31 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
     return _appTheme.whiteBoxTheme.buildStandardCard(
       width: screenSize.width * 0.9,
       height: cardHeight,
-      child: _buildContent(),
+      child: Padding(
+        padding: const EdgeInsets.only(right: 12.0), // 在整個卡片右邊預留空間
+        child: CupertinoScrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          thickness: 4.0,
+          radius: const Radius.circular(2.0),
+          mainAxisMargin: 3.0,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: ListView.separated(
+              controller: _scrollController,
+              padding: EdgeInsets.zero,
+              itemCount: discoveredDevices.length,
+              separatorBuilder: (context, index) => Divider(
+                height: 1,
+                color: Colors.white.withOpacity(0.1),
+              ),
+              itemBuilder: (context, index) {
+                return _buildDeviceListItem(discoveredDevices[index]);
+              },
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -697,15 +729,13 @@ class _WifiScannerComponentState extends State<WifiScannerComponent>
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: RawScrollbar(
-        thumbVisibility: true,  // 只在需要時顯示
+      child: CupertinoScrollbar(
+        controller: _scrollController,
+        thumbVisibility: true,
         thickness: 4.0,
         radius: const Radius.circular(2.0),
-        thumbColor: const Color(0xFF9747FF).withOpacity(0.6),  // 您的主題色但更透明
-        trackVisibility: false,
-        crossAxisMargin: -12.0,  // 滾動條距離右邊界的距離
-        mainAxisMargin: 3.0,
         child: ListView.separated(
+          controller: _scrollController,
           padding: EdgeInsets.zero,
           itemCount: discoveredDevices.length,
           separatorBuilder: (context, index) => Divider(
