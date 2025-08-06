@@ -24,15 +24,15 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
   String qrResult = '';
   bool isScanning = true;
   bool _isCameraInitFailed = false;
-  bool _permissionsRequested = false;
+  // 🔧 移除：_permissionsRequested 變數
 
   // QR Code WiFi 相關變數
   String? _scannedSSID;
   String? _scannedPassword;
   String? _scannedSecurity;
-  bool _showNextButton = false; // 控制是否顯示 Next 按鈕
-  bool _waitingForConnection = false; // 新增：等待用戶連接 WiFi 的狀態
-  bool _isDialogShowing = false; // 🎯 新增：追蹤是否有對話框正在顯示
+  bool _showNextButton = false;
+  bool _waitingForConnection = false;
+  bool _isDialogShowing = false;
 
   // ========== Auto Focus 相關變數 ==========
   Timer? _autoFocusTimer;
@@ -41,8 +41,7 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeScanner();
-    _requestPermissionsQuietly();
+    _initializeWithPermissionCheck(); // 🔧 修改：使用新的初始化方法
   }
 
   @override
@@ -60,8 +59,9 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
 
     if (state == AppLifecycleState.resumed) {
       print('🔍 QR Scanner 頁面回到前台');
-      // 重新啟動 Auto Focus
-      _startAutoFocus();
+
+      // 🔧 新增：回到前台時檢查權限並重新初始化相機
+      _checkPermissionsAndReinitializeCamera();
 
       // 🎯 新增：如果正在等待連接，自動檢測 WiFi
       if (_waitingForConnection && _scannedSSID != null) {
@@ -71,6 +71,193 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
     } else if (state == AppLifecycleState.paused) {
       // 暫停 Auto Focus
       _stopAutoFocus();
+    }
+  }
+
+  // 🔧 新增：初始化時檢查權限
+  Future<void> _initializeWithPermissionCheck() async {
+    print('🔍 開始初始化 QR Scanner');
+
+    // 每次進入都檢查權限
+    await _requestAndCheckPermissions();
+
+    // 檢查權限後初始化相機
+    await _initializeScanner();
+  }
+
+  // 🔧 新增：回到前台時檢查權限並重新初始化相機
+  Future<void> _checkPermissionsAndReinitializeCamera() async {
+    print('🔍 回到前台，檢查權限狀態');
+
+    // 檢查當前權限狀態
+    final cameraStatus = await Permission.camera.status;
+
+    print('🔍 當前相機權限狀態: $cameraStatus');
+
+    if (cameraStatus.isGranted) {
+      // 權限已獲得
+      if (_isCameraInitFailed || _controller == null) {
+        print('🔍 權限已獲得，重新初始化相機');
+        await _reinitializeCamera();
+      } else {
+        // 相機正常，重新啟動 Auto Focus
+        _startAutoFocus();
+      }
+    } else {
+      // 權限未獲得，設置失敗狀態
+      print('🔍 權限未獲得，設置相機失敗狀態');
+      setState(() {
+        _isCameraInitFailed = true;
+      });
+    }
+  }
+
+  // 🔧 新增：重新初始化相機
+  Future<void> _reinitializeCamera() async {
+    try {
+      // 先釋放舊的控制器
+      _controller?.dispose();
+      _controller = null;
+
+      // 重置狀態
+      setState(() {
+        _isCameraInitFailed = false;
+      });
+
+      // 重新初始化
+      await _initializeScanner();
+
+      print('🔍 相機重新初始化成功');
+    } catch (e) {
+      print('🔍 重新初始化相機失敗: $e');
+      setState(() {
+        _isCameraInitFailed = true;
+      });
+    }
+  }
+
+  // 🔧 修改：權限請求和檢查（每次都執行）
+  Future<void> _requestAndCheckPermissions() async {
+    try {
+      print('🔍 檢查並請求權限');
+
+      // 檢查當前權限狀態
+      final cameraStatus = await Permission.camera.status;
+      final locationStatus = await Permission.locationWhenInUse.status;
+
+      print('🔍 相機權限狀態: $cameraStatus');
+      print('🔍 位置權限狀態: $locationStatus');
+
+      // 如果權限未獲得，請求權限
+      if (!cameraStatus.isGranted) {
+        final newCameraStatus = await Permission.camera.request();
+        print('🔍 請求相機權限結果: $newCameraStatus');
+      }
+
+      if (!locationStatus.isGranted) {
+        final newLocationStatus = await Permission.locationWhenInUse.request();
+        print('🔍 請求位置權限結果: $newLocationStatus');
+      }
+
+    } catch (e) {
+      print('🔍 權限請求失敗: $e');
+    }
+  }
+
+  // 🔧 修改：相機初始化方法
+  Future<void> _initializeScanner() async {
+    try {
+      // 先檢查相機權限
+      final cameraStatus = await Permission.camera.status;
+
+      if (!cameraStatus.isGranted) {
+        print('🔍 相機權限未獲得，無法初始化相機');
+        setState(() {
+          _isCameraInitFailed = true;
+        });
+        return;
+      }
+
+      print('🔍 開始初始化相機控制器');
+
+      _controller = MobileScannerController(
+        detectionSpeed: DetectionSpeed.normal,
+        facing: CameraFacing.back,
+        torchEnabled: false,
+        returnImage: false,
+        detectionTimeoutMs: 1000,
+        formats: [BarcodeFormat.qrCode], // 只掃描 QR Code，提升效能
+      );
+
+      // 啟動 Auto Focus
+      _startAutoFocus();
+
+      print('🔍 相機初始化成功');
+
+      // 確保 UI 更新
+      if (mounted) {
+        setState(() {
+          _isCameraInitFailed = false;
+        });
+      }
+
+    } catch (e) {
+      print('🔍 相機初始化失敗: $e');
+      if (mounted) {
+        setState(() {
+          _isCameraInitFailed = true;
+        });
+      }
+    }
+  }
+
+  void _startAutoFocus() {
+    _autoFocusTimer?.cancel();
+    _autoFocusTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      try {
+        if (_controller != null && mounted) {
+          await _controller!.resetZoomScale();
+        }
+      } catch (e) {
+        print('🔍 Auto focus 錯誤: $e');
+      }
+    });
+  }
+
+  void _stopAutoFocus() {
+    _autoFocusTimer?.cancel();
+    _autoFocusTimer = null;
+  }
+
+  // 手動對焦
+  Future<void> _handleTapToFocus() async {
+    print('🎯 觸發手動對焦');
+
+    try {
+      if (_controller != null) {
+        // 暫停自動對焦
+        _stopAutoFocus();
+
+        // 執行對焦操作
+        await _controller!.resetZoomScale();
+
+        print('🎯 對焦完成');
+
+        // 1秒後重新啟動自動對焦
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            _startAutoFocus();
+          }
+        });
+      }
+    } catch (e) {
+      print('🎯 對焦失敗: $e');
+      // 即使失敗也要重新啟動自動對焦
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          _startAutoFocus();
+        }
+      });
     }
   }
 
@@ -139,90 +326,6 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
       _isDialogShowing = false;
 
       _showErrorDialog('檢查失敗', '無法檢查當前 WiFi 連接狀態');
-    }
-  }
-
-  // 靜默請求權限
-  Future<void> _requestPermissionsQuietly() async {
-    if (!_permissionsRequested) {
-      try {
-        await Permission.camera.request();
-        await Permission.locationWhenInUse.request();
-        _permissionsRequested = true;
-      } catch (e) {
-        print('🔍 預先權限請求失敗: $e');
-      }
-    }
-  }
-
-  void _initializeScanner() {
-    try {
-      _controller = MobileScannerController(
-        detectionSpeed: DetectionSpeed.normal,
-        facing: CameraFacing.back,
-        torchEnabled: false,
-        returnImage: false,
-        detectionTimeoutMs: 1000,
-        formats: [BarcodeFormat.qrCode], // 只掃描 QR Code，提升效能
-      );
-
-      // 啟動 Auto Focus
-      _startAutoFocus();
-    } catch (e) {
-      print('🔍 Camera initialization failed: $e');
-      setState(() {
-        _isCameraInitFailed = true;
-      });
-    }
-  }
-
-  void _startAutoFocus() {
-    _autoFocusTimer?.cancel();
-    _autoFocusTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
-      try {
-        if (_controller != null && mounted) {
-          await _controller!.resetZoomScale();
-        }
-      } catch (e) {
-        print('🔍 Auto focus 錯誤: $e');
-      }
-    });
-  }
-
-  void _stopAutoFocus() {
-    _autoFocusTimer?.cancel();
-    _autoFocusTimer = null;
-  }
-
-  // 手動對焦
-  Future<void> _handleTapToFocus() async {
-    print('🎯 觸發手動對焦');
-
-    try {
-      if (_controller != null) {
-        // 暫停自動對焦
-        _stopAutoFocus();
-
-        // 執行對焦操作
-        await _controller!.resetZoomScale();
-
-        print('🎯 對焦完成');
-
-        // 1秒後重新啟動自動對焦
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            _startAutoFocus();
-          }
-        });
-      }
-    } catch (e) {
-      print('🎯 對焦失敗: $e');
-      // 即使失敗也要重新啟動自動對焦
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          _startAutoFocus();
-        }
-      });
     }
   }
 
@@ -1056,41 +1159,130 @@ class _QrCodeScannerPageState extends State<QrCodeScannerPage>
   }
 
   Widget _buildCameraView(double width, double height) {
-    // 如果相機初始化失敗，顯示錯誤信息
+    // 🔧 修正：如果相機初始化失敗，保持原有風格的錯誤顯示
     if (_isCameraInitFailed) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 48),
-            SizedBox(height: 16),
-            Text(
-              'Camera initialization failed',
-              style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.bold),
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          // 背景 - 保持與正常相機視圖一致的外觀
+          Container(
+            width: width,
+            height: height,
+            color: Colors.black,
+          ),
+
+          // 錯誤信息覆蓋層
+          Container(
+            width: width,
+            height: height,
+            color: Colors.black.withOpacity(0.8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.camera_alt_outlined, color: Colors.white54, size: 48),
+                SizedBox(height: 16),
+                Text(
+                  'Camera Permission Required',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Please enable camera access in Settings',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 8),
-            Text(
-              'Please check camera permissions',
-              style: TextStyle(color: Colors.grey[700]),
+          ),
+
+          // 🔧 修正：設定按鈕 - 與 "Tap to Focus" 相同的位置和風格
+          Positioned(
+            bottom: 10,
+            left: 10,
+            child: GestureDetector(
+              onTap: () async {
+                print('🔍 開啟系統設定');
+                try {
+                  // 🔧 修正：使用 asAnotherTask: true 完全跳出 App
+                  await AppSettings.openAppSettings(
+                    asAnotherTask: true, // 🎯 關鍵：在不同的 Activity 中開啟設定
+                  );
+                } catch (e) {
+                  print('🔍 開啟應用設定失敗: $e');
+                  // 如果失敗，嘗試不同的設定類型
+                  try {
+                    await AppSettings.openAppSettings(
+                      type: AppSettingsType.settings,
+                      asAnotherTask: true,
+                    );
+                  } catch (e2) {
+                    print('🔍 備用設定方法也失敗: $e2');
+                  }
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.settings,
+                      color: const Color(0xFF9747FF),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Open Settings',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     // 如果相機控制器為空，顯示加載動畫
     if (_controller == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Initializing camera...',
-              style: TextStyle(color: Colors.grey[700]),
-            ),
-          ],
+      return Container(
+        width: width,
+        height: height,
+        color: Colors.black, // 🔧 修正：黑色背景保持一致性
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: const Color(0xFF9747FF)),
+              SizedBox(height: 16),
+              Text(
+                'Initializing camera...',
+                style: TextStyle(
+                  color: Colors.white70, // 🔧 修正：白色文字在黑背景上
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
