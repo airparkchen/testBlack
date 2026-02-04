@@ -1,4 +1,4 @@
-# Wi-Fi 5G IoT App 框架 - 完整開發指南
+# Wi-Fi 5G IoT App 框架 
 
 一個模組化的 Flutter 應用框架，專為物聯網、Wi-Fi 和 5G 設備管理設計，支援多產品線的設備控制與監控。
 
@@ -528,8 +528,3 @@ flutter build ios --release
 - **Flutter 官方文檔**: https://flutter.dev/docs
 - **Dart 語言指南**: https://dart.dev/guides
 - **API 參考**: Swagger UI 
-
----
-
-**完整的模組化解決方案**  
-*從初始化設定到高級網路拓樸管理*
